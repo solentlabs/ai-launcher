@@ -1,3 +1,3 @@
-"""Claude Launcher - Fast context switching for Claude Code projects."""
+"""AI Launcher - Fast context switching for AI coding assistant projects."""
 
 __version__ = "0.1.0"

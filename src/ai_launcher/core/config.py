@@ -1,4 +1,11 @@
-"""Configuration management for claude-launcher."""
+"""Configuration management for ai-launcher.
+
+This module handles loading, saving, and validating configuration from TOML files.
+It manages scan paths, UI preferences, provider selection, and cleanup settings.
+
+Author: Solent Labs™
+Last Modified: 2026-02-10 (Added cleanup config support)
+"""
 
 import sys
 from pathlib import Path
@@ -19,7 +26,15 @@ else:
 
 import tomli_w
 
-from ai_launcher.core.models import ConfigData, HistoryConfig, ScanConfig, UIConfig
+from ai_launcher.core.models import (
+    CleanupConfig,
+    ConfigData,
+    ContextConfig,
+    HistoryConfig,
+    ProviderConfig,
+    ScanConfig,
+    UIConfig,
+)
 
 
 class ConfigManager:
@@ -32,7 +47,7 @@ class ConfigManager:
             config_path: Optional path to config file. If None, uses platform default.
         """
         if config_path is None:
-            self.config_path = user_config_path("claude-launcher") / "config.toml"
+            self.config_path = user_config_path("ai-launcher") / "config.toml"
         else:
             self.config_path = config_path
 
@@ -90,6 +105,8 @@ class ConfigManager:
             ui=UIConfig(
                 preview_width=70,
                 show_git_status=True,
+                set_terminal_title=True,
+                terminal_title_format="{project} → {provider}",
             ),
             history=HistoryConfig(
                 max_entries=50,
@@ -131,6 +148,10 @@ class ConfigManager:
         ui = UIConfig(
             preview_width=ui_data.get("preview_width", 70),
             show_git_status=ui_data.get("show_git_status", True),
+            set_terminal_title=ui_data.get("set_terminal_title", True),
+            terminal_title_format=ui_data.get(
+                "terminal_title_format", "{project} → {provider}"
+            ),
         )
 
         # Parse history config
@@ -139,7 +160,37 @@ class ConfigManager:
             max_entries=history_data.get("max_entries", 50),
         )
 
-        return ConfigData(scan=scan, ui=ui, history=history)
+        # Parse provider config
+        provider_data = data.get("provider", {})
+        provider = ProviderConfig(
+            default=provider_data.get("default", "claude-code"),
+            per_project=provider_data.get("per_project", {}),
+        )
+
+        # Parse context config
+        context_data = data.get("context", {})
+        context = ContextConfig(
+            global_files=context_data.get("global_files", []),
+        )
+
+        # Parse cleanup config
+        cleanup_data = data.get("cleanup", {})
+        cleanup = CleanupConfig(
+            enabled=cleanup_data.get("enabled", False),
+            clean_provider_files=cleanup_data.get("clean_provider_files", True),
+            clean_system_cache=cleanup_data.get("clean_system_cache", False),
+            clean_npm_cache=cleanup_data.get("clean_npm_cache", False),
+            debug_logs_max_age_days=cleanup_data.get("debug_logs_max_age_days", 7),
+        )
+
+        return ConfigData(
+            scan=scan,
+            ui=ui,
+            history=history,
+            provider=provider,
+            context=context,
+            cleanup=cleanup,
+        )
 
     def _config_to_dict(self, config: ConfigData) -> Dict[str, Any]:
         """Convert ConfigData to dictionary for TOML serialization.
@@ -159,9 +210,25 @@ class ConfigManager:
             "ui": {
                 "preview_width": config.ui.preview_width,
                 "show_git_status": config.ui.show_git_status,
+                "set_terminal_title": config.ui.set_terminal_title,
+                "terminal_title_format": config.ui.terminal_title_format,
             },
             "history": {
                 "max_entries": config.history.max_entries,
+            },
+            "provider": {
+                "default": config.provider.default,
+                "per_project": config.provider.per_project,
+            },
+            "context": {
+                "global_files": config.context.global_files,
+            },
+            "cleanup": {
+                "enabled": config.cleanup.enabled,
+                "clean_provider_files": config.cleanup.clean_provider_files,
+                "clean_system_cache": config.cleanup.clean_system_cache,
+                "clean_npm_cache": config.cleanup.clean_npm_cache,
+                "debug_logs_max_age_days": config.cleanup.debug_logs_max_age_days,
             },
         }
 
@@ -183,7 +250,7 @@ class ConfigManager:
             ConfigData with user-provided values
         """
         try:
-            print("=== Claude Launcher First-Time Setup ===\n")
+            print("=== AI Launcher First-Time Setup ===\n")
 
             # Get scan paths
             paths = []
@@ -230,12 +297,12 @@ class ConfigManager:
 
 
 def get_data_dir() -> Path:
-    """Get the data directory for claude-launcher.
+    """Get the data directory for ai-launcher.
 
     Returns:
         Path to data directory (for database, cache, etc.)
     """
-    data_dir = Path(user_data_path("claude-launcher"))
+    data_dir = Path(user_data_path("ai-launcher"))
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 

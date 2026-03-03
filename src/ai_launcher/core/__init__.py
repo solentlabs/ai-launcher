@@ -1,1 +1,1 @@
-"""Core functionality for claude-launcher."""
+"""Core functionality for ai-launcher."""

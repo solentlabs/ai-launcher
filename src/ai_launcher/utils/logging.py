@@ -1,4 +1,4 @@
-"""Logging configuration for claude-launcher."""
+"""Logging configuration for ai-launcher."""
 
 import logging
 import sys
@@ -13,7 +13,7 @@ def setup_logging(
     log_file: Optional[Path] = None,
     verbose: bool = False,
 ) -> logging.Logger:
-    """Configure logging for claude-launcher.
+    """Configure logging for ai-launcher.
 
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR)
@@ -45,9 +45,9 @@ def setup_logging(
     # File handler (if log file specified or in debug mode)
     if log_file or verbose:
         if log_file is None:
-            log_dir = user_log_path("claude-launcher")
+            log_dir = user_log_path("ai-launcher")
             log_dir.mkdir(parents=True, exist_ok=True)
-            log_file = log_dir / "claude-launcher.log"
+            log_file = log_dir / "ai-launcher.log"
 
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)

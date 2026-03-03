@@ -1,4 +1,4 @@
-"""Project discovery for claude-launcher."""
+"""Project discovery for ai-launcher."""
 
 import os
 from pathlib import Path

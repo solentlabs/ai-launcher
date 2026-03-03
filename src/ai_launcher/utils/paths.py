@@ -1,4 +1,4 @@
-"""Path utilities for claude-launcher."""
+"""Path utilities for ai-launcher."""
 
 import os
 from pathlib import Path

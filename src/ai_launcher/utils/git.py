@@ -1,11 +1,8 @@
-"""Git utilities for claude-launcher."""
+"""Git utilities for ai-launcher."""
 
 import subprocess  # nosec B404
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
-
-if TYPE_CHECKING:
-    from ai_launcher.core.storage import Storage
+from typing import Optional
 
 
 def clone_repository(
@@ -69,80 +66,3 @@ def clone_repository(
         raise RuntimeError(f"Git clone failed: {error_msg}")
     except FileNotFoundError:
         raise RuntimeError("Git command not found. Please install git.")
-
-
-def interactive_clone(storage: "Storage") -> Optional[Path]:
-    """Interactive git clone workflow.
-
-    Args:
-        storage: Storage instance for adding manual paths
-
-    Returns:
-        Path to cloned repository or None if cancelled
-    """
-
-    # Get git URL
-    print("\n=== Clone Git Repository ===\n")
-    url = input("Git repository URL (https:// or git@): ").strip()
-
-    if not url:
-        print("Cancelled.")
-        return None
-
-    # Validate URL
-    if not (url.startswith("https://") or url.startswith("git@")):
-        print("Error: Invalid URL. Must start with 'https://' or 'git@'")
-        return None
-
-    # Get target folder
-    print("\nSelect target folder:")
-    print("  1. Home directory (~)")
-    print("  2. ~/projects")
-    print("  3. ~/work")
-    print("  4. Custom path")
-
-    choice = input("\nChoice (1-4): ").strip()
-
-    if choice == "1":
-        target_base = Path.home()
-        subfolder = None
-    elif choice == "2":
-        target_base = Path.home()
-        subfolder = "projects"
-    elif choice == "3":
-        target_base = Path.home()
-        subfolder = "work"
-    elif choice == "4":
-        custom = input("Enter custom path: ").strip()
-        if not custom:
-            print("Cancelled.")
-            return None
-        target_base = Path(custom).expanduser().resolve()
-        subfolder = None
-    else:
-        print("Invalid choice.")
-        return None
-
-    # Clone
-    try:
-        cloned_path = clone_repository(url, target_base, subfolder)
-
-        # Ask if they want to add as manual path
-        print(f"\nCloned to: {cloned_path}")
-        add_manual = input("Add to manual paths? (y/n): ").strip().lower()
-
-        if add_manual == "y":
-            storage.add_manual_path(cloned_path)
-            print("Added to manual paths.")
-
-        # Ask if they want to launch Claude
-        launch = input("Launch Claude now? (y/n): ").strip().lower()
-
-        if launch == "y":
-            return cloned_path
-
-        return None
-
-    except (ValueError, RuntimeError) as e:
-        print(f"\nError: {e}")
-        return None
