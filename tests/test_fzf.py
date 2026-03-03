@@ -255,8 +255,9 @@ class TestDownloadFzf:
 
         assert result == install_dir / "fzf"
         assert result.exists()
-        # Verify executable bit is set
-        assert result.stat().st_mode & stat.S_IXUSR
+        # Verify executable bit is set (only meaningful on Unix filesystems)
+        if os.name != "nt":
+            assert result.stat().st_mode & stat.S_IXUSR
 
     def test_download_zip(self, tmp_path):
         archive_data = _make_zip_archive("fzf.exe")
