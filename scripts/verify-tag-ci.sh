@@ -47,8 +47,17 @@ fi
 COMMIT=$(git rev-parse HEAD)
 echo "Checking CI status for commit ${COMMIT:0:8}..."
 
-# Get CI status
-STATUS=$(gh api "repos/{owner}/{repo}/commits/$COMMIT/status" --jq '.state' 2>/dev/null || echo "unknown")
+# Use check-runs API (matches tag-protection.yml) — only look at CI test jobs
+STATUS=$(gh api "repos/{owner}/{repo}/commits/$COMMIT/check-runs" \
+    --paginate \
+    --jq '[.check_runs[] | select(.name | startswith("test ("))] |
+          if length == 0 then "pending"
+          elif all(.status == "completed") then
+            if all(.conclusion == "success") then "success"
+            else "failure"
+            end
+          else "pending"
+          end' 2>/dev/null || echo "unknown")
 
 case "$STATUS" in
     success)
@@ -60,7 +69,7 @@ case "$STATUS" in
         echo "  Wait for CI to complete before pushing tags."
         exit 1
         ;;
-    failure|error)
+    failure)
         echo -e "${RED}✗ CI failed on ${COMMIT:0:8}${NC}"
         echo "  Fix CI failures before pushing tags."
         exit 1
