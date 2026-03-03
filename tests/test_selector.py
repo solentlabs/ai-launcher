@@ -122,7 +122,9 @@ def test_select_project_empty_list(capsys):
 @patch("subprocess.Popen")
 @patch("ai_launcher.ui.selector.build_tree_view")
 @patch("ai_launcher.ui.selector.clear_screen")
-def test_select_project_fzf_not_found(mock_clear, mock_tree, mock_popen, tmp_path, capsys):
+def test_select_project_fzf_not_found(
+    mock_clear, mock_tree, mock_popen, tmp_path, capsys
+):
     """Test handling when fzf is not installed."""
     from ai_launcher.ui.selector import select_project
 

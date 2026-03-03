@@ -112,7 +112,7 @@ fi
         if selected == ".":
             # Select current directory
             return current_path
-        elif selected == "..":
+        if selected == "..":
             # Navigate up
             current_path = current_path.parent
         else:

@@ -9,9 +9,9 @@ import pytest
 from ai_launcher.ui.startup_report import (
     ContextSource,
     StartupReport,
-    generate_startup_report,
-    _visual_length,
     _pad_line,
+    _visual_length,
+    generate_startup_report,
 )
 
 
@@ -179,7 +179,9 @@ class TestStartupReport:
         memory_dir = tmp_path / ".claude" / "projects" / encoded_path / "memory"
         memory_dir.mkdir(parents=True)
         memory_file = memory_dir / "MEMORY.md"
-        memory_file.write_text("# Memory\n" * 160)  # 160 lines (>150 to trigger warning)
+        memory_file.write_text(
+            "# Memory\n" * 160
+        )  # 160 lines (>150 to trigger warning)
 
         with patch("ai_launcher.ui.startup_report.Path.home", return_value=tmp_path):
             report = StartupReport(project_dir)
@@ -188,7 +190,9 @@ class TestStartupReport:
             source = report.sources[0]
             assert source.status == "loaded"
             assert source.line_count == 160
-            assert any("approaching 200-line limit" in hint.lower() for hint in source.hints)
+            assert any(
+                "approaching 200-line limit" in hint.lower() for hint in source.hints
+            )
 
     def test_check_auto_memory_missing(self, tmp_path):
         """Test _check_auto_memory when MEMORY.md doesn't exist."""
@@ -342,7 +346,9 @@ class TestStartupReport:
 
         assert "Claude Code Startup Context Report" in output
         # Hints should not appear (check for hint indicators)
-        assert "💡" not in output or "Tips for Maximizing" in output  # Footer tips are ok
+        assert (
+            "💡" not in output or "Tips for Maximizing" in output
+        )  # Footer tips are ok
 
     def test_format_summary(self, temp_project):
         """Test format_summary() generates compact summary."""
@@ -528,7 +534,9 @@ class TestIntegration:
             summary = generate_startup_report(project_dir, summary_only=True)
 
             # Should show missing sources
-            assert "missing" in full_report.lower() or "not present" in full_report.lower()
+            assert (
+                "missing" in full_report.lower() or "not present" in full_report.lower()
+            )
             assert "⚪" in summary or "❌" in summary
 
             # Should provide hints

@@ -1,7 +1,5 @@
 """Integration tests for ai-launcher."""
 
-from pathlib import Path
-
 from ai_launcher.core.config import ConfigManager
 from ai_launcher.core.discovery import get_all_projects
 from ai_launcher.core.models import Project

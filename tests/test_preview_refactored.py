@@ -8,10 +8,7 @@ Author: Solent Labs™
 Created: 2026-02-12
 """
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from ai_launcher.core.provider_data import ContextFile, ProviderPreviewData
 from ai_launcher.ui.preview import generate_provider_preview
@@ -65,7 +62,9 @@ class TestGenerateProviderPreview:
     def test_generate_provider_preview_data_collection_error(self, tmp_path):
         """Test preview generation when data collection fails."""
         mock_provider = MagicMock()
-        mock_provider.collect_preview_data.side_effect = Exception("Data collection failed")
+        mock_provider.collect_preview_data.side_effect = Exception(
+            "Data collection failed"
+        )
 
         with patch("ai_launcher.providers.registry.ProviderRegistry") as MockRegistry:
             MockRegistry.return_value.get.return_value = mock_provider

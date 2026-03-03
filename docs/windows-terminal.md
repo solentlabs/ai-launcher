@@ -31,7 +31,7 @@ Add this profile to the `profiles.list` array:
     "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher ~/projects'",
     "guid": "{YOUR-UNIQUE-GUID}",
     "icon": "C:\\Users\\YOUR_USERNAME\\AppData\\Local\\wsl\\DISTRO_ID\\shortcut.ico",
-    "name": "Claude Code",
+    "name": "AI Launcher",
     "startingDirectory": "//wsl.localhost/Ubuntu/home/YOUR_USERNAME/projects"
 }
 ```
@@ -82,14 +82,18 @@ Create separate profiles for different project folders:
    wsl.exe -d Ubuntu bash -lic 'ai-launcher ~/projects'
    ```
 
-### Claude not found
+### AI provider CLI not found
 
-Ensure Claude Code CLI is installed in WSL:
+Ensure your chosen AI provider CLI is installed in WSL:
 ```bash
-which claude
+which claude   # Claude Code
+which gemini   # Gemini CLI
+which cursor   # Cursor
+which aider    # Aider
+which copilot  # GitHub Copilot CLI
 ```
 
-If not found, install Claude Code CLI in your WSL environment.
+If not found, install the appropriate CLI in your WSL environment.
 
 ### Path issues
 

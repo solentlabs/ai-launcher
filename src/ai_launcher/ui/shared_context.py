@@ -15,7 +15,9 @@ def clear_screen() -> None:
     print("\033[2J\033[H", end="")
 
 
-def add_global_files(config_manager: ConfigManager, scan_paths: Optional[List[Path]] = None) -> bool:
+def add_global_files(
+    config_manager: ConfigManager, scan_paths: Optional[List[Path]] = None
+) -> bool:
     """Simple interface to add global files.
 
     Args:
@@ -68,7 +70,7 @@ def add_global_files(config_manager: ConfigManager, scan_paths: Optional[List[Pa
     try:
         preview_cmd = (
             "path=$(echo {1} | sed 's|^~|'$HOME'|'); "
-            "if [ -f \"$path\" ]; then cat \"$path\"; fi"
+            'if [ -f "$path" ]; then cat "$path"; fi'
         )
 
         process = subprocess.Popen(
@@ -105,7 +107,9 @@ def add_global_files(config_manager: ConfigManager, scan_paths: Optional[List[Pa
             return False
 
         # Add to config
-        config.context.global_files = sorted(set(config.context.global_files) | set(selected_paths))
+        config.context.global_files = sorted(
+            set(config.context.global_files) | set(selected_paths)
+        )
         config_manager.save(config)
         return True
 
@@ -149,7 +153,7 @@ def remove_global_files(config_manager: ConfigManager) -> bool:
     try:
         preview_cmd = (
             "path=$(echo {1} | sed 's|^~|'$HOME'|'); "
-            "if [ -f \"$path\" ]; then cat \"$path\"; "
+            'if [ -f "$path" ]; then cat "$path"; '
             "else echo 'File not found'; fi"
         )
 
@@ -181,13 +185,15 @@ def remove_global_files(config_manager: ConfigManager) -> bool:
 
         # Parse selected files
         selected_lines = stdout.strip().split("\n")
-        selected_paths = set(line.split("\t\t")[0] for line in selected_lines if line)
+        selected_paths = {line.split("\t\t")[0] for line in selected_lines if line}
 
         if not selected_paths:
             return False
 
         # Remove from config
-        config.context.global_files = sorted(set(config.context.global_files) - selected_paths)
+        config.context.global_files = sorted(
+            set(config.context.global_files) - selected_paths
+        )
         config_manager.save(config)
         return True
 
@@ -216,10 +222,12 @@ def _find_markdown_files(scan_paths: Optional[List[Path]] = None) -> List[Path]:
         for scan_path in scan_paths:
             search_paths.append((scan_path, str(scan_path)))
     else:
-        search_paths.extend([
-            (home / "projects", "~/projects"),
-            (home / ".config", "~/.config"),
-        ])
+        search_paths.extend(
+            [
+                (home / "projects", "~/projects"),
+                (home / ".config", "~/.config"),
+            ]
+        )
 
     for search_path, _ in search_paths:
         if not search_path.exists():
@@ -228,11 +236,15 @@ def _find_markdown_files(scan_paths: Optional[List[Path]] = None) -> List[Path]:
         try:
             for md_file in search_path.rglob("*.md"):
                 # Skip hidden directories and common ignore patterns
-                if any(part.startswith(".") and part not in [".claude", ".config"]
-                       for part in md_file.parts):
+                if any(
+                    part.startswith(".") and part not in [".claude", ".config"]
+                    for part in md_file.parts
+                ):
                     continue
-                if any(ignore in str(md_file)
-                       for ignore in ["node_modules", ".git", ".cache", "__pycache__"]):
+                if any(
+                    ignore in str(md_file)
+                    for ignore in ["node_modules", ".git", ".cache", "__pycache__"]
+                ):
                     continue
 
                 # Only include files up to reasonable depth
@@ -246,5 +258,3 @@ def _find_markdown_files(scan_paths: Optional[List[Path]] = None) -> List[Path]:
             continue
 
     return md_files
-
-

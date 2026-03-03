@@ -40,10 +40,8 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "black>=23.0.0",
+    "ruff>=0.5.0",
     "mypy>=1.0.0",
-    "flake8>=6.0.0",
-    "isort>=5.12.0",
     "pre-commit>=3.0.0",
     "pytest-mock>=3.10.0",
 ]
@@ -64,26 +62,98 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=ai_launcher --cov-report=term-missing"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "-ra",
+    "--cov=ai_launcher",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=75",
+]
 
-[tool.black]
+[tool.coverage.run]
+source = ["src/ai_launcher"]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@overload",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.ruff]
 line-length = 88
-target-version = ['py38']
+target-version = "py38"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I",           # core + isort
+    "B", "C4", "UP", "SIM",       # quality
+    "ARG", "PTH", "RUF",          # unused args, pathlib, ruff
+    "S",                           # security (replaces bandit)
+    "PT",                          # pytest style
+    "C90",                         # complexity
+    "RET", "PIE", "PERF",         # returns, pie, perf
+]
+ignore = [
+    "E501",                        # line length handled by formatter
+    "E741",                        # ambiguous variable names (existing code)
+    "B008",                        # function call in default arg (typer)
+    "B904",                        # raise from in except (existing pattern)
+    "S101",                        # assert (in tests, handled by per-file)
+    "S110",                        # try-except-pass (intentional in many places)
+    "S108",                        # hardcoded temp directory
+    "C901",                        # complexity (many existing complex functions)
+    "PLR0913", "PLR0912", "PLR0915",
+    "PLR2004",
+    "SIM108",                      # ternary
+    "SIM117",                      # combine with statements (readability)
+    "RET504",                      # unnecessary assignment before return
+    "UP007",                       # use X | Y for union (needs 3.10+)
+    "PTH123",                      # open() vs Path.open() (existing pattern)
+    "PTH108",                      # os.unlink vs Path.unlink
+    "PTH208",                      # os.listdir vs Path.iterdir
+    "PERF203",                     # try-except in loop
+    "PERF401",                     # list comprehension (readability preference)
+    "PERF402",                     # list copy
+    "RUF001",                      # ambiguous unicode (intentional in UI)
+    "RUF005",                      # collection literal concatenation
+    "RUF012",                      # mutable class variable
+    "RUF059",                      # unused unpacked variable
+    "PIE810",                      # single starts/endswith call
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S105", "PLR2004", "ARG", "SLF001", "PT006", "PT011", "PT018"]
+"src/ai_launcher/cli.py" = ["T20", "F821"]
+"src/ai_launcher/ui/**/*.py" = ["T20", "F821", "F841", "S603", "S607", "ARG001", "ARG002"]
+"src/ai_launcher/core/**/*.py" = ["F821", "ARG001", "ARG002", "S603", "S607"]
+"src/ai_launcher/providers/**/*.py" = ["T20", "S603", "S607", "F821"]
+"src/ai_launcher/utils/**/*.py" = ["S603", "S607"]
+"scripts/**/*.py" = ["T20", "S603", "S607"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ai_launcher"]
+
+[tool.ruff.format]
+docstring-code-format = true
 
 [tool.mypy]
 python_version = "3.8"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-
-[tool.bandit]
-exclude_dirs = ["tests", "build", "dist"]
-skips = ["B101"]
-
-[tool.interrogate]
-ignore-init-method = true
-ignore-init-module = true
-fail-under = 50
-exclude = ["tests", "build", "dist"]
-verbose = 0
-quiet = false
+ignore_missing_imports = true

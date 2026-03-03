@@ -1,16 +1,16 @@
-"""Cursor CLI provider implementation.
+"""GitHub Copilot CLI provider implementation.
 
-This module implements the AIProvider interface for Cursor CLI, a terminal-based
-AI coding agent from Cursor.
+This module implements the AIProvider interface for GitHub Copilot CLI,
+GitHub's AI-powered coding assistant for the terminal.
 
 Installation:
-    curl https://cursor.com/install -fsS | bash
+    See https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli
 
 Documentation:
-    https://cursor.com/docs/cli/using
+    https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli
 
 Author: Solent Labs™
-Created: 2026-02-10
+Created: 2026-03-03
 """
 
 import os
@@ -27,66 +27,70 @@ if TYPE_CHECKING:
     from ai_launcher.core.models import CleanupConfig
 
 
-class CursorProvider(AIProvider):
-    """Cursor CLI provider implementation.
+class CopilotProvider(AIProvider):
+    """GitHub Copilot CLI provider implementation.
 
-    Cursor CLI is a terminal-based AI coding agent. The CLI command is 'agent'.
-    It reads .cursor/rules/ directory and AGENTS.md for project context.
+    GitHub Copilot CLI is a terminal-based AI coding assistant that integrates
+    with GitHub's Copilot service.
 
     Installation:
-        curl https://cursor.com/install -fsS | bash
+        See https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli
 
     Documentation:
-        https://cursor.com/docs/cli/using
+        https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli
     """
 
     @property
     def metadata(self) -> ProviderMetadata:
-        """Get Cursor CLI metadata.
+        """Get Copilot metadata.
 
         Returns:
-            ProviderMetadata with Cursor CLI-specific configuration
+            ProviderMetadata with Copilot-specific configuration
         """
         return ProviderMetadata(
-            name="cursor",
-            display_name="Cursor CLI",
-            command="agent",
-            description="AI coding agent in the terminal",
-            config_files=["AGENTS.md", ".cursorrules"],
+            name="copilot",
+            display_name="GitHub Copilot CLI",
+            command="copilot",
+            description="GitHub's AI coding assistant for the terminal",
+            config_files=[".github/copilot-instructions.md", "AGENTS.md"],
             requires_installation=True,
         )
 
     def is_installed(self) -> bool:
-        """Check if Cursor CLI is installed.
+        """Check if GitHub Copilot CLI is installed.
 
         Returns:
-            True if 'agent' command is available in PATH
+            True if 'copilot' command is available in PATH
         """
-        return shutil.which("agent") is not None
+        return shutil.which("copilot") is not None
 
     def launch(self, project_path: Path) -> None:
-        """Launch Cursor CLI in the specified project directory.
+        """Launch GitHub Copilot CLI in the specified project directory.
 
         Args:
             project_path: Path to the project directory
 
         Raises:
-            FileNotFoundError: If Cursor CLI is not found
-            subprocess.CalledProcessError: If Cursor CLI fails to launch
+            FileNotFoundError: If Copilot CLI is not found
+            subprocess.CalledProcessError: If Copilot fails to launch
         """
         # Change to project directory
         os.chdir(project_path)
 
-        # Launch Cursor CLI
+        # Launch Copilot
         try:
-            subprocess.run(["agent"], check=True)  # nosec B603, B607
+            subprocess.run(["copilot"], check=True)  # nosec B603, B607
         except FileNotFoundError:
-            print("Error: 'agent' command not found.")
-            print("Install: curl https://cursor.com/install -fsS | bash")
-            print("Docs: https://cursor.com/docs/cli/using")
+            print("Error: 'copilot' command not found.")
+            print(
+                "Install: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli"
+            )
+            print(
+                "Docs: https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli"
+            )
             sys.exit(1)
         except subprocess.CalledProcessError as e:
-            print(f"Error launching Cursor CLI: {e}")
+            print(f"Error launching Copilot: {e}")
             sys.exit(1)
         except KeyboardInterrupt:
             print("\nInterrupted by user.")
@@ -95,9 +99,9 @@ class CursorProvider(AIProvider):
     def cleanup_environment(
         self, verbose: bool = False, cleanup_config: Optional["CleanupConfig"] = None
     ) -> None:
-        """Clean Cursor-specific environment.
+        """Clean Copilot-specific environment.
 
-        Clears Cursor cache directory if it exists and cleanup is enabled.
+        Clears Copilot cache directory if it exists and cleanup is enabled.
 
         Args:
             verbose: Whether to print cleanup messages to stdout
@@ -108,27 +112,26 @@ class CursorProvider(AIProvider):
         if cleanup_config is None or not cleanup_config.enabled:
             return
 
-        # Only clean Cursor cache if provider-specific cleanup is enabled
+        # Only clean Copilot cache if provider-specific cleanup is enabled
         if not cleanup_config.clean_provider_files:
             return
 
-        # Cursor stores data in ~/.cursor
-        home = Path.home()
-        cursor_dir = home / ".cursor"
-        if cursor_dir.exists():
-            cache_dir = cursor_dir / "cache"
+        # Copilot stores config in ~/.config/github-copilot
+        copilot_dir = Path.home() / ".config" / "github-copilot"
+        if copilot_dir.exists():
+            cache_dir = copilot_dir / "cache"
             if cache_dir.exists():
                 try:
                     shutil.rmtree(cache_dir, ignore_errors=True)
                     if verbose:
-                        print("  → Cleaned Cursor cache")
+                        print("  → Cleaned Copilot cache")
                 except (OSError, PermissionError):
                     pass  # Silently skip on error
 
     # === Data Collection (returns structured data) ===
 
     def collect_preview_data(self, project_path: Path) -> ProviderPreviewData:
-        """Collect Cursor CLI-specific preview data.
+        """Collect Copilot-specific preview data.
 
         Returns structured data only - no formatting.
 
@@ -136,9 +139,30 @@ class CursorProvider(AIProvider):
             project_path: Path to the project
 
         Returns:
-            ProviderPreviewData with Cursor CLI-specific information
+            ProviderPreviewData with Copilot-specific information
         """
         context_files = []
+
+        # Check for .github/copilot-instructions.md in project
+        copilot_instructions = project_path / ".github" / "copilot-instructions.md"
+        if copilot_instructions.exists():
+            try:
+                stat = copilot_instructions.stat()
+                with open(copilot_instructions, encoding="utf-8") as f:
+                    lines = f.readlines()
+                    context_files.append(
+                        ContextFile(
+                            path=copilot_instructions,
+                            label=".github/copilot-instructions.md",
+                            exists=True,
+                            size_bytes=stat.st_size,
+                            line_count=len(lines),
+                            file_type="project",
+                            content_preview="".join(lines[:10]),
+                        )
+                    )
+            except (OSError, UnicodeDecodeError):
+                pass
 
         # Check for AGENTS.md in project
         agents_md = project_path / "AGENTS.md"
@@ -161,27 +185,6 @@ class CursorProvider(AIProvider):
             except (OSError, UnicodeDecodeError):
                 pass
 
-        # Check for .cursorrules in project (legacy, still supported)
-        cursorrules = project_path / ".cursorrules"
-        if cursorrules.exists():
-            try:
-                stat = cursorrules.stat()
-                with open(cursorrules, encoding="utf-8") as f:
-                    lines = f.readlines()
-                    context_files.append(
-                        ContextFile(
-                            path=cursorrules,
-                            label=".cursorrules",
-                            exists=True,
-                            size_bytes=stat.st_size,
-                            line_count=len(lines),
-                            file_type="project",
-                            content_preview="".join(lines[:10]),
-                        )
-                    )
-            except (OSError, UnicodeDecodeError):
-                pass
-
         # Global config paths
         global_paths = self.get_global_context_paths()
 
@@ -194,15 +197,15 @@ class CursorProvider(AIProvider):
     # === Discovery Methods ===
 
     def get_global_context_paths(self) -> List[Path]:
-        """Get paths to Cursor's global configuration."""
+        """Get paths to Copilot's global configuration."""
         return [
-            Path.home() / ".cursor",
+            Path.home() / ".config" / "github-copilot",
         ]
 
     def get_documentation_urls(self) -> Dict[str, str]:
-        """Get Cursor CLI documentation URLs."""
+        """Get GitHub Copilot CLI documentation URLs."""
         return {
-            "Documentation": "https://cursor.com/docs/cli/using",
-            "Installation": "https://cursor.com/cli",
-            "Rules": "https://cursor.com/docs/context/rules",
+            "Documentation": "https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli",
+            "Installation": "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli",
+            "Custom instructions": "https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-custom-instructions",
         }

@@ -5,9 +5,9 @@ Tests for functions not covered by existing test_startup_report.py.
 Author: Solent Labs™
 """
 
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, patch
-from datetime import datetime
 
 import pytest
 
@@ -16,12 +16,12 @@ from ai_launcher.core.provider_data import (
     GlobalContextSummary,
     MarketplaceInfo,
     MarketplacePlugin,
+    MemoryFile,
     MemoryInfo,
     ProviderPreviewData,
     SessionConfig,
     SessionStats,
     SkillInfo,
-    MemoryFile,
 )
 from ai_launcher.providers.base import ProviderMetadata
 from ai_launcher.ui.startup_report import (
@@ -80,19 +80,25 @@ class TestCheckBoundaryProtection:
 class TestGetFileDescription:
     """Tests for _get_file_description()."""
 
-    def test_known_files(self):
-        assert _get_file_description("STANDARDS.md") == "coding standards"
-        assert _get_file_description("TESTING.md") == "testing guidelines"
-        assert _get_file_description("SECURITY.md") == "security best practices"
-        assert _get_file_description("OPERATIONS.md") == "operational procedures"
-        assert _get_file_description("DEVKIT-PATTERNS.md") == "common patterns"
-        assert _get_file_description("DEPLOYMENT.md") == "deployment guide"
-        assert _get_file_description("ARCHITECTURE.md") == "architecture docs"
-        assert _get_file_description("CONTRIBUTING.md") == "contribution guide"
+    @pytest.mark.parametrize(
+        "filename,expected",
+        [
+            ("STANDARDS.md", "coding standards"),
+            ("TESTING.md", "testing guidelines"),
+            ("SECURITY.md", "security best practices"),
+            ("OPERATIONS.md", "operational procedures"),
+            ("DEVKIT-PATTERNS.md", "common patterns"),
+            ("DEPLOYMENT.md", "deployment guide"),
+            ("ARCHITECTURE.md", "architecture docs"),
+            ("CONTRIBUTING.md", "contribution guide"),
+        ],
+    )
+    def test_known_files(self, filename, expected):
+        assert _get_file_description(filename) == expected
 
-    def test_unknown_file(self):
-        assert _get_file_description("RANDOM.md") == "documentation"
-        assert _get_file_description("unknown.txt") == "documentation"
+    @pytest.mark.parametrize("filename", ["RANDOM.md", "unknown.txt"])
+    def test_unknown_file(self, filename):
+        assert _get_file_description(filename) == "documentation"
 
 
 class TestVisualLength:
@@ -121,8 +127,14 @@ class TestPadLine:
 class TestDisplayLaunchInfo:
     """Tests for display_launch_info()."""
 
-    def _make_provider(self, preview_data=None, display_name="Test Provider",
-                       config_files=None, has_get_version=False, version=None):
+    def _make_provider(
+        self,
+        preview_data=None,
+        display_name="Test Provider",
+        config_files=None,
+        has_get_version=False,
+        version=None,
+    ):
         """Create a mock provider."""
         provider = MagicMock()
         metadata = ProviderMetadata(
@@ -175,11 +187,16 @@ class TestDisplayLaunchInfo:
 
     def test_verbose_context_files(self, tmp_path, capsys):
         ctx = ContextFile(
-            path=tmp_path / "CLAUDE.md", label="CLAUDE.md",
-            exists=True, size_bytes=100, line_count=50, file_type="project",
+            path=tmp_path / "CLAUDE.md",
+            label="CLAUDE.md",
+            exists=True,
+            size_bytes=100,
+            line_count=50,
+            file_type="project",
         )
         data = ProviderPreviewData(
-            provider_name="Test", context_files=[ctx],
+            provider_name="Test",
+            context_files=[ctx],
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -202,7 +219,8 @@ class TestDisplayLaunchInfo:
             model="opus",
         )
         data = ProviderPreviewData(
-            provider_name="Test", session_config=session,
+            provider_name="Test",
+            session_config=session,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -220,7 +238,8 @@ class TestDisplayLaunchInfo:
             model=None,
         )
         data = ProviderPreviewData(
-            provider_name="Test", session_config=session,
+            provider_name="Test",
+            session_config=session,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -245,7 +264,8 @@ class TestDisplayLaunchInfo:
             project_lines=25,
         )
         data = ProviderPreviewData(
-            provider_name="Test", memory_info=memory,
+            provider_name="Test",
+            memory_info=memory,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -261,7 +281,11 @@ class TestDisplayLaunchInfo:
         assert "No memory files" in captured.out
 
     def test_verbose_skills(self, tmp_path, capsys):
-        skills = [SkillInfo(name="commit"), SkillInfo(name="review"), SkillInfo(name="test")]
+        skills = [
+            SkillInfo(name="commit"),
+            SkillInfo(name="review"),
+            SkillInfo(name="test"),
+        ]
         data = ProviderPreviewData(provider_name="Test", skills=skills)
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -285,7 +309,8 @@ class TestDisplayLaunchInfo:
             ],
         )
         data = ProviderPreviewData(
-            provider_name="Test", marketplace_plugins=plugins,
+            provider_name="Test",
+            marketplace_plugins=plugins,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -298,7 +323,8 @@ class TestDisplayLaunchInfo:
             categories={"standards": 2, "guidelines": 1},
         )
         data = ProviderPreviewData(
-            provider_name="Test", global_context_summary=global_ctx,
+            provider_name="Test",
+            global_context_summary=global_ctx,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -308,7 +334,8 @@ class TestDisplayLaunchInfo:
 
     def test_verbose_no_global_context(self, tmp_path, capsys):
         data = ProviderPreviewData(
-            provider_name="Test", global_context_summary=None,
+            provider_name="Test",
+            global_context_summary=None,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -335,13 +362,16 @@ class TestDisplayLaunchInfo:
             last_session_time=datetime.now(),
             memory_files=[
                 MemoryFile(
-                    path=tmp_path / "MEMORY.md", name="MEMORY.md",
-                    size_bytes=100, last_modified=datetime.now(),
+                    path=tmp_path / "MEMORY.md",
+                    name="MEMORY.md",
+                    size_bytes=100,
+                    last_modified=datetime.now(),
                 ),
             ],
         )
         data = ProviderPreviewData(
-            provider_name="Test", session_stats=stats,
+            provider_name="Test",
+            session_stats=stats,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -362,7 +392,8 @@ class TestDisplayLaunchInfo:
             mcp_servers=["s1", "s2", "s3", "s4", "s5"],
         )
         data = ProviderPreviewData(
-            provider_name="Test", session_config=session,
+            provider_name="Test",
+            session_config=session,
         )
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
@@ -408,8 +439,11 @@ class TestGenerateStartupReport:
     def test_with_provider(self, tmp_path):
         provider = MagicMock()
         metadata = ProviderMetadata(
-            name="test", display_name="Test", command="test",
-            description="desc", config_files=["TEST.md"],
+            name="test",
+            display_name="Test",
+            command="test",
+            description="desc",
+            config_files=["TEST.md"],
         )
         type(provider).metadata = PropertyMock(return_value=metadata)
 
@@ -427,8 +461,11 @@ class TestAnalyzeWithProviderEdgeCases:
     def _make_provider(self, preview_data=None, display_name="Test Provider"):
         provider = MagicMock()
         metadata = ProviderMetadata(
-            name="test", display_name=display_name, command="test",
-            description="desc", config_files=["TEST.md"],
+            name="test",
+            display_name=display_name,
+            command="test",
+            description="desc",
+            config_files=["TEST.md"],
         )
         type(provider).metadata = PropertyMock(return_value=metadata)
         if preview_data is None:
@@ -443,12 +480,16 @@ class TestAnalyzeWithProviderEdgeCases:
         from ai_launcher.ui.startup_report import StartupReport
 
         ctx = ContextFile(
-            path=tmp_path / "CLAUDE.md", label="CLAUDE.md",
-            exists=True, size_bytes=60000, line_count=600,
+            path=tmp_path / "CLAUDE.md",
+            label="CLAUDE.md",
+            exists=True,
+            size_bytes=60000,
+            line_count=600,
             file_type="project",
         )
         data = ProviderPreviewData(
-            provider_name="Test", context_files=[ctx],
+            provider_name="Test",
+            context_files=[ctx],
         )
         provider = self._make_provider(preview_data=data)
         report = StartupReport(tmp_path, provider=provider)
@@ -471,7 +512,8 @@ class TestAnalyzeWithProviderEdgeCases:
 
         memory = MemoryInfo(project_memory=mem_path, project_lines=210)
         data = ProviderPreviewData(
-            provider_name="Test", memory_info=memory,
+            provider_name="Test",
+            memory_info=memory,
         )
         provider = self._make_provider(preview_data=data)
         report = StartupReport(tmp_path, provider=provider)
@@ -492,7 +534,8 @@ class TestAnalyzeWithProviderEdgeCases:
 
         memory = MemoryInfo(project_memory=mem_path, project_lines=2)
         data = ProviderPreviewData(
-            provider_name="Test", memory_info=memory,
+            provider_name="Test",
+            memory_info=memory,
         )
         provider = self._make_provider(preview_data=data)
         report = StartupReport(tmp_path, provider=provider)

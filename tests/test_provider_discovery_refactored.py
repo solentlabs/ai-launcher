@@ -141,12 +141,19 @@ class TestProviderDiscoveryRefactored:
 
             assert version is None
 
-    def test_extract_version(self, discovery):
-        """Test version string extraction."""
-        assert discovery._extract_version("2.1.37") == "2.1.37"
-        assert discovery._extract_version("Version 3.0.0") == "3.0.0"
-        assert discovery._extract_version("v1.2.3 (Build 456)") == "1.2.3"
-        assert discovery._extract_version("No version here") is None
+    @pytest.mark.parametrize(
+        "version_str,expected",
+        [
+            ("2.1.37", "2.1.37"),
+            ("Version 3.0.0", "3.0.0"),
+            ("v1.2.3 (Build 456)", "1.2.3"),
+            ("No version here", None),
+        ],
+        ids=["plain", "prefixed", "with_build", "no_version"],
+    )
+    def test_extract_version(self, discovery, version_str, expected):
+        """Test version string extraction from various formats."""
+        assert discovery._extract_version(version_str) == expected
 
     def test_analyze_context(self, discovery, tmp_path):
         """Test context analysis for a provider."""

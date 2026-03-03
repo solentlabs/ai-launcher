@@ -5,7 +5,7 @@ Created: 2026-02-09
 """
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List, Tuple
 
 from ai_launcher.utils.logging import get_logger
 
@@ -40,7 +40,7 @@ class ContextAnalyzer:
             Dictionary mapping category names to lists of file paths
         """
         # Initialize categories
-        categories: Dict[str, List[Path]] = {cat: [] for cat in self.CATEGORIES.keys()}
+        categories: Dict[str, List[Path]] = {cat: [] for cat in self.CATEGORIES}
         categories["other"] = []
 
         if not path.exists():
@@ -104,9 +104,7 @@ class ContextAnalyzer:
 
         return sizes
 
-    def get_total_stats(
-        self, categories: Dict[str, List[Path]]
-    ) -> tuple[int, int]:
+    def get_total_stats(self, categories: Dict[str, List[Path]]) -> Tuple[int, int]:
         """Get total file count and size for all categories.
 
         Args:
@@ -121,7 +119,7 @@ class ContextAnalyzer:
 
         return total_files, total_bytes
 
-    def analyze_single_file(self, file_path: Path) -> Dict[str, any]:
+    def analyze_single_file(self, file_path: Path) -> Dict[str, Any]:
         """Analyze a single file and return metadata.
 
         Args:

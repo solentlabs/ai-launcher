@@ -77,7 +77,6 @@ class SessionStats:
     session_dir: Optional[Path] = None
 
 
-
 @dataclass
 class MemoryInfo:
     """Information about provider memory files.

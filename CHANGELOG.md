@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Provider abstraction layer** - Extensible system for multiple AI tools
 - **ClaudeProvider** - Full Claude Code integration
 - **GeminiProvider** - Google Gemini CLI support
+- **CursorProvider** - Cursor IDE integration
+- **AiderProvider** - Aider pair programmer integration
+- **CopilotProvider** - GitHub Copilot CLI integration
 - **Provider registry** - Centralized provider management
 - **Discovery mode** (`--discover`) - Shows installed providers and context
 - **Context viewer** (`--context`) - Interactive visualization of AI context files

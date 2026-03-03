@@ -3,9 +3,8 @@
 Author: Solent Labs™
 """
 
-import shutil
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+import subprocess
+from unittest.mock import patch
 
 import pytest
 
@@ -31,98 +30,88 @@ def cleanup_config():
 class TestAiderMetadata:
     """Tests for Aider provider metadata."""
 
-    def test_metadata_name(self, provider):
-        assert provider.metadata.name == "aider"
-
-    def test_metadata_display_name(self, provider):
-        assert provider.metadata.display_name == "Aider"
-
-    def test_metadata_command(self, provider):
-        assert provider.metadata.command == "aider"
+    @pytest.mark.parametrize(
+        "attr,expected",
+        [
+            ("name", "aider"),
+            ("display_name", "Aider"),
+            ("command", "aider"),
+            ("requires_installation", True),
+        ],
+    )
+    def test_metadata_attributes(self, provider, attr, expected):
+        assert getattr(provider.metadata, attr) == expected
 
     def test_metadata_config_files(self, provider):
         assert ".aider.conf.yml" in provider.metadata.config_files
         assert "AIDER.md" in provider.metadata.config_files
 
-    def test_metadata_requires_installation(self, provider):
-        assert provider.metadata.requires_installation is True
-
 
 class TestAiderIsInstalled:
     """Tests for Aider installation check."""
 
-    def test_installed_when_found(self, provider):
-        with patch("shutil.which", return_value="/usr/bin/aider"):
-            assert provider.is_installed() is True
-
-    def test_not_installed_when_missing(self, provider):
-        with patch("shutil.which", return_value=None):
-            assert provider.is_installed() is False
+    @pytest.mark.parametrize(
+        "which_return,expected",
+        [
+            ("/usr/bin/aider", True),
+            (None, False),
+        ],
+        ids=["installed", "not_installed"],
+    )
+    def test_is_installed(self, provider, which_return, expected):
+        with patch("shutil.which", return_value=which_return):
+            assert provider.is_installed() is expected
 
 
 class TestAiderLaunch:
     """Tests for Aider launch."""
 
     def test_launch_basic(self, provider, tmp_path):
-        with patch("subprocess.run") as mock_run:
-            with patch("os.chdir"):
-                provider.launch(tmp_path)
-                mock_run.assert_called_once_with(["aider"], check=True)
+        with patch("subprocess.run") as mock_run, patch("os.chdir"):
+            provider.launch(tmp_path)
+            mock_run.assert_called_once_with(["aider"], check=True)
 
     def test_launch_with_config_file(self, provider, tmp_path):
         config_file = tmp_path / ".aider.conf.yml"
         config_file.write_text("model: gpt-4")
 
-        with patch("subprocess.run") as mock_run:
-            with patch("os.chdir"):
+        with patch("subprocess.run") as mock_run, patch("os.chdir"):
+            provider.launch(tmp_path)
+            mock_run.assert_called_once_with(
+                ["aider", "--config", str(config_file)], check=True
+            )
+
+    @pytest.mark.parametrize(
+        "exception,exit_code",
+        [
+            (FileNotFoundError, 1),
+            (KeyboardInterrupt, 0),
+            (subprocess.CalledProcessError(1, "aider"), 1),
+        ],
+        ids=["not_found", "keyboard_interrupt", "process_error"],
+    )
+    def test_launch_error_handling(self, provider, tmp_path, exception, exit_code):
+        with patch("subprocess.run", side_effect=exception), patch("os.chdir"):
+            with pytest.raises(SystemExit) as exc_info:
                 provider.launch(tmp_path)
-                mock_run.assert_called_once_with(
-                    ["aider", "--config", str(config_file)], check=True
-                )
-
-    def test_launch_not_found(self, provider, tmp_path):
-        with patch("subprocess.run", side_effect=FileNotFoundError):
-            with patch("os.chdir"):
-                with pytest.raises(SystemExit) as exc_info:
-                    provider.launch(tmp_path)
-                assert exc_info.value.code == 1
-
-    def test_launch_keyboard_interrupt(self, provider, tmp_path):
-        with patch("subprocess.run", side_effect=KeyboardInterrupt):
-            with patch("os.chdir"):
-                with pytest.raises(SystemExit) as exc_info:
-                    provider.launch(tmp_path)
-                assert exc_info.value.code == 0
-
-    def test_launch_called_process_error(self, provider, tmp_path):
-        import subprocess
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "aider")):
-            with patch("os.chdir"):
-                with pytest.raises(SystemExit) as exc_info:
-                    provider.launch(tmp_path)
-                assert exc_info.value.code == 1
+            assert exc_info.value.code == exit_code
 
 
 class TestAiderCleanup:
     """Tests for Aider cleanup."""
 
-    def test_cleanup_no_config(self, provider, tmp_path):
+    @pytest.mark.parametrize(
+        "config",
+        [
+            None,
+            CleanupConfig(enabled=False),
+            CleanupConfig(enabled=True, clean_provider_files=False),
+        ],
+        ids=["no_config", "disabled", "provider_files_disabled"],
+    )
+    def test_cleanup_noop(self, provider, tmp_path, config):
+        """Test that cleanup is a no-op under various disabled configs."""
         with patch("pathlib.Path.home", return_value=tmp_path):
-            aider_dir = tmp_path / ".aider" / "cache"
-            aider_dir.mkdir(parents=True)
-            (aider_dir / "cached.txt").write_text("data")
-
-            provider.cleanup_environment(verbose=False, cleanup_config=None)
-            assert (aider_dir / "cached.txt").exists()
-
-    def test_cleanup_disabled(self, provider, tmp_path):
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            config = CleanupConfig(enabled=False)
-            provider.cleanup_environment(verbose=False, cleanup_config=config)
-
-    def test_cleanup_provider_files_disabled(self, provider, tmp_path):
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            config = CleanupConfig(enabled=True, clean_provider_files=False)
             aider_cache = tmp_path / ".aider" / "cache"
             aider_cache.mkdir(parents=True)
             (aider_cache / "data.txt").write_text("data")
@@ -190,3 +179,23 @@ class TestAiderCollectPreviewData:
         paths = provider.get_global_context_paths()
         assert len(paths) == 1
         assert ".aider" in str(paths[0])
+
+
+class TestAiderDocumentationUrls:
+    """Tests for Aider documentation URLs."""
+
+    def test_has_documentation_urls(self, provider):
+        assert len(provider.get_documentation_urls()) > 0
+
+    @pytest.mark.parametrize(
+        "key,url_fragment",
+        [
+            ("Documentation", "aider.chat"),
+            ("Installation", "aider.chat"),
+            ("Configuration", "aider.chat"),
+        ],
+    )
+    def test_documentation_url_entries(self, provider, key, url_fragment):
+        urls = provider.get_documentation_urls()
+        assert key in urls
+        assert url_fragment in urls[key]

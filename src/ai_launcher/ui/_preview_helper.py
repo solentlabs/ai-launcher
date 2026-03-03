@@ -19,7 +19,8 @@ def show_configuration_preview() -> None:
     print()
 
     # Provider
-    print("\033[1m🤖 Provider:\033[0m claude-code")
+    provider_name = os.environ.get("AI_LAUNCHER_PROVIDER", "claude-code")
+    print(f"\033[1m🤖 Provider:\033[0m {provider_name}")
     print()
 
     # Project Paths
@@ -124,7 +125,9 @@ def show_configuration_preview() -> None:
     print()
 
     # Available Options
-    print("\033[1m⚙️ Available Options\033[0m \033[2m(All options work independently)\033[0m")
+    print(
+        "\033[1m⚙️ Available Options\033[0m \033[2m(All options work independently)\033[0m"
+    )
     print()
     print("   \033[1mContext:\033[0m")
     print("     --global-files FILE1,FILE2    Load files for all projects")
@@ -147,6 +150,7 @@ def show_configuration_preview() -> None:
 
     # Version
     from ai_launcher import __version__
+
     print(f"\033[2mai-launcher v{__version__}\033[0m")
 
 
@@ -238,12 +242,11 @@ def main() -> None:
             # Configuration action - show configuration preview
             show_configuration_preview()
             return
-        elif parts[0] in ("__SPACE__", "__ACTION__"):
+        if parts[0] in ("__SPACE__", "__ACTION__"):
             # Other action items or spacing - show nothing
             return
-        else:
-            # Normal line - first field is absolute path (project or directory)
-            path_str = parts[0]
+        # Normal line - first field is absolute path (project or directory)
+        path_str = parts[0]
     else:
         # Malformed line - show nothing
         return
@@ -298,7 +301,11 @@ def main() -> None:
                     # Show manual paths from environment variable
                     manual_paths_env = os.environ.get("AI_LAUNCHER_MANUAL_PATHS", "")
                     if manual_paths_env:
-                        manual_paths = [mp.strip() for mp in manual_paths_env.split(",") if mp.strip()]
+                        manual_paths = [
+                            mp.strip()
+                            for mp in manual_paths_env.split(",")
+                            if mp.strip()
+                        ]
                         if manual_paths:
                             print("─" * 80)
                             print("📌 Manual Paths:")
@@ -314,7 +321,9 @@ def main() -> None:
                             print()
 
                     # Show global files via provider abstraction (separation of concerns)
-                    provider_name = os.environ.get("AI_LAUNCHER_PROVIDER", "claude-code")
+                    provider_name = os.environ.get(
+                        "AI_LAUNCHER_PROVIDER", "claude-code"
+                    )
                     try:
                         from ai_launcher.providers.registry import ProviderRegistry
                         from ai_launcher.ui.formatter import PreviewFormatter
@@ -330,33 +339,48 @@ def main() -> None:
 
                             # User-configured global files
                             if preview_data.global_files:
-                                print(formatter._format_global_files_section(preview_data.global_files))
+                                print(
+                                    formatter._format_global_files_section(
+                                        preview_data.global_files
+                                    )
+                                )
                                 print("─" * 80)
                                 print()
 
                             # Auto-discovered provider context files
                             if preview_data.provider_context:
-                                print(formatter._format_provider_context_section(
-                                    preview_data.provider_context, preview_data.provider_name
-                                ))
+                                print(
+                                    formatter._format_provider_context_section(
+                                        preview_data.provider_context,
+                                        preview_data.provider_name,
+                                    )
+                                )
                                 print("─" * 80)
                                 print()
 
                             # Marketplace plugins
                             if preview_data.marketplace_plugins:
-                                print(formatter._format_plugins_section(preview_data.marketplace_plugins))
+                                print(
+                                    formatter._format_plugins_section(
+                                        preview_data.marketplace_plugins
+                                    )
+                                )
                                 print("─" * 80)
                                 print()
                     except Exception as e:
                         print(f"\n⚠️  Error loading provider context: {e}")
                         import traceback
+
                         traceback.print_exc()
 
                 except Exception:
                     pass  # Silently skip if error displaying preview info
         else:
             # Project directory - show full preview using new architecture
-            preview_output = generate_provider_preview(path, provider_name="claude-code")
+            provider_name = os.environ.get("AI_LAUNCHER_PROVIDER", "claude-code")
+            preview_output = generate_provider_preview(
+                path, provider_name=provider_name
+            )
             print(preview_output)
     except Exception as e:
         print(f"Error generating preview: {e}")

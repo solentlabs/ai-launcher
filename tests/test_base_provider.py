@@ -93,7 +93,10 @@ class TestLaunchWithTitle:
 
     def test_sets_title_and_launches(self, provider, tmp_path):
         with patch("ai_launcher.providers.base.set_terminal_title") as mock_set:
-            with patch("ai_launcher.providers.base.format_terminal_title", return_value="my-proj → Test Provider"):
+            with patch(
+                "ai_launcher.providers.base.format_terminal_title",
+                return_value="my-proj → Test Provider",
+            ):
                 provider.launch_with_title(tmp_path)
                 mock_set.assert_called_once_with("my-proj → Test Provider")
 

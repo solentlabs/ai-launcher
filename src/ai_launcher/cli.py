@@ -74,7 +74,14 @@ def _run_launcher(
     logger.debug(f"Version: {__version__}")
 
     # Build runtime config from CLI flags (no config file needed)
-    from ai_launcher.core.models import ConfigData, ScanConfig, UIConfig, CleanupConfig, ContextConfig, ProviderConfig
+    from ai_launcher.core.models import (
+        CleanupConfig,
+        ConfigData,
+        ContextConfig,
+        ProviderConfig,
+        ScanConfig,
+        UIConfig,
+    )
 
     # Parse global files from comma-separated string
     global_files_list = []
@@ -127,25 +134,32 @@ def _run_launcher(
     manual_project_list = []
     if manual_paths:
         from ai_launcher.core.models import Project
+
         for mp in manual_paths.split(","):
             mp = mp.strip()
             if mp:
                 mp_path = Path(mp).expanduser()
                 if mp_path.exists():
-                    manual_project_list.append(Project(
-                        path=mp_path,
-                        name=mp_path.name,
-                        parent_path=mp_path.parent,
-                        is_git_repo=(mp_path / ".git").exists(),
-                        is_manual=True,
-                    ))
+                    manual_project_list.append(
+                        Project(
+                            path=mp_path,
+                            name=mp_path.name,
+                            parent_path=mp_path.parent,
+                            is_git_repo=(mp_path / ".git").exists(),
+                            is_manual=True,
+                        )
+                    )
 
-    all_projects = get_all_projects(
-        scan_paths,
-        config.scan.max_depth,
-        config.scan.prune_dirs,
-        manual_project_list,
-    ) if scan_paths else []
+    all_projects = (
+        get_all_projects(
+            scan_paths,
+            config.scan.max_depth,
+            config.scan.prune_dirs,
+            manual_project_list,
+        )
+        if scan_paths
+        else []
+    )
 
     # Handle --discover
     if discover:
@@ -215,7 +229,15 @@ def launch_ai(
     if provider is None:
         # Use default config if none provided
         if config is None:
-            from ai_launcher.core.models import ConfigData, ScanConfig, UIConfig, CleanupConfig, ContextConfig, ProviderConfig
+            from ai_launcher.core.models import (
+                CleanupConfig,
+                ConfigData,
+                ContextConfig,
+                ProviderConfig,
+                ScanConfig,
+                UIConfig,
+            )
+
             config = ConfigData(
                 scan=ScanConfig(paths=[], max_depth=5, prune_dirs=[]),
                 ui=UIConfig(),
@@ -259,15 +281,15 @@ def claude(
     discover: bool = typer.Option(
         False, "--discover", "-d", help="Show discovery report"
     ),
-    context: bool = typer.Option(
-        False, "--context", "-c", help="Show context viewer"
-    ),
+    context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
     # Configuration options
     cleanup: bool = typer.Option(
         False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
     ),
     clean_provider: bool = typer.Option(
-        False, "--clean-provider/--no-clean-provider", help="Clean AI assistant cache/logs"
+        False,
+        "--clean-provider/--no-clean-provider",
+        help="Clean AI assistant cache/logs",
     ),
     clean_cache: bool = typer.Option(
         False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
@@ -292,8 +314,21 @@ def claude(
         ai-launcher claude ~/projects --cleanup --clean-cache
     """
     # Just call main() with provider forced to claude-code
-    _run_launcher("claude-code", path, verbose, debug, list_projects, discover, context,
-                  cleanup, clean_provider, clean_cache, clean_npm, global_files, manual_paths)
+    _run_launcher(
+        "claude-code",
+        path,
+        verbose,
+        debug,
+        list_projects,
+        discover,
+        context,
+        cleanup,
+        clean_provider,
+        clean_cache,
+        clean_npm,
+        global_files,
+        manual_paths,
+    )
 
 
 @app.command()
@@ -309,15 +344,15 @@ def gemini(
     discover: bool = typer.Option(
         False, "--discover", "-d", help="Show discovery report"
     ),
-    context: bool = typer.Option(
-        False, "--context", "-c", help="Show context viewer"
-    ),
+    context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
     # Configuration options
     cleanup: bool = typer.Option(
         False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
     ),
     clean_provider: bool = typer.Option(
-        False, "--clean-provider/--no-clean-provider", help="Clean AI assistant cache/logs"
+        False,
+        "--clean-provider/--no-clean-provider",
+        help="Clean AI assistant cache/logs",
     ),
     clean_cache: bool = typer.Option(
         False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
@@ -342,9 +377,204 @@ def gemini(
         ai-launcher gemini ~/projects --cleanup --clean-cache
     """
     # Just call main() with provider forced to gemini
-    _run_launcher("gemini", path, verbose, debug, list_projects, discover, context,
-                  cleanup, clean_provider, clean_cache, clean_npm, global_files, manual_paths)
+    _run_launcher(
+        "gemini",
+        path,
+        verbose,
+        debug,
+        list_projects,
+        discover,
+        context,
+        cleanup,
+        clean_provider,
+        clean_cache,
+        clean_npm,
+        global_files,
+        manual_paths,
+    )
 
+
+@app.command()
+def cursor(
+    path: Optional[Path] = typer.Argument(
+        None,
+        help="Directory to scan for projects (optional)",
+        exists=True,
+    ),
+    verbose: bool = typer.Option(False, "--verbose", help="Enable verbose logging"),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug mode"),
+    list_projects: bool = typer.Option(False, "--list", help="List all projects"),
+    discover: bool = typer.Option(
+        False, "--discover", "-d", help="Show discovery report"
+    ),
+    context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
+    # Configuration options
+    cleanup: bool = typer.Option(
+        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+    ),
+    clean_provider: bool = typer.Option(
+        False,
+        "--clean-provider/--no-clean-provider",
+        help="Clean AI assistant cache/logs",
+    ),
+    clean_cache: bool = typer.Option(
+        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
+    ),
+    clean_npm: bool = typer.Option(
+        False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
+    ),
+    global_files: Optional[str] = typer.Option(
+        None, "--global-files", help="Comma-separated list of global context files"
+    ),
+    manual_paths: Optional[str] = typer.Option(
+        None, "--manual-paths", help="Comma-separated list of manual project paths"
+    ),
+) -> None:
+    """Launch Cursor with project selection.
+
+    Configuration is passed via CLI flags.
+
+    Examples:
+        ai-launcher cursor ~/projects
+        ai-launcher cursor ~/projects --global-files ~/.cursor/RULES.md
+    """
+    _run_launcher(
+        "cursor",
+        path,
+        verbose,
+        debug,
+        list_projects,
+        discover,
+        context,
+        cleanup,
+        clean_provider,
+        clean_cache,
+        clean_npm,
+        global_files,
+        manual_paths,
+    )
+
+
+@app.command()
+def aider(
+    path: Optional[Path] = typer.Argument(
+        None,
+        help="Directory to scan for projects (optional)",
+        exists=True,
+    ),
+    verbose: bool = typer.Option(False, "--verbose", help="Enable verbose logging"),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug mode"),
+    list_projects: bool = typer.Option(False, "--list", help="List all projects"),
+    discover: bool = typer.Option(
+        False, "--discover", "-d", help="Show discovery report"
+    ),
+    context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
+    # Configuration options
+    cleanup: bool = typer.Option(
+        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+    ),
+    clean_provider: bool = typer.Option(
+        False,
+        "--clean-provider/--no-clean-provider",
+        help="Clean AI assistant cache/logs",
+    ),
+    clean_cache: bool = typer.Option(
+        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
+    ),
+    clean_npm: bool = typer.Option(
+        False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
+    ),
+    global_files: Optional[str] = typer.Option(
+        None, "--global-files", help="Comma-separated list of global context files"
+    ),
+    manual_paths: Optional[str] = typer.Option(
+        None, "--manual-paths", help="Comma-separated list of manual project paths"
+    ),
+) -> None:
+    """Launch Aider with project selection.
+
+    Configuration is passed via CLI flags.
+
+    Examples:
+        ai-launcher aider ~/projects
+        ai-launcher aider ~/projects --global-files ~/.aider/RULES.md
+    """
+    _run_launcher(
+        "aider",
+        path,
+        verbose,
+        debug,
+        list_projects,
+        discover,
+        context,
+        cleanup,
+        clean_provider,
+        clean_cache,
+        clean_npm,
+        global_files,
+        manual_paths,
+    )
+
+
+@app.command()
+def copilot(
+    path: Optional[Path] = typer.Argument(
+        None,
+        help="Directory to scan for projects (optional)",
+        exists=True,
+    ),
+    verbose: bool = typer.Option(False, "--verbose", help="Enable verbose logging"),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug mode"),
+    list_projects: bool = typer.Option(False, "--list", help="List all projects"),
+    discover: bool = typer.Option(
+        False, "--discover", "-d", help="Show discovery report"
+    ),
+    context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
+    # Configuration options
+    cleanup: bool = typer.Option(
+        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+    ),
+    clean_provider: bool = typer.Option(
+        False,
+        "--clean-provider/--no-clean-provider",
+        help="Clean AI assistant cache/logs",
+    ),
+    clean_cache: bool = typer.Option(
+        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
+    ),
+    clean_npm: bool = typer.Option(
+        False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
+    ),
+    global_files: Optional[str] = typer.Option(
+        None, "--global-files", help="Comma-separated list of global context files"
+    ),
+    manual_paths: Optional[str] = typer.Option(
+        None, "--manual-paths", help="Comma-separated list of manual project paths"
+    ),
+) -> None:
+    """Launch GitHub Copilot CLI with project selection.
+
+    Configuration is passed via CLI flags.
+
+    Examples:
+        ai-launcher copilot ~/projects
+        ai-launcher copilot ~/projects --global-files ~/.config/github-copilot/RULES.md
+    """
+    _run_launcher(
+        "copilot",
+        path,
+        verbose,
+        debug,
+        list_projects,
+        discover,
+        context,
+        cleanup,
+        clean_provider,
+        clean_cache,
+        clean_npm,
+        global_files,
+        manual_paths,
+    )
 
 
 if __name__ == "__main__":

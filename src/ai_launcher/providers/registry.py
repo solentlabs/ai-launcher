@@ -13,7 +13,6 @@ Updated: 2026-02-10 (Added auto-discovery)
 
 import importlib
 import inspect
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -203,9 +202,7 @@ def get_provider(name: str) -> AIProvider:
 
     if not provider:
         available = ", ".join(registry.get_names())
-        raise ValueError(
-            f"Unknown provider: {name}\nAvailable providers: {available}"
-        )
+        raise ValueError(f"Unknown provider: {name}\nAvailable providers: {available}")
 
     if not provider.is_installed():
         raise ValueError(

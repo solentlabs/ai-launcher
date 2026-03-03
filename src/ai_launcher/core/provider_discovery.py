@@ -110,7 +110,11 @@ class ProviderDiscovery:
             if result.returncode == 0:
                 return self._extract_version(result.stdout)
 
-        except (subprocess.SubprocessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
+        except (
+            subprocess.SubprocessError,
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+        ) as e:
             logger.debug(f"Could not get version for {command}: {e}")
 
         return None
@@ -131,9 +135,7 @@ class ProviderDiscovery:
 
         return None
 
-    def _analyze_context(
-        self, provider, version: Optional[str]
-    ) -> ProviderContext:
+    def _analyze_context(self, provider, version: Optional[str]) -> ProviderContext:
         """Analyze context for a provider.
 
         Args:
@@ -164,7 +166,7 @@ class ProviderDiscovery:
 
         # Categorize files in config directories
         all_categories: Dict[str, List[Path]] = {
-            cat: [] for cat in self.analyzer.CATEGORIES.keys()
+            cat: [] for cat in self.analyzer.CATEGORIES
         }
         all_categories["other"] = []
 

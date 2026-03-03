@@ -2,16 +2,20 @@
 
 ## Installation Issues
 
-### "claude command not found"
+### AI provider CLI not found
 
-Claude Code CLI is not installed or not in PATH.
+Your chosen AI provider CLI is not installed or not in PATH.
 
 **Check:**
 ```bash
-which claude
+which claude   # Claude Code
+which gemini   # Gemini CLI
+which cursor   # Cursor
+which aider    # Aider
+which copilot  # GitHub Copilot CLI
 ```
 
-**Fix:** Install Claude Code CLI and ensure it's in your PATH.
+**Fix:** Install the appropriate CLI for your provider and ensure it's in your PATH.
 
 ### "fzf not found"
 

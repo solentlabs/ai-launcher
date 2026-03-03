@@ -1,8 +1,5 @@
 """Tests for preview generation (active code paths)."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch
-
 from ai_launcher.ui.preview import build_tree_view, generate_provider_preview
 
 
@@ -43,8 +40,20 @@ def test_build_tree_view_with_manual_projects(tmp_path):
     external.mkdir(parents=True)
 
     projects = [
-        Project(path=base / "repo1", name="repo1", parent_path=base, is_git_repo=True, is_manual=False),
-        Project(path=external, name="manual-project", parent_path=external.parent, is_git_repo=False, is_manual=True),
+        Project(
+            path=base / "repo1",
+            name="repo1",
+            parent_path=base,
+            is_git_repo=True,
+            is_manual=False,
+        ),
+        Project(
+            path=external,
+            name="manual-project",
+            parent_path=external.parent,
+            is_git_repo=False,
+            is_manual=True,
+        ),
     ]
 
     lines, mapping = build_tree_view(projects, base_path=base)

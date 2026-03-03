@@ -11,19 +11,23 @@ Author: Solent Labs™
 Created: 2026-02-12
 """
 
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from ai_launcher.core.provider_data import (
     ContextFile,
     DirectoryListing,
     GitStatus,
     MarketplaceInfo,
-    MemoryFile,
     ProviderPreviewData,
     SessionStats,
 )
+from ai_launcher.utils.paths import is_relative_to
+
+if TYPE_CHECKING:
+    from ai_launcher.core.provider_data import GlobalFiles, SessionConfig
 
 
 class PreviewFormatter:
@@ -111,7 +115,6 @@ class PreviewFormatter:
         sections.append(self._format_footer())
 
         return "\n\n".join(s.rstrip("\n") for s in sections)
-
 
     def format_context_files(self, files: List[ContextFile]) -> str:
         """Format context files section.
@@ -205,7 +208,9 @@ class PreviewFormatter:
                         f"{self.DIM}({size_kb:.1f}KB){self.RESET}"
                     )
                 else:
-                    lines.append(f"  {self.CYAN}{path}{self.RESET} {self.DIM}(directory){self.RESET}")
+                    lines.append(
+                        f"  {self.CYAN}{path}{self.RESET} {self.DIM}(directory){self.RESET}"
+                    )
             else:
                 lines.append(f"  {self.DIM}{path} (not found){self.RESET}")
 
@@ -319,14 +324,13 @@ class PreviewFormatter:
 
         if delta.days > 0:
             return f"{delta.days} day{'s' if delta.days != 1 else ''} ago"
-        elif delta.seconds >= 3600:
+        if delta.seconds >= 3600:
             hours = delta.seconds // 3600
             return f"{hours} hour{'s' if hours != 1 else ''} ago"
-        elif delta.seconds >= 60:
+        if delta.seconds >= 60:
             minutes = delta.seconds // 60
             return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
-        else:
-            return "just now"
+        return "just now"
 
     def _humanize_size(self, size_bytes: int) -> str:
         """Format file size in human-readable format.
@@ -339,12 +343,11 @@ class PreviewFormatter:
         """
         if size_bytes < 1024:
             return f"{size_bytes}B"
-        elif size_bytes < 1024 * 1024:
+        if size_bytes < 1024 * 1024:
             return f"{size_bytes / 1024:.1f}KB"
-        elif size_bytes < 1024 * 1024 * 1024:
+        if size_bytes < 1024 * 1024 * 1024:
             return f"{size_bytes / (1024 * 1024):.1f}MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.1f}GB"
+        return f"{size_bytes / (1024 * 1024 * 1024):.1f}GB"
 
     # ===== Rich Formatting Methods (for format_complete_preview) =====
 
@@ -386,7 +389,9 @@ class PreviewFormatter:
                 # Show content preview if available
                 if ctx_file.content_preview:
                     lines.append("")  # Blank line before preview
-                    preview_lines = ctx_file.content_preview.split("\n")[:self.max_preview_lines]
+                    preview_lines = ctx_file.content_preview.split("\n")[
+                        : self.max_preview_lines
+                    ]
                     for line in preview_lines:
                         if line.strip():  # Skip empty lines
                             # Truncate long lines to 80 chars
@@ -394,9 +399,7 @@ class PreviewFormatter:
                             lines.append(f"    {self.DIM}{display_line}{self.RESET}")
                     lines.append("")  # Blank line after preview
             else:
-                lines.append(
-                    f"  {self.DIM}✗ {ctx_file.label} (not found){self.RESET}"
-                )
+                lines.append(f"  {self.DIM}✗ {ctx_file.label} (not found){self.RESET}")
 
         return "\n".join(lines)
 
@@ -445,35 +448,36 @@ class PreviewFormatter:
         Returns:
             Formatted section with files grouped by category
         """
-        from collections import defaultdict
-        from pathlib import Path
-
         # Header with common root if present
         if global_files.common_root:
-            lines = [f"{self.BOLD}🌐 Global Files{self.RESET} {self.DIM}({global_files.common_root}/){self.RESET}"]
+            lines = [
+                f"{self.BOLD}🌐 Global Files{self.RESET} {self.DIM}({global_files.common_root}/){self.RESET}"
+            ]
         else:
             lines = [f"{self.BOLD}🌐 Global Files{self.RESET}"]
 
         # Category display order (most important first)
         category_order = [
-            "📋 Rule",      # Project instructions and standards
-            "🔧 Skill",     # Custom capabilities
-            "🤖 Agent",     # AI agent configuration
-            "💡 Hint",      # Patterns and examples
-            "🏗️  Arch",     # Architecture decisions
-            "📚 Docs",      # Documentation
-            "🔒 Ops",       # Security and operations
-            "🧪 Test",      # Testing standards
-            "⚙️  Config",   # Configuration files
-            "🔗 Shared",    # Shared context
-            "📝 Notes",     # Plans and notes
-            "📦 Cache",     # Cache and history
-            "📄 General",   # General files
+            "📋 Rule",  # Project instructions and standards
+            "🔧 Skill",  # Custom capabilities
+            "🤖 Agent",  # AI agent configuration
+            "💡 Hint",  # Patterns and examples
+            "🏗️  Arch",  # Architecture decisions
+            "📚 Docs",  # Documentation
+            "🔒 Ops",  # Security and operations
+            "🧪 Test",  # Testing standards
+            "⚙️  Config",  # Configuration files
+            "🔗 Shared",  # Shared context
+            "📝 Notes",  # Plans and notes
+            "📦 Cache",  # Cache and history
+            "📄 General",  # General files
         ]
 
         # Display each category
         for cat_prefix in category_order:
-            matching = [cat for cat in global_files.by_category.keys() if cat.startswith(cat_prefix)]
+            matching = [
+                cat for cat in global_files.by_category if cat.startswith(cat_prefix)
+            ]
 
             for category in matching:
                 files = global_files.by_category[category]
@@ -500,12 +504,16 @@ class PreviewFormatter:
                 # Print category header
                 lines.append("")
                 if category_common_subdir:
-                    lines.append(f"{type_name}: {self.DIM}(./{category_common_subdir}/){self.RESET}")
+                    lines.append(
+                        f"{type_name}: {self.DIM}(./{category_common_subdir}/){self.RESET}"
+                    )
                 else:
                     lines.append(f"{type_name}:")
 
                 # Group files by directory
-                by_root = defaultdict(lambda: defaultdict(list))
+                by_root: Dict[str, Dict[str, List[str]]] = defaultdict(
+                    lambda: defaultdict(list)
+                )
                 for file_path in files:
                     try:
                         rel_path = file_path.relative_to(Path.home())
@@ -522,25 +530,33 @@ class PreviewFormatter:
                             else:
                                 subdir = "/".join(rest_parts[:-1])
                                 # Strip category common subdir if present
-                                if category_common_subdir and subdir.startswith(category_common_subdir):
+                                if category_common_subdir and subdir.startswith(
+                                    category_common_subdir
+                                ):
                                     if subdir == category_common_subdir:
                                         subdir = ""
                                     else:
-                                        subdir = subdir[len(category_common_subdir) + 1:]
+                                        subdir = subdir[
+                                            len(category_common_subdir) + 1 :
+                                        ]
                                 by_root[root][subdir].append(file_path.name)
                     except ValueError:
                         by_root[str(file_path.parent)][""].append(file_path.name)
 
                 # Display tree
                 for root in sorted(by_root.keys()):
-                    show_root = root != global_files.common_root if global_files.common_root else True
+                    show_root = (
+                        root != global_files.common_root
+                        if global_files.common_root
+                        else True
+                    )
 
                     if show_root:
                         lines.append(f"  {root}/")
 
-                    subdirs = by_root[root]
-                    for subdir in sorted(subdirs.keys()):
-                        file_list = sorted(subdirs[subdir])
+                    dir_groups = by_root[root]
+                    for subdir in sorted(dir_groups.keys()):
+                        file_list = sorted(dir_groups[subdir])
                         indent = "    " if show_root else "  "
                         file_indent = "      " if show_root else "    "
 
@@ -550,7 +566,9 @@ class PreviewFormatter:
                         else:
                             lines.append(f"{indent}{subdir}/")
                             for fname in file_list:
-                                lines.append(f"{file_indent}{self.DIM}• {fname}{self.RESET}")
+                                lines.append(
+                                    f"{file_indent}{self.DIM}• {fname}{self.RESET}"
+                                )
 
         return "\n".join(lines)
 
@@ -591,7 +609,6 @@ class PreviewFormatter:
         Returns:
             Formatted section showing permissions, MCP servers, hooks, model
         """
-        from ai_launcher.core.provider_data import SessionConfig
 
         lines = [f"{self.BOLD}⚙️ Session Configuration{self.RESET}"]
 
@@ -618,9 +635,7 @@ class PreviewFormatter:
             server_list = ", ".join(config.mcp_servers[:3])
             if len(config.mcp_servers) > 3:
                 server_list += f", +{len(config.mcp_servers) - 3} more"
-            lines.append(
-                f"  {self.CYAN}🔌{self.RESET} MCP Servers: {server_list}"
-            )
+            lines.append(f"  {self.CYAN}🔌{self.RESET} MCP Servers: {server_list}")
 
         # Hooks
         if config.hooks_configured:
@@ -635,9 +650,10 @@ class PreviewFormatter:
             # Show relative path if possible
             try:
                 from pathlib import Path
+
                 config_path = Path(config.config_file_path)
                 home = Path.home()
-                if config_path.is_relative_to(home):
+                if is_relative_to(config_path, home):
                     display_path = f"~/{config_path.relative_to(home)}"
                 else:
                     display_path = str(config_path)

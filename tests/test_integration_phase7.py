@@ -10,10 +10,6 @@ Author: Solent Labs™
 Created: 2026-02-12
 """
 
-from pathlib import Path
-
-import pytest
-
 from ai_launcher.ui.preview import generate_provider_preview
 
 

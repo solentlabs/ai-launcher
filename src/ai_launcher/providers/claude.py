@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, List, Optional
 from ai_launcher.core.provider_data import (
     ContextFile,
     GlobalContextSummary,
+    GlobalFiles,
     MarketplaceInfo,
     MarketplacePlugin,
     MemoryFile,
@@ -156,7 +157,10 @@ class ClaudeProvider(AIProvider):
 
                 removed_count = 0
                 for debug_file in claude_debug_dir.glob("*.txt"):
-                    if debug_file.is_file() and debug_file.stat().st_mtime < cutoff_time:
+                    if (
+                        debug_file.is_file()
+                        and debug_file.stat().st_mtime < cutoff_time
+                    ):
                         debug_file.unlink(missing_ok=True)
                         removed_count += 1
 
@@ -338,7 +342,7 @@ def _get_personal_context_file() -> Optional[ContextFile]:
                 stat = path.stat()
                 size = stat.st_size
 
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     lines = f.readlines()
                     line_count = len(lines)
                     # Preview: first 10 lines
@@ -385,7 +389,7 @@ def _get_project_context_file(project_path: Path) -> ContextFile:
         stat = claude_md.stat()
         size = stat.st_size
 
-        with open(claude_md, "r", encoding="utf-8") as f:
+        with open(claude_md, encoding="utf-8") as f:
             lines = f.readlines()
             line_count = len(lines)
             content_preview = "".join(lines[:10])
@@ -516,7 +520,6 @@ def _get_session_stats(project_path: Path) -> Optional[SessionStats]:
         return None
 
 
-
 def _categorize_global_file(file_path: Path) -> str:
     """Categorize a global file by its name and location (Claude-specific).
 
@@ -548,11 +551,16 @@ def _categorize_global_file(file_path: Path) -> str:
         return "🔧 Skill: Custom capabilities and tools"
 
     # Documentation
-    if any(word in name_lower for word in ["changelog", "readme", "doc", "guide", "manual"]):
+    if any(
+        word in name_lower for word in ["changelog", "readme", "doc", "guide", "manual"]
+    ):
         return "📚 Docs: Documentation and guides"
 
     # Standards and conventions
-    if any(word in name for word in ["STANDARD", "CONVENTION", "STYLE", "GUIDELINE", "POLICY"]):
+    if any(
+        word in name
+        for word in ["STANDARD", "CONVENTION", "STYLE", "GUIDELINE", "POLICY"]
+    ):
         return "📋 Rule: Coding standards and conventions"
 
     # Patterns and examples
@@ -602,6 +610,7 @@ def _collect_global_files() -> Optional["GlobalFiles"]:
     """
     import os
     from collections import defaultdict
+
     from ai_launcher.core.provider_data import GlobalFiles
 
     try:
@@ -665,6 +674,7 @@ def _discover_claude_context_files() -> Optional["GlobalFiles"]:
         GlobalFiles instance with auto-discovered files, or None if ~/.claude/ doesn't exist
     """
     from collections import defaultdict
+
     from ai_launcher.core.provider_data import GlobalFiles
 
     claude_dir = Path.home() / ".claude"
@@ -675,7 +685,13 @@ def _discover_claude_context_files() -> Optional["GlobalFiles"]:
     files = []
     try:
         for subdir in claude_dir.iterdir():
-            if subdir.is_dir() and subdir.name not in ["projects", "versions", "marketplaces", "plugins", "skills"]:
+            if subdir.is_dir() and subdir.name not in [
+                "projects",
+                "versions",
+                "marketplaces",
+                "plugins",
+                "skills",
+            ]:
                 # Skip projects and versions dirs (they're not context files)
                 try:
                     for md_file in subdir.glob("**/*.md"):
@@ -774,7 +790,12 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
         config.hooks_configured = True
 
     # Only return if we found some config
-    if config.permissions_count > 0 or config.mcp_servers or config.hooks_configured or config.model:
+    if (
+        config.permissions_count > 0
+        or config.mcp_servers
+        or config.hooks_configured
+        or config.model
+    ):
         return config
 
     return None
@@ -798,7 +819,9 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
     # Personal memory - encode home directory path
     home = Path.home()
     personal_encoded = _encode_project_path(home)
-    personal_mem = home / ".claude" / "projects" / personal_encoded / "memory" / "MEMORY.md"
+    personal_mem = (
+        home / ".claude" / "projects" / personal_encoded / "memory" / "MEMORY.md"
+    )
     if personal_mem.exists():
         info.personal_memory = personal_mem
         try:
@@ -809,7 +832,9 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
 
     # Project memory - encode project path
     project_encoded = _encode_project_path(project_path)
-    project_mem = home / ".claude" / "projects" / project_encoded / "memory" / "MEMORY.md"
+    project_mem = (
+        home / ".claude" / "projects" / project_encoded / "memory" / "MEMORY.md"
+    )
     if project_mem.exists():
         info.project_memory = project_mem
         try:
@@ -829,7 +854,7 @@ def _get_skills() -> List[SkillInfo]:
     Returns:
         List of SkillInfo instances
     """
-    skills = []
+    skills: List[SkillInfo] = []
     skills_dir = Path.home() / ".claude" / "skills"
 
     if not skills_dir.exists():
@@ -916,7 +941,6 @@ def _discover_marketplace_plugins() -> Optional[MarketplaceInfo]:
     Returns:
         MarketplaceInfo instance or None if no marketplace plugins found
     """
-    import json
 
     marketplaces_dir = Path.home() / ".claude" / "plugins" / "marketplaces"
     if not marketplaces_dir.exists():
@@ -925,7 +949,8 @@ def _discover_marketplace_plugins() -> Optional[MarketplaceInfo]:
     try:
         # Find marketplace directories (e.g., claude-plugins-official)
         marketplace_dirs = [
-            d for d in marketplaces_dir.iterdir()
+            d
+            for d in marketplaces_dir.iterdir()
             if d.is_dir() and not d.name.startswith(".")
         ]
     except (PermissionError, OSError):
@@ -941,7 +966,10 @@ def _discover_marketplace_plugins() -> Optional[MarketplaceInfo]:
     plugins = []
 
     # Scan both plugins/ (internal) and external_plugins/ (external)
-    for source_dir_name, source_type in [("plugins", "internal"), ("external_plugins", "external")]:
+    for source_dir_name, source_type in [
+        ("plugins", "internal"),
+        ("external_plugins", "external"),
+    ]:
         source_dir = marketplace_dir / source_dir_name
         if not source_dir.exists():
             continue
@@ -963,7 +991,9 @@ def _discover_marketplace_plugins() -> Optional[MarketplaceInfo]:
     return MarketplaceInfo(name=marketplace_name, plugins=plugins)
 
 
-def _read_plugin_metadata(plugin_dir: Path, source_type: str) -> Optional[MarketplacePlugin]:
+def _read_plugin_metadata(
+    plugin_dir: Path, source_type: str
+) -> Optional[MarketplacePlugin]:
     """Read plugin metadata and detect capabilities from a plugin directory.
 
     Args:
@@ -1038,7 +1068,8 @@ def _list_subdirectory_names(directory: Path) -> List[str]:
 
     try:
         return sorted(
-            d.name for d in directory.iterdir()
+            d.name
+            for d in directory.iterdir()
             if d.is_dir() and not d.name.startswith(".")
         )
     except (PermissionError, OSError):

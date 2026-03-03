@@ -137,14 +137,16 @@ SPACE to toggle • ENTER to open • ESC to go back
                     # Use unique IDs to identify actions
                     if "ADD_GLOBAL_FILES" in selected:
                         from ai_launcher.ui.shared_context import add_global_files
+
                         if add_global_files(config_manager, scan_paths):
                             print("\n✓ Global files added\n")
                             input("Press Enter to continue...")
                             changes_made = True
                         continue
 
-                    elif "REMOVE_GLOBAL_FILES" in selected:
+                    if "REMOVE_GLOBAL_FILES" in selected:
                         from ai_launcher.ui.shared_context import remove_global_files
+
                         if remove_global_files(config_manager):
                             print("\n✓ Global files removed\n")
                             input("Press Enter to continue...")
@@ -184,7 +186,9 @@ def _build_settings_choices(config: ConfigData) -> List[str]:
     # Cleanup enabled (master switch)
     enabled_icon = "✓" if config.cleanup.enabled else "✗"
     enabled_color = "\033[32m" if config.cleanup.enabled else "\033[90m"
-    enabled_desc = "CLEANUP_ENABLED||Master switch for pre-launch cleanup. When disabled, no cleanup operations run.".replace("\n", "\\n")
+    enabled_desc = "CLEANUP_ENABLED||Master switch for pre-launch cleanup. When disabled, no cleanup operations run.".replace(
+        "\n", "\\n"
+    )
     choices.append(
         f"__SETTING__:cleanup_enabled:{enabled_desc}\t\t{enabled_color}[{enabled_icon}] Auto-cleanup before launch\033[0m"
     )
@@ -192,7 +196,9 @@ def _build_settings_choices(config: ConfigData) -> List[str]:
     # Provider-specific cleanup (always safe)
     if config.cleanup.enabled:
         provider_icon = "✓" if config.cleanup.clean_provider_files else "✗"
-        provider_color = "\033[32m" if config.cleanup.clean_provider_files else "\033[90m"
+        provider_color = (
+            "\033[32m" if config.cleanup.clean_provider_files else "\033[90m"
+        )
         provider_desc = "CLEAN_PROVIDER||Remove provider-specific files:\\n• .claude.json.backup.* files (bug workaround)\\n• Debug logs older than 7 days\\n• Old CLI versions\\n\\nSafe: Only affects AI provider files"
         choices.append(
             f"__SETTING__:clean_provider_files:{provider_desc}\t\t    {provider_color}[{provider_icon}] Clean provider files\033[0m \033[2m(backups, logs, old versions)\033[0m"
@@ -201,7 +207,11 @@ def _build_settings_choices(config: ConfigData) -> List[str]:
         # System-wide cache (WARNING)
         cache_icon = "✓" if config.cleanup.clean_system_cache else "✗"
         cache_color = "\033[33m" if config.cleanup.clean_system_cache else "\033[90m"
-        cache_warning = "\033[2m(WARNING: affects all apps)\033[0m" if config.cleanup.clean_system_cache else "\033[2m(system-wide)\033[0m"
+        cache_warning = (
+            "\033[2m(WARNING: affects all apps)\033[0m"
+            if config.cleanup.clean_system_cache
+            else "\033[2m(system-wide)\033[0m"
+        )
         cache_desc = "CLEAN_CACHE||⚠️  WARNING: System-wide operation\\n\\nClears entire ~/.cache directory, which affects:\\n• All applications, not just AI tools\\n• VS Code, browsers, build tools, etc.\\n• Apps will rebuild cache (performance hit)\\n\\nRecommended: Keep disabled unless you know what you're doing"
         choices.append(
             f"__SETTING__:clean_system_cache:{cache_desc}\t\t    {cache_color}[{cache_icon}] Clean ~/.cache\033[0m {cache_warning}"
@@ -210,7 +220,11 @@ def _build_settings_choices(config: ConfigData) -> List[str]:
         # npm cache (WARNING)
         npm_icon = "✓" if config.cleanup.clean_npm_cache else "✗"
         npm_color = "\033[33m" if config.cleanup.clean_npm_cache else "\033[90m"
-        npm_warning = "\033[2m(WARNING: slows npm installs)\033[0m" if config.cleanup.clean_npm_cache else "\033[2m(optional)\033[0m"
+        npm_warning = (
+            "\033[2m(WARNING: slows npm installs)\033[0m"
+            if config.cleanup.clean_npm_cache
+            else "\033[2m(optional)\033[0m"
+        )
         npm_desc = "CLEAN_NPM||⚠️  WARNING: Affects npm performance\\n\\nRuns 'npm cache clean --force' which:\\n• Clears downloaded npm packages (~/.npm)\\n• Can reach 800MB+ but is regenerated\\n• Slows down future npm install commands\\n• Unrelated to AI launcher functionality\\n\\nRecommended: Keep disabled unless disk space is critical"
         choices.append(
             f"__SETTING__:clean_npm_cache:{npm_desc}\t\t    {npm_color}[{npm_icon}] Clean npm cache\033[0m {npm_warning}"

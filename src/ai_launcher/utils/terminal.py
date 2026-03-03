@@ -104,7 +104,7 @@ def format_terminal_title(
         >>> format_terminal_title(
         ...     "{project} → {provider}",
         ...     Path("/home/user/projects/my-app"),
-        ...     "Claude Code"
+        ...     "Claude Code",
         ... )
         'my-app → Claude Code'
     """
@@ -208,10 +208,7 @@ def _supports_title_setting() -> bool:
         return True
 
     # Windows Terminal (WT_SESSION)
-    if os.environ.get("WT_SESSION"):
-        return True
-
-    return False
+    return bool(os.environ.get("WT_SESSION"))
 
 
 def _set_terminal_title_tmux(title: str) -> bool:

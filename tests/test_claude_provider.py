@@ -5,7 +5,6 @@ Created: 2026-02-12
 """
 
 import time
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -76,7 +75,9 @@ class TestClaudeCleanup:
         # File should still exist
         assert backup.exists()
 
-    def test_cleanup_backup_files(self, provider, tmp_path, monkeypatch, cleanup_config):
+    def test_cleanup_backup_files(
+        self, provider, tmp_path, monkeypatch, cleanup_config
+    ):
         """Test cleanup removes .claude.json.backup.* files."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -97,7 +98,9 @@ class TestClaudeCleanup:
         # Other files should remain
         assert other_file.exists()
 
-    def test_cleanup_old_debug_logs(self, provider, tmp_path, monkeypatch, cleanup_config):
+    def test_cleanup_old_debug_logs(
+        self, provider, tmp_path, monkeypatch, cleanup_config
+    ):
         """Test cleanup removes old debug logs."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -111,6 +114,7 @@ class TestClaudeCleanup:
         old_log.touch()
         # Set mtime to 10 days ago
         import os
+
         os.utime(old_log, (old_time, old_time))
 
         # Create recent log (1 day old)

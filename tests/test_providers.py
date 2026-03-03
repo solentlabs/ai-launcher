@@ -5,7 +5,6 @@ Created: 2026-02-09
 """
 
 import pytest
-from pathlib import Path
 
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 from ai_launcher.providers.claude import ClaudeProvider
@@ -157,7 +156,6 @@ class TestProviderRegistryExtended:
 
     def test_list_installed(self):
         """Test list_installed returns only installed providers."""
-        from unittest.mock import patch
 
         registry = ProviderRegistry()
         installed = registry.list_installed()
@@ -168,12 +166,10 @@ class TestProviderRegistryExtended:
 
     def test_list_installed_with_no_installed(self):
         """Test list_installed when nothing is installed."""
-        from unittest.mock import patch
 
         registry = ProviderRegistry()
         # Patch all providers to be not installed
         for provider in registry.list_all():
-            original = provider.is_installed
             provider.is_installed = lambda: False
 
         result = registry.list_installed()

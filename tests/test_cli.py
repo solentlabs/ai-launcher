@@ -1,5 +1,6 @@
 """Tests for CLI interface."""
 
+import pytest
 from typer.testing import CliRunner
 
 from ai_launcher.cli import app
@@ -14,8 +15,12 @@ def test_version_command():
     assert "ai-launcher" in result.stdout
 
 
-def test_claude_command_no_path():
-    """Test claude command without path argument shows error."""
-    result = runner.invoke(app, ["claude"])
+@pytest.mark.parametrize(
+    "command",
+    ["claude", "gemini", "cursor", "aider", "copilot"],
+)
+def test_provider_command_no_path(command):
+    """Test that provider commands without path argument show error."""
+    result = runner.invoke(app, [command])
     assert result.exit_code == 1
     assert "No directory specified" in result.output

@@ -38,6 +38,25 @@ def validate_directory(path: Path) -> bool:
     return path.exists() and path.is_dir()
 
 
+def is_relative_to(path: Path, base: Path) -> bool:
+    """Check if path is relative to base (Python 3.8 compatible).
+
+    Equivalent to Path.is_relative_to() which requires Python 3.9+.
+
+    Args:
+        path: Path to check
+        base: Base path
+
+    Returns:
+        True if path is relative to base
+    """
+    try:
+        path.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
 def get_relative_path(path: Path, base: Path) -> Path:
     """Get relative path from base, or return path if not relative.
 

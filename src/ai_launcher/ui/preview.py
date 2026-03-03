@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from ai_launcher.core.models import Project
+from ai_launcher.utils.paths import is_relative_to
 
 if TYPE_CHECKING:
     from ai_launcher.core.provider_data import DirectoryListing, GitStatus
@@ -114,7 +115,11 @@ def build_tree_view(
             if base != Path("/"):
                 # Format base path with ~ shorthand
                 home = Path.home()
-                display_base = f"~/{base.relative_to(home)}" if base.is_relative_to(home) else str(base)
+                display_base = (
+                    f"~/{base.relative_to(home)}"
+                    if is_relative_to(base, home)
+                    else str(base)
+                )
                 dir_display = f"\033[2m📁 {display_base}/\033[0m"
                 formatted_lines.append(f"{base}\t\t{dir_display}")
             child_prefix = ""
@@ -229,7 +234,9 @@ def _get_git_status(project_path: Path) -> Optional["GitStatus"]:
 
         if result.returncode == 0:
             changed_files = [
-                line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+                line.strip()
+                for line in result.stdout.strip().split("\n")
+                if line.strip()
             ]
             return GitStatus(
                 is_repo=True,
@@ -274,7 +281,9 @@ def _get_directory_listing(project_path: Path) -> "DirectoryListing":
         return DirectoryListing()
 
 
-def generate_provider_preview(project_path: Path, provider_name: str = "claude-code") -> str:
+def generate_provider_preview(
+    project_path: Path, provider_name: str = "claude-code"
+) -> str:
     """Generate preview using provider abstraction and formatter.
 
     Collects generic data (git, directory) and provider-specific data,

@@ -12,12 +12,15 @@ import os
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 # ConfigManager removed - using runtime config from CLI flags
-from ai_launcher.core.discovery import get_all_projects
 from ai_launcher.core.models import Project
 from ai_launcher.ui.preview import build_tree_view
+from ai_launcher.utils.paths import is_relative_to
+
+if TYPE_CHECKING:
+    from ai_launcher.core.models import ConfigData
 
 
 def clear_screen() -> None:
@@ -81,7 +84,11 @@ def select_project(
 
         # Format base path with ~ shorthand
         home = Path.home()
-        display_base = f"~/{base_path.relative_to(home)}" if base_path.is_relative_to(home) else str(base_path)
+        display_base = (
+            f"~/{base_path.relative_to(home)}"
+            if is_relative_to(base_path, home)
+            else str(base_path)
+        )
 
         header = f"""╭─────────────────────────────────────────╮
 │            AI Launcher                  │
@@ -164,11 +171,7 @@ Type to filter • Arrows to navigate
                 continue
 
             # Handle empty line action item (just loop back)
-            elif selected == "__ACTION__\t\t":
-                continue
-
-            # Handle spacing lines (just loop back)
-            elif selected.startswith("__SPACE__"):
+            if selected == "__ACTION__\t\t" or selected.startswith("__SPACE__"):
                 continue
 
             # Regular project selection

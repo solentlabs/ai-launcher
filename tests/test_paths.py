@@ -84,4 +84,4 @@ def test_get_relative_path_not_relative(tmp_path):
 def test_get_relative_path_same_path(tmp_path):
     """Test getting relative path when path equals base."""
     result = get_relative_path(tmp_path, tmp_path)
-    assert result == Path(".")
+    assert result == Path()

@@ -1,10 +1,6 @@
 """Tests for configuration preview output."""
 
 import re
-import sys
-from pathlib import Path
-
-import pytest
 
 
 def strip_ansi(text):
@@ -87,17 +83,17 @@ def test_configuration_preview_indentation(monkeypatch, capsys, tmp_path):
     context_lines = [
         l for l in lines if "Context:" in l and l.strip().startswith("Context:")
     ]
-    assert any(
-        l.startswith("   ") for l in context_lines
-    ), "Context should have 3-space indent"
+    assert any(l.startswith("   ") for l in context_lines), (
+        "Context should have 3-space indent"
+    )
 
     # Check that option descriptions have 5-space indent
     global_files_lines = [
         l for l in lines if "--global-files" in l and "Load files" in l
     ]
-    assert any(
-        l.startswith("     --global-files") for l in global_files_lines
-    ), "Options should have 5-space indent"
+    assert any(l.startswith("     --global-files") for l in global_files_lines), (
+        "Options should have 5-space indent"
+    )
 
 
 def test_configuration_preview_multiline_command(monkeypatch, capsys, tmp_path):
@@ -125,11 +121,11 @@ def test_configuration_preview_multiline_command(monkeypatch, capsys, tmp_path):
     # Files appear in both Global Files section (with bullet) and Current command section
     # Filter to command section lines (no bullet, 6-space indent)
     command_file_lines = [
-        l
-        for l in lines
-        if ("file1.md" in l or "file2.md" in l) and "\u2022" not in l
+        l for l in lines if ("file1.md" in l or "file2.md" in l) and "\u2022" not in l
     ]
-    assert len(command_file_lines) == 2, "Each file should be on separate line in command section"
-    assert all(
-        l.startswith("      ") for l in command_file_lines
-    ), "Files should have 6-space indent"
+    assert len(command_file_lines) == 2, (
+        "Each file should be on separate line in command section"
+    )
+    assert all(l.startswith("      ") for l in command_file_lines), (
+        "Files should have 6-space indent"
+    )

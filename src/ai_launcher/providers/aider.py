@@ -12,7 +12,7 @@ import shutil
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from ai_launcher.core.provider_data import ContextFile, ProviderPreviewData
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
@@ -145,7 +145,7 @@ class AiderProvider(AIProvider):
         if aider_config.exists():
             try:
                 stat = aider_config.stat()
-                with open(aider_config, "r", encoding="utf-8") as f:
+                with open(aider_config, encoding="utf-8") as f:
                     lines = f.readlines()
                     context_files.append(
                         ContextFile(
@@ -166,7 +166,7 @@ class AiderProvider(AIProvider):
         if aider_md.exists():
             try:
                 stat = aider_md.stat()
-                with open(aider_md, "r", encoding="utf-8") as f:
+                with open(aider_md, encoding="utf-8") as f:
                     lines = f.readlines()
                     context_files.append(
                         ContextFile(
@@ -198,3 +198,11 @@ class AiderProvider(AIProvider):
         return [
             Path.home() / ".aider",
         ]
+
+    def get_documentation_urls(self) -> Dict[str, str]:
+        """Get Aider documentation URLs."""
+        return {
+            "Documentation": "https://aider.chat/docs/",
+            "Installation": "https://aider.chat/docs/install.html",
+            "Configuration": "https://aider.chat/docs/config.html",
+        }

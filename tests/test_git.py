@@ -22,25 +22,24 @@ def test_clone_repository_url_validation():
         clone_repository("ftp://example.com/repo", Path("/tmp"), None)
 
 
-def test_clone_repository_https_url_accepted(tmp_path):
-    """Test that HTTPS URLs are accepted."""
+@pytest.mark.parametrize(
+    "url,expected_name",
+    [
+        ("https://github.com/user/repo.git", "repo"),
+        ("git@github.com:user/repo.git", "repo"),
+    ],
+    ids=["https", "ssh"],
+)
+def test_clone_repository_url_accepted(tmp_path, url, expected_name):
+    """Test that valid git URLs (HTTPS and SSH) are accepted."""
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
-        result = clone_repository("https://github.com/user/repo.git", tmp_path, None)
-        assert result == tmp_path / "repo"
-
-
-def test_clone_repository_ssh_url_accepted(tmp_path):
-    """Test that SSH URLs (git@) are accepted."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
-        result = clone_repository("git@github.com:user/repo.git", tmp_path, None)
-        assert result == tmp_path / "repo"
+        result = clone_repository(url, tmp_path, None)
+        assert result == tmp_path / expected_name
 
 
 def test_clone_repository_existing_directory(tmp_path):
     """Test that cloning to existing directory is rejected."""
-    # Create existing directory with the same name as the repo in the URL
     existing = tmp_path / "repo"
     existing.mkdir()
 
@@ -50,7 +49,6 @@ def test_clone_repository_existing_directory(tmp_path):
 
 def test_clone_repository_existing_directory_with_subfolder(tmp_path):
     """Test that cloning to existing directory in subfolder is rejected."""
-    # Create existing directory
     subfolder = tmp_path / "projects"
     subfolder.mkdir()
     existing = subfolder / "repo"
@@ -74,7 +72,6 @@ def test_clone_repository_success(mock_run, tmp_path):
     expected_path = tmp_path / "projects" / "my-repo"
     assert result == expected_path
 
-    # Check that git clone was called correctly
     mock_run.assert_called_once()
     args = mock_run.call_args[0][0]
     assert args[0] == "git"
@@ -96,10 +93,7 @@ def test_clone_repository_success_no_subfolder(mock_run, tmp_path):
 
     expected_path = tmp_path / "my-repo"
     assert result == expected_path
-
-    # Verify the target path
-    args = mock_run.call_args[0][0]
-    assert args[3] == str(expected_path)
+    assert mock_run.call_args[0][0][3] == str(expected_path)
 
 
 @patch("subprocess.run")
@@ -113,25 +107,22 @@ def test_clone_repository_git_failure(mock_run, tmp_path):
         clone_repository("https://github.com/user/repo.git", tmp_path, None)
 
 
+@pytest.mark.parametrize(
+    "stderr,match_pattern",
+    [
+        ("fatal: repository not found", "fatal: repository not found"),
+        ("", "Git clone failed"),
+    ],
+    ids=["with_stderr", "without_stderr"],
+)
 @patch("subprocess.run")
-def test_clone_repository_git_failure_with_stderr(mock_run, tmp_path):
-    """Test handling of git clone failure with stderr message."""
+def test_clone_repository_git_failure_stderr(mock_run, tmp_path, stderr, match_pattern):
+    """Test handling of git clone failure with and without stderr."""
     error = subprocess.CalledProcessError(128, "git")
-    error.stderr = "fatal: repository not found"
+    error.stderr = stderr
     mock_run.side_effect = error
 
-    with pytest.raises(RuntimeError, match="fatal: repository not found"):
-        clone_repository("https://github.com/user/repo.git", tmp_path, None)
-
-
-@patch("subprocess.run")
-def test_clone_repository_git_failure_without_stderr(mock_run, tmp_path):
-    """Test handling of git clone failure without stderr message."""
-    error = subprocess.CalledProcessError(128, "git")
-    error.stderr = ""
-    mock_run.side_effect = error
-
-    with pytest.raises(RuntimeError, match="Git clone failed"):
+    with pytest.raises(RuntimeError, match=match_pattern):
         clone_repository("https://github.com/user/repo.git", tmp_path, None)
 
 
@@ -149,7 +140,6 @@ def test_clone_repository_creates_parent_directory(mock_run, tmp_path):
     """Test that parent directories are created if they don't exist."""
     mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
 
-    # Use a subfolder that doesn't exist yet
     result = clone_repository(
         "https://github.com/user/repo.git",
         tmp_path,
@@ -158,25 +148,32 @@ def test_clone_repository_creates_parent_directory(mock_run, tmp_path):
 
     expected_path = tmp_path / "deep" / "nested" / "path" / "repo"
     assert result == expected_path
-
-    # Verify parent was created
     assert expected_path.parent.exists()
 
 
-def test_clone_extracts_repo_name():
-    """Test that repository name is correctly extracted from URL."""
-    test_cases = [
+@pytest.mark.parametrize(
+    "url,expected_name",
+    [
         ("https://github.com/user/repo.git", "repo"),
         ("https://github.com/user/repo", "repo"),
         ("git@github.com:user/repo.git", "repo"),
         ("https://gitlab.com/user/my-project.git", "my-project"),
         ("https://github.com/user/repo/", "repo"),
         ("git@bitbucket.org:user/my-app.git", "my-app"),
-    ]
-
-    for url, expected_name in test_cases:
-        extracted = url.rstrip("/").split("/")[-1].replace(".git", "")
-        assert extracted == expected_name
+    ],
+    ids=[
+        "https_dotgit",
+        "https_bare",
+        "ssh_dotgit",
+        "gitlab",
+        "trailing_slash",
+        "bitbucket",
+    ],
+)
+def test_clone_extracts_repo_name(url, expected_name):
+    """Test that repository name is correctly extracted from URL."""
+    extracted = url.rstrip("/").split("/")[-1].replace(".git", "")
+    assert extracted == expected_name
 
 
 @patch("subprocess.run")

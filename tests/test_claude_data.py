@@ -12,8 +12,6 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-
 from ai_launcher.providers.claude import (
     _encode_project_path,
     _get_claude_session_config,
@@ -310,12 +308,13 @@ class TestGetClaudeSessionConfig:
 
         # Create project settings with permissions
         import json
+
         claude_dir = project_path / ".claude"
         claude_dir.mkdir()
         settings = claude_dir / "settings.local.json"
-        settings.write_text(json.dumps({
-            "permissions": {"allow": ["Bash(git *)", "Read(*)"]}
-        }))
+        settings.write_text(
+            json.dumps({"permissions": {"allow": ["Bash(git *)", "Read(*)"]}})
+        )
 
         result = _get_claude_session_config(project_path)
 
@@ -332,6 +331,7 @@ class TestGetClaudeSessionConfig:
 
         # Create global settings with model
         import json
+
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
         settings = claude_dir / "settings.json"
@@ -351,12 +351,11 @@ class TestGetClaudeSessionConfig:
 
         # Create MCP config
         import json
+
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
         mcp = claude_dir / "mcp.json"
-        mcp.write_text(json.dumps({
-            "mcpServers": {"filesystem": {}, "github": {}}
-        }))
+        mcp.write_text(json.dumps({"mcpServers": {"filesystem": {}, "github": {}}}))
 
         result = _get_claude_session_config(project_path)
 
@@ -538,4 +537,3 @@ class TestGetGlobalContextSummary:
         result = _get_global_context_summary()
 
         assert result is None
-

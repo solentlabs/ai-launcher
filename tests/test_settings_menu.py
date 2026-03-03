@@ -3,13 +3,16 @@
 Author: Solent Labs™
 """
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai_launcher.core.models import CleanupConfig, ConfigData, ContextConfig
-from ai_launcher.ui.settings import _build_settings_choices, _toggle_setting, show_settings_menu
+from ai_launcher.core.models import ConfigData
+from ai_launcher.ui.settings import (
+    _build_settings_choices,
+    _toggle_setting,
+    show_settings_menu,
+)
 
 
 class TestBuildSettingsChoices:
@@ -70,31 +73,30 @@ class TestBuildSettingsChoices:
 class TestToggleSetting:
     """Tests for _toggle_setting()."""
 
-    def test_toggle_cleanup_enabled(self):
+    @pytest.mark.parametrize(
+        "setting_name,attr_name,initial_value",
+        [
+            ("cleanup_enabled", "enabled", False),
+            ("clean_provider_files", "clean_provider_files", True),
+            ("clean_system_cache", "clean_system_cache", False),
+            ("clean_npm_cache", "clean_npm_cache", False),
+        ],
+    )
+    def test_toggle_setting(self, setting_name, attr_name, initial_value):
+        """Test that toggling a setting flips its boolean value."""
+        config = ConfigData()
+        assert getattr(config.cleanup, attr_name) is initial_value
+        config = _toggle_setting(config, setting_name)
+        assert getattr(config.cleanup, attr_name) is (not initial_value)
+
+    def test_toggle_cleanup_enabled_round_trip(self):
+        """Test that toggling cleanup_enabled twice returns to original."""
         config = ConfigData()
         assert config.cleanup.enabled is False
         config = _toggle_setting(config, "cleanup_enabled")
         assert config.cleanup.enabled is True
         config = _toggle_setting(config, "cleanup_enabled")
         assert config.cleanup.enabled is False
-
-    def test_toggle_clean_provider_files(self):
-        config = ConfigData()
-        assert config.cleanup.clean_provider_files is True
-        config = _toggle_setting(config, "clean_provider_files")
-        assert config.cleanup.clean_provider_files is False
-
-    def test_toggle_clean_system_cache(self):
-        config = ConfigData()
-        assert config.cleanup.clean_system_cache is False
-        config = _toggle_setting(config, "clean_system_cache")
-        assert config.cleanup.clean_system_cache is True
-
-    def test_toggle_clean_npm_cache(self):
-        config = ConfigData()
-        assert config.cleanup.clean_npm_cache is False
-        config = _toggle_setting(config, "clean_npm_cache")
-        assert config.cleanup.clean_npm_cache is True
 
     def test_toggle_unknown_setting(self):
         config = ConfigData()

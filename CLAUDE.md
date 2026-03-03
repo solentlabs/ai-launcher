@@ -7,7 +7,7 @@
 
 ## Project Overview
 
-AI Launcher is a terminal-first tool that provides a single entry point to launch AI coding assistants (starting with Claude Code) across multiple projects. It maintains persistent context, discovers projects automatically, and provides an interactive fuzzy-search interface.
+AI Launcher is a terminal-first tool that provides a single entry point to launch AI coding assistants (Claude Code, Gemini CLI, Cursor, Aider, GitHub Copilot CLI, and more) across multiple projects. It maintains persistent context, discovers projects automatically, and provides an interactive fuzzy-search interface.
 
 **Core Philosophy:**
 - **Local-first** - All data stays on your machine
@@ -136,6 +136,7 @@ Provider implementations that collect data:
   - `GeminiProvider` (`gemini.py`) - Google's Gemini CLI
   - `CursorProvider` (`cursor.py`) - Cursor IDE
   - `AiderProvider` (`aider.py`) - Aider pair programmer
+  - `CopilotProvider` (`copilot.py`) - GitHub Copilot CLI
 
 - **ProviderRegistry** (`registry.py`)
   - Auto-discovers all providers at runtime
@@ -188,7 +189,7 @@ Display in fzf preview pane
 - ✅ Easy to add new providers (extend AIProvider)
 - ✅ Strongly typed (no dict coupling)
 - ✅ Centralized formatting (easier to maintain)
-- ✅ Testable components (301 tests and growing)
+- ✅ Testable components (644 tests and growing)
 
 ### Project Discovery
 1. Scans configured paths for `.git` directories
@@ -254,6 +255,7 @@ ai-launcher/
 │   │   ├── gemini.py            # GeminiProvider implementation
 │   │   ├── cursor.py            # CursorProvider implementation
 │   │   ├── aider.py             # AiderProvider implementation
+│   │   ├── copilot.py           # CopilotProvider implementation
 │   │   └── registry.py          # ProviderRegistry (auto-discovery)
 │   ├── ui/                      # User interface
 │   │   ├── browser.py           # Directory browser
@@ -277,7 +279,7 @@ ai-launcher/
 │       ├── humanize.py          # Size/count formatting
 │       ├── session.py           # Session management
 │       └── terminal.py          # Terminal title management
-├── tests/                       # Test suite (301 tests)
+├── tests/                       # Test suite (644 tests)
 │   ├── conftest.py              # Shared fixtures
 │   ├── test_browser.py          # Directory browser tests
 │   ├── test_cli.py              # CLI tests
@@ -299,7 +301,8 @@ ai-launcher/
 │   ├── test_providers.py        # Provider tests
 │   ├── test_selector.py         # Selector tests
 │   ├── test_startup_report.py   # Startup report tests
-│   └── test_terminal.py         # Terminal title tests
+│   ├── test_terminal.py         # Terminal title tests
+│   └── test_copilot_provider.py # Copilot provider tests
 ├── docs/                        # Documentation
 │   ├── configuration.md
 │   ├── installation.md
@@ -598,7 +601,7 @@ flake8 src/ tests/
 
 ## Testing
 
-### Test Suite (301 Tests)
+### Test Suite (644 Tests)
 The project has comprehensive test coverage:
 
 ```bash

@@ -1,0 +1,75 @@
+name: Tag Protection
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag is on main branch
+        run: |
+          TAG_COMMIT=$(git rev-parse HEAD)
+          if ! git branch -r --contains "$TAG_COMMIT" | grep -q 'origin/main'; then
+            echo "::error::Tag must be on the main branch"
+            exit 1
+          fi
+          echo "✓ Tag is on main branch"
+
+      - name: Validate CI passed on tagged commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT=$(git rev-parse HEAD)
+          STATUS=$(gh api "repos/${{ github.repository }}/commits/$COMMIT/status" --jq '.state')
+          if [ "$STATUS" != "success" ]; then
+            echo "::error::CI status is '$STATUS' — must be 'success' to tag"
+            exit 1
+          fi
+          echo "✓ CI passed on tagged commit"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate version consistency
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "Tag version: $TAG"
+
+          # Check pyproject.toml
+          PYPROJECT_VER=$(python3 -c "
+          import re
+          content = open('pyproject.toml').read()
+          match = re.search(r'^version\s*=\s*\"([^\"]+)\"', content, re.MULTILINE)
+          print(match.group(1) if match else 'NOT_FOUND')
+          ")
+          echo "pyproject.toml version: $PYPROJECT_VER"
+
+          if [ "$PYPROJECT_VER" != "$TAG" ]; then
+            echo "::error::pyproject.toml version ($PYPROJECT_VER) does not match tag ($TAG)"
+            exit 1
+          fi
+
+          # Check __init__.py
+          INIT_VER=$(python3 -c "
+          import re
+          content = open('src/ai_launcher/__init__.py').read()
+          match = re.search(r'^__version__\s*=\s*\"([^\"]+)\"', content, re.MULTILINE)
+          print(match.group(1) if match else 'NOT_FOUND')
+          ")
+          echo "__init__.py version: $INIT_VER"
+
+          if [ "$INIT_VER" != "$TAG" ]; then
+            echo "::error::__init__.py version ($INIT_VER) does not match tag ($TAG)"
+            exit 1
+          fi
+
+          echo "✓ All versions match: $TAG"

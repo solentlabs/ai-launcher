@@ -188,8 +188,9 @@ class TestAnalyzeSingleFile:
 
         # Patch exists() to return True (bypassing its internal stat call)
         # while stat() itself raises OSError in the try block
-        with patch.object(Path, "stat", failing_stat), \
-             patch.object(Path, "exists", forced_exists):
+        with patch.object(Path, "stat", failing_stat), patch.object(
+            Path, "exists", forced_exists
+        ):
             result = analyzer.analyze_single_file(f)
         assert result["exists"] is True
         assert result["size"] == 0

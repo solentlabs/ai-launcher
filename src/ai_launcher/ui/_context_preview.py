@@ -161,7 +161,7 @@ def show_project_context(project_path: Path) -> None:
                 for line in lines:
                     print(f"  {line}")
                 if len(result.stdout.strip().split("\n")) > 10:
-                    print(f"  ... and more changes")
+                    print("  ... and more changes")
             else:
                 print("  Working tree clean")
         except Exception:

@@ -7,8 +7,6 @@ Created: 2026-02-12
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-
 from ai_launcher.core.provider_data import (
     ContextFile,
     DirectoryListing,
@@ -264,9 +262,13 @@ class TestMemoryInfo:
     def test_memory_info_with_data(self):
         """Test MemoryInfo with actual data."""
         info = MemoryInfo(
-            personal_memory=Path("/home/user/.claude/projects/-home-user/memory/MEMORY.md"),
+            personal_memory=Path(
+                "/home/user/.claude/projects/-home-user/memory/MEMORY.md"
+            ),
             personal_lines=42,
-            project_memory=Path("/home/user/.claude/projects/-home-user-project/memory/MEMORY.md"),
+            project_memory=Path(
+                "/home/user/.claude/projects/-home-user-project/memory/MEMORY.md"
+            ),
             project_lines=15,
         )
 
@@ -427,7 +429,12 @@ class TestMarketplaceInfo:
         """Test creating marketplace info with plugins."""
         plugins = [
             MarketplacePlugin(name="hookify", description="Hook management"),
-            MarketplacePlugin(name="github", description="GitHub MCP", source_type="external", has_mcp=True),
+            MarketplacePlugin(
+                name="github",
+                description="GitHub MCP",
+                source_type="external",
+                has_mcp=True,
+            ),
         ]
 
         info = MarketplaceInfo(name="claude-plugins-official", plugins=plugins)

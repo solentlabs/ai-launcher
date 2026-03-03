@@ -4,10 +4,11 @@ Shows users exactly what context Claude loads at startup, with links to
 documentation and hints for optimization.
 """
 
+import contextlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
-import json
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from ai_launcher.providers.base import AIProvider
@@ -63,31 +64,41 @@ class StartupReport:
             if ctx_file.exists:
                 hints = []
                 if ctx_file.line_count and ctx_file.line_count > 500:
-                    hints.append("⚠️  File is large - consider splitting into multiple context files")
+                    hints.append(
+                        "⚠️  File is large - consider splitting into multiple context files"
+                    )
                 if ctx_file.size_bytes and ctx_file.size_bytes > 50000:
-                    hints.append("💡 Consider moving detailed docs to separate files and linking them")
+                    hints.append(
+                        "💡 Consider moving detailed docs to separate files and linking them"
+                    )
 
-                self.sources.append(ContextSource(
-                    name=f"Project Instructions ({ctx_file.label})",
-                    file_path=ctx_file.path,
-                    status="loaded",
-                    size_bytes=ctx_file.size_bytes,
-                    line_count=ctx_file.line_count,
-                    purpose="Project-specific rules, architecture, and conventions",
-                    doc_url=doc_urls.get("CLAUDE.md guide", ""),
-                    hints=hints,
-                ))
+                self.sources.append(
+                    ContextSource(
+                        name=f"Project Instructions ({ctx_file.label})",
+                        file_path=ctx_file.path,
+                        status="loaded",
+                        size_bytes=ctx_file.size_bytes,
+                        line_count=ctx_file.line_count,
+                        purpose="Project-specific rules, architecture, and conventions",
+                        doc_url=doc_urls.get("CLAUDE.md guide", ""),
+                        hints=hints,
+                    )
+                )
             else:
-                self.sources.append(ContextSource(
-                    name=f"Project Instructions ({ctx_file.label})",
-                    file_path=None,
-                    status="missing",
-                    size_bytes=None,
-                    line_count=None,
-                    purpose="Project-specific rules, architecture, and conventions",
-                    doc_url=doc_urls.get("CLAUDE.md guide", ""),
-                    hints=[f"💡 Create {ctx_file.label} to add project-specific instructions"],
-                ))
+                self.sources.append(
+                    ContextSource(
+                        name=f"Project Instructions ({ctx_file.label})",
+                        file_path=None,
+                        status="missing",
+                        size_bytes=None,
+                        line_count=None,
+                        purpose="Project-specific rules, architecture, and conventions",
+                        doc_url=doc_urls.get("CLAUDE.md guide", ""),
+                        hints=[
+                            f"💡 Create {ctx_file.label} to add project-specific instructions"
+                        ],
+                    )
+                )
 
         # Memory from provider data
         if data.memory_info:
@@ -95,24 +106,48 @@ class StartupReport:
             if mem.project_memory:
                 hints = []
                 if mem.project_lines > 200:
-                    hints.append("⚠️  Only first 200 lines are loaded - move details to topic files")
+                    hints.append(
+                        "⚠️  Only first 200 lines are loaded - move details to topic files"
+                    )
                 elif mem.project_lines > 150:
-                    hints.append("💡 Approaching 200-line limit - consider organizing by topics")
+                    hints.append(
+                        "💡 Approaching 200-line limit - consider organizing by topics"
+                    )
                 elif mem.project_lines < 20 and mem.project_lines > 0:
                     hints.append("✅ Good - concise and focused")
 
-                self.sources.append(ContextSource(
-                    name="Auto Memory (MEMORY.md)",
-                    file_path=mem.project_memory,
-                    status="loaded",
-                    size_bytes=mem.project_memory.stat().st_size if mem.project_memory.exists() else None,
-                    line_count=mem.project_lines,
-                    purpose="Persistent learnings across sessions (first 200 lines only)",
-                    doc_url=doc_urls.get("Auto memory", ""),
-                    hints=hints,
-                ))
+                self.sources.append(
+                    ContextSource(
+                        name="Auto Memory (MEMORY.md)",
+                        file_path=mem.project_memory,
+                        status="loaded",
+                        size_bytes=mem.project_memory.stat().st_size
+                        if mem.project_memory.exists()
+                        else None,
+                        line_count=mem.project_lines,
+                        purpose="Persistent learnings across sessions (first 200 lines only)",
+                        doc_url=doc_urls.get("Auto memory", ""),
+                        hints=hints,
+                    )
+                )
             else:
-                self.sources.append(ContextSource(
+                self.sources.append(
+                    ContextSource(
+                        name="Auto Memory (MEMORY.md)",
+                        file_path=None,
+                        status="not created yet",
+                        size_bytes=None,
+                        line_count=None,
+                        purpose="Persistent learnings across sessions (first 200 lines only)",
+                        doc_url=doc_urls.get("Auto memory", ""),
+                        hints=[
+                            "💡 Auto memory will be created as the AI learns about your project"
+                        ],
+                    )
+                )
+        else:
+            self.sources.append(
+                ContextSource(
                     name="Auto Memory (MEMORY.md)",
                     file_path=None,
                     status="not created yet",
@@ -120,19 +155,11 @@ class StartupReport:
                     line_count=None,
                     purpose="Persistent learnings across sessions (first 200 lines only)",
                     doc_url=doc_urls.get("Auto memory", ""),
-                    hints=["💡 Auto memory will be created as the AI learns about your project"],
-                ))
-        else:
-            self.sources.append(ContextSource(
-                name="Auto Memory (MEMORY.md)",
-                file_path=None,
-                status="not created yet",
-                size_bytes=None,
-                line_count=None,
-                purpose="Persistent learnings across sessions (first 200 lines only)",
-                doc_url=doc_urls.get("Auto memory", ""),
-                hints=["💡 Auto memory will be created as the AI learns about your project"],
-            ))
+                    hints=[
+                        "💡 Auto memory will be created as the AI learns about your project"
+                    ],
+                )
+            )
 
         # Session config from provider data
         if data.session_config and data.session_config.model:
@@ -140,16 +167,20 @@ class StartupReport:
         else:
             status = "missing"
 
-        self.sources.append(ContextSource(
-            name="Global Settings",
-            file_path=None,
-            status=status,
-            size_bytes=None,
-            line_count=None,
-            purpose="Global preferences (model selection, features)",
-            doc_url=doc_urls.get("Settings", ""),
-            hints=["✅ Global preferences loaded"] if "loaded" in status else ["💡 Using default settings"],
-        ))
+        self.sources.append(
+            ContextSource(
+                name="Global Settings",
+                file_path=None,
+                status=status,
+                size_bytes=None,
+                line_count=None,
+                purpose="Global preferences (model selection, features)",
+                doc_url=doc_urls.get("Settings", ""),
+                hints=["✅ Global preferences loaded"]
+                if "loaded" in status
+                else ["💡 Using default settings"],
+            )
+        )
 
         # Project settings
         self._check_project_settings()
@@ -168,9 +199,13 @@ class StartupReport:
             hints = []
 
             if lines > 500:
-                hints.append("⚠️  File is large - consider splitting into multiple context files")
+                hints.append(
+                    "⚠️  File is large - consider splitting into multiple context files"
+                )
             if size > 50000:
-                hints.append("💡 Consider moving detailed docs to separate files and linking them")
+                hints.append(
+                    "💡 Consider moving detailed docs to separate files and linking them"
+                )
 
         else:
             size = None
@@ -178,19 +213,21 @@ class StartupReport:
             status = "missing"
             hints = [
                 "💡 Create CLAUDE.md to add project-specific instructions",
-                "📚 See examples: https://github.com/anthropics/claude-code/examples"
+                "📚 See examples: https://github.com/anthropics/claude-code/examples",
             ]
 
-        self.sources.append(ContextSource(
-            name="Project Instructions (CLAUDE.md)",
-            file_path=claude_md if claude_md.exists() else None,
-            status=status,
-            size_bytes=size,
-            line_count=lines,
-            purpose="Project-specific rules, architecture, and conventions",
-            doc_url="https://code.claude.com/docs/en/claude-md",
-            hints=hints
-        ))
+        self.sources.append(
+            ContextSource(
+                name="Project Instructions (CLAUDE.md)",
+                file_path=claude_md if claude_md.exists() else None,
+                status=status,
+                size_bytes=size,
+                line_count=lines,
+                purpose="Project-specific rules, architecture, and conventions",
+                doc_url="https://code.claude.com/docs/en/claude-md",
+                hints=hints,
+            )
+        )
 
     def _check_auto_memory(self) -> None:
         """Check for auto memory files."""
@@ -209,9 +246,13 @@ class StartupReport:
             hints = []
 
             if lines > 200:
-                hints.append("⚠️  Only first 200 lines are loaded - move details to topic files")
+                hints.append(
+                    "⚠️  Only first 200 lines are loaded - move details to topic files"
+                )
             if lines > 150:
-                hints.append("💡 Approaching 200-line limit - consider organizing by topics")
+                hints.append(
+                    "💡 Approaching 200-line limit - consider organizing by topics"
+                )
             if lines < 20:
                 hints.append("✅ Good - concise and focused")
 
@@ -221,19 +262,21 @@ class StartupReport:
             status = "not created yet"
             hints = [
                 "💡 Auto memory will be created as Claude learns about your project",
-                "💬 Tell Claude to remember things: 'Remember we use pytest for testing'"
+                "💬 Tell Claude to remember things: 'Remember we use pytest for testing'",
             ]
 
-        self.sources.append(ContextSource(
-            name="Auto Memory (MEMORY.md)",
-            file_path=memory_file if memory_file.exists() else None,
-            status=status,
-            size_bytes=size,
-            line_count=lines,
-            purpose="Claude's persistent learnings across sessions (first 200 lines only)",
-            doc_url="https://code.claude.com/docs/en/memory",
-            hints=hints
-        ))
+        self.sources.append(
+            ContextSource(
+                name="Auto Memory (MEMORY.md)",
+                file_path=memory_file if memory_file.exists() else None,
+                status=status,
+                size_bytes=size,
+                line_count=lines,
+                purpose="Claude's persistent learnings across sessions (first 200 lines only)",
+                doc_url="https://code.claude.com/docs/en/memory",
+                hints=hints,
+            )
+        )
 
     def _check_global_settings(self) -> None:
         """Check for global Claude settings."""
@@ -254,16 +297,18 @@ class StartupReport:
             status = "missing"
             hints = ["💡 Claude will use default settings"]
 
-        self.sources.append(ContextSource(
-            name="Global Settings",
-            file_path=settings_file if settings_file.exists() else None,
-            status=status,
-            size_bytes=size,
-            line_count=None,
-            purpose="Global Claude preferences (model selection, features)",
-            doc_url="https://code.claude.com/docs/en/settings",
-            hints=hints
-        ))
+        self.sources.append(
+            ContextSource(
+                name="Global Settings",
+                file_path=settings_file if settings_file.exists() else None,
+                status=status,
+                size_bytes=size,
+                line_count=None,
+                purpose="Global Claude preferences (model selection, features)",
+                doc_url="https://code.claude.com/docs/en/settings",
+                hints=hints,
+            )
+        )
 
     def _check_project_settings(self) -> None:
         """Check for project-level settings override."""
@@ -276,18 +321,22 @@ class StartupReport:
         else:
             size = None
             status = "not present"
-            hints = ["💡 Create .claude/settings.local.json to override global settings"]
+            hints = [
+                "💡 Create .claude/settings.local.json to override global settings"
+            ]
 
-        self.sources.append(ContextSource(
-            name="Project Settings Override",
-            file_path=settings_file if settings_file.exists() else None,
-            status=status,
-            size_bytes=size,
-            line_count=None,
-            purpose="Project-specific overrides for global settings",
-            doc_url="https://code.claude.com/docs/en/settings",
-            hints=hints
-        ))
+        self.sources.append(
+            ContextSource(
+                name="Project Settings Override",
+                file_path=settings_file if settings_file.exists() else None,
+                status=status,
+                size_bytes=size,
+                line_count=None,
+                purpose="Project-specific overrides for global settings",
+                doc_url="https://code.claude.com/docs/en/settings",
+                hints=hints,
+            )
+        )
 
     def _check_git_context(self) -> None:
         """Check for git repository context."""
@@ -300,31 +349,39 @@ class StartupReport:
             status = "not a git repo"
             hints = ["💡 Initialize git to enable version context: git init"]
 
-        self.sources.append(ContextSource(
-            name="Git Context",
-            file_path=git_dir if git_dir.exists() else None,
-            status=status,
-            size_bytes=None,
-            line_count=None,
-            purpose="Branch name, git status, recent commits",
-            doc_url="https://git-scm.com/doc",
-            hints=hints
-        ))
+        self.sources.append(
+            ContextSource(
+                name="Git Context",
+                file_path=git_dir if git_dir.exists() else None,
+                status=status,
+                size_bytes=None,
+                line_count=None,
+                purpose="Branch name, git status, recent commits",
+                doc_url="https://git-scm.com/doc",
+                hints=hints,
+            )
+        )
 
     def format_report(self, show_hints: bool = True) -> str:
         """Format the report for terminal display."""
-        provider_name = self.provider.metadata.display_name if self.provider else "Claude Code"
+        provider_name = (
+            self.provider.metadata.display_name if self.provider else "Claude Code"
+        )
 
         lines = []
         lines.append("")
-        lines.append("┌─────────────────────────────────────────────────────────────────┐")
+        lines.append(
+            "┌─────────────────────────────────────────────────────────────────┐"
+        )
         title_line = f"│  {provider_name} Startup Context Report"
         title_line = title_line + " " * (66 - len(title_line)) + "│"
         lines.append(title_line)
         subtitle = f"│  Transparency: What Context is {provider_name} Loading?"
         subtitle = subtitle + " " * (66 - len(subtitle)) + "│"
         lines.append(subtitle)
-        lines.append("└─────────────────────────────────────────────────────────────────┘")
+        lines.append(
+            "└─────────────────────────────────────────────────────────────────┘"
+        )
         lines.append("")
         lines.append(f"📁 Project: {self.project_path}")
         lines.append("")
@@ -358,13 +415,17 @@ class StartupReport:
             lines.append("")
 
         # Footer
-        lines.append("─────────────────────────────────────────────────────────────────")
+        lines.append(
+            "─────────────────────────────────────────────────────────────────"
+        )
         lines.append("")
         lines.append("💡 Tips for Maximizing Your Experience:")
         lines.append("")
         lines.append("   1. Keep CLAUDE.md concise - move detailed docs elsewhere")
         lines.append("   2. Let auto memory grow naturally - Claude learns as you work")
-        lines.append("   3. Use project settings to override model/preferences per-project")
+        lines.append(
+            "   3. Use project settings to override model/preferences per-project"
+        )
         lines.append("   4. Tell Claude to remember things: 'Remember we use pytest'")
         lines.append("")
         lines.append("📖 Learn more:")
@@ -384,11 +445,19 @@ class StartupReport:
         lines.append("")
 
         for source in self.sources:
-            icon = "✅" if "loaded" in source.status else "❌" if "missing" in source.status else "⚪"
+            icon = (
+                "✅"
+                if "loaded" in source.status
+                else "❌"
+                if "missing" in source.status
+                else "⚪"
+            )
             lines.append(f"{icon} {source.name}: {source.status}")
 
         lines.append("")
-        lines.append("💡 Run 'ai-launcher --startup-report' for detailed context breakdown")
+        lines.append(
+            "💡 Run 'ai-launcher --startup-report' for detailed context breakdown"
+        )
         lines.append("═══════════════════════════════════════════════════════════════")
         lines.append("")
 
@@ -418,8 +487,7 @@ def generate_startup_report(
 
     if summary_only:
         return report.format_summary()
-    else:
-        return report.format_report()
+    return report.format_report()
 
 
 def _visual_length(text: str) -> int:
@@ -438,10 +506,7 @@ def _visual_length(text: str) -> int:
     length = 0
     for char in text:
         # East Asian Wide and Fullwidth characters take 2 spaces
-        if unicodedata.east_asian_width(char) in ('F', 'W'):
-            length += 2
-        # Emoji and other symbols typically take 2 spaces
-        elif ord(char) > 0x1F000:  # Most emoji start here
+        if unicodedata.east_asian_width(char) in ("F", "W") or ord(char) > 0x1F000:
             length += 2
         else:
             length += 1
@@ -462,8 +527,7 @@ def _pad_line(text: str, width: int) -> str:
     padding_needed = width - visual_len - 1  # -1 for closing │
     if padding_needed > 0:
         return text + " " * padding_needed + "│"
-    else:
-        return text + "│"
+    return text + "│"
 
 
 def _check_boundary_protection(project_path: Path) -> dict:
@@ -484,7 +548,8 @@ def _check_boundary_protection(project_path: Path) -> dict:
     parent = project_path.parent
     if parent.exists():
         siblings = [
-            d for d in parent.iterdir()
+            d
+            for d in parent.iterdir()
             if d.is_dir() and d != project_path and not d.name.startswith(".")
         ]
         protection["sibling_count"] = len(siblings)
@@ -535,10 +600,8 @@ def display_launch_info(
     # Provider info
     version = None
     if hasattr(provider, "get_version"):
-        try:
+        with contextlib.suppress(Exception):
             version = provider.get_version()
-        except Exception:
-            pass
 
     if version:
         provider_label = f"{metadata.display_name} v{version}"
@@ -622,7 +685,9 @@ def display_launch_info(
     has_memory = False
     if memory_info:
         if memory_info.personal_memory and memory_info.personal_lines > 0:
-            print(_pad_line(f"│   ✓ Personal: {memory_info.personal_lines} lines", width))
+            print(
+                _pad_line(f"│   ✓ Personal: {memory_info.personal_lines} lines", width)
+            )
             has_memory = True
         elif memory_info.personal_memory:
             print(_pad_line("│   ○ Personal: empty", width))
@@ -664,7 +729,12 @@ def display_launch_info(
             names_str += f" + {total - max_named} more"
 
         print(_pad_line(f"│ 🔌 Plugins: {names_str}", width))
-        print(_pad_line(f"│    /plugin to browse · https://code.claude.com/docs/en/discover-plugins", width))
+        print(
+            _pad_line(
+                "│    /plugin to browse · https://code.claude.com/docs/en/discover-plugins",
+                width,
+            )
+        )
         print(_pad_line("│", width))
 
     # Global Context section (from provider data)
@@ -686,7 +756,11 @@ def display_launch_info(
     boundary = _check_boundary_protection(project_path)
     if boundary["sibling_count"] > 0:
         print(_pad_line("│ 🔒 Boundary Protection:", width))
-        print(_pad_line(f"│   ✓ {boundary['sibling_count']} sibling projects detected", width))
+        print(
+            _pad_line(
+                f"│   ✓ {boundary['sibling_count']} sibling projects detected", width
+            )
+        )
 
         forbidden_list = ", ".join(boundary["forbidden_projects"][:3])
         if boundary["sibling_count"] > 3:
@@ -722,7 +796,7 @@ def display_launch_info(
 
     # Session activity section (from provider data)
     if data.session_stats:
-        from ai_launcher.utils.humanize import humanize_size, format_time_ago
+        from ai_launcher.utils.humanize import format_time_ago, humanize_size
 
         stats = data.session_stats
         print(_pad_line("│ 📊 Session Activity:", width))

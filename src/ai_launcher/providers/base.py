@@ -78,7 +78,6 @@ class AIProvider(ABC):
         Returns:
             ProviderMetadata instance describing this provider
         """
-        pass
 
     @abstractmethod
     def is_installed(self) -> bool:
@@ -87,7 +86,6 @@ class AIProvider(ABC):
         Returns:
             True if the provider's CLI command is installed and accessible
         """
-        pass
 
     @abstractmethod
     def launch(self, project_path: Path) -> None:
@@ -100,7 +98,6 @@ class AIProvider(ABC):
             FileNotFoundError: If provider CLI is not found
             subprocess.CalledProcessError: If provider CLI fails to launch
         """
-        pass
 
     @abstractmethod
     def cleanup_environment(
@@ -116,7 +113,6 @@ class AIProvider(ABC):
             cleanup_config: Configuration controlling what gets cleaned.
                           If None or disabled, no cleanup is performed.
         """
-        pass
 
     def get_context_sources(self, project_path: Path) -> List[Path]:
         """Get context files the provider reads from the project.
@@ -189,7 +185,7 @@ class AIProvider(ABC):
             if file_path.exists():
                 try:
                     stat = file_path.stat()
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         lines = f.readlines()
                     context_files.append(
                         ContextFile(

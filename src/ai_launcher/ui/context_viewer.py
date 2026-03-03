@@ -4,6 +4,7 @@ Author: Solent Labs™
 Created: 2026-02-09
 """
 
+import contextlib
 import os
 import subprocess  # nosec B404
 import sys
@@ -38,7 +39,9 @@ def show_context_viewer(
     for provider in providers:
         if provider.context:
             status = "✓"
-            version_str = f" v{provider.context.version}" if provider.context.version else ""
+            version_str = (
+                f" v{provider.context.version}" if provider.context.version else ""
+            )
             label = f"{provider.name}{version_str}"
         else:
             status = "✗"
@@ -60,9 +63,7 @@ def show_context_viewer(
 
     # Write items to temp file
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, suffix=".txt"
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("\n".join(items))
             items_file = f.name
 
@@ -89,7 +90,7 @@ def show_context_viewer(
         ]
 
         try:
-            with open(items_file, "r") as f:
+            with open(items_file) as f:
                 result = subprocess.run(
                     fzf_cmd,
                     stdin=f,
@@ -98,10 +99,8 @@ def show_context_viewer(
                 )  # nosec B603
         finally:
             # Clean up temp file
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(items_file)
-            except OSError:
-                pass
 
     except FileNotFoundError:
         print("Error: fzf not found. Please install fzf to use the context viewer.")

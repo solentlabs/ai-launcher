@@ -5,8 +5,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from ai_launcher.utils.session import (
     count_sessions,
     encode_project_path,
@@ -17,7 +15,6 @@ from ai_launcher.utils.session import (
     get_session_size,
     get_session_summary,
 )
-
 
 # ============================================================================
 # encode_project_path() tests
@@ -308,7 +305,7 @@ def test_format_time_ago_deprecated():
         assert len(w) == 1
         assert issubclass(w[0].category, DeprecationWarning)
         assert "deprecated" in str(w[0].message).lower()
-        assert "5 minutes ago" == result
+        assert result == "5 minutes ago"
 
 
 # ============================================================================

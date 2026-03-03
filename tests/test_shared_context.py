@@ -3,10 +3,7 @@
 Author: Solent Labs™
 """
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from ai_launcher.ui.shared_context import (
     _find_markdown_files,
@@ -104,7 +101,9 @@ class TestAddGlobalFiles:
     def test_no_md_files_found(self, tmp_path, capsys):
         config_manager = MagicMock()
         with patch("pathlib.Path.home", return_value=tmp_path):
-            with patch("ai_launcher.ui.shared_context._find_markdown_files", return_value=[]):
+            with patch(
+                "ai_launcher.ui.shared_context._find_markdown_files", return_value=[]
+            ):
                 with patch("builtins.input", return_value=""):
                     result = add_global_files(config_manager, [tmp_path])
 
@@ -123,7 +122,10 @@ class TestAddGlobalFiles:
         md_file.write_text("standards")
 
         with patch("pathlib.Path.home", return_value=tmp_path):
-            with patch("ai_launcher.ui.shared_context._find_markdown_files", return_value=[md_file]):
+            with patch(
+                "ai_launcher.ui.shared_context._find_markdown_files",
+                return_value=[md_file],
+            ):
                 with patch("builtins.input", return_value=""):
                     result = add_global_files(config_manager, [tmp_path])
 
@@ -139,7 +141,10 @@ class TestAddGlobalFiles:
         md_file.write_text("standards")
 
         with patch("pathlib.Path.home", return_value=tmp_path):
-            with patch("ai_launcher.ui.shared_context._find_markdown_files", return_value=[md_file]):
+            with patch(
+                "ai_launcher.ui.shared_context._find_markdown_files",
+                return_value=[md_file],
+            ):
                 with patch("subprocess.Popen", side_effect=FileNotFoundError):
                     with patch("builtins.input", return_value=""):
                         result = add_global_files(config_manager, [tmp_path])
@@ -162,7 +167,10 @@ class TestAddGlobalFiles:
         mock_process.returncode = 1
 
         with patch("pathlib.Path.home", return_value=tmp_path):
-            with patch("ai_launcher.ui.shared_context._find_markdown_files", return_value=[md_file]):
+            with patch(
+                "ai_launcher.ui.shared_context._find_markdown_files",
+                return_value=[md_file],
+            ):
                 with patch("subprocess.Popen", return_value=mock_process):
                     result = add_global_files(config_manager, [tmp_path])
 

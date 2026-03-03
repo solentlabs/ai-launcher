@@ -60,9 +60,7 @@ class TestShowProjectContext:
     def test_git_status_clean(self, capsys, tmp_path):
         (tmp_path / ".git").mkdir()
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
             show_project_context(tmp_path)
         captured = capsys.readouterr()
         assert "Working tree clean" in captured.out
@@ -81,9 +79,7 @@ class TestShowProjectContext:
         (tmp_path / ".git").mkdir()
         lines = "\n".join(f" M file{i}.py" for i in range(15))
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=lines
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout=lines)
             show_project_context(tmp_path)
         captured = capsys.readouterr()
         assert "and more changes" in captured.out
@@ -100,7 +96,9 @@ class TestShowProviderContext:
     """Tests for show_provider_context()."""
 
     def test_provider_not_found(self, capsys):
-        with patch("ai_launcher.ui._context_preview.ProviderDiscovery") as MockDiscovery:
+        with patch(
+            "ai_launcher.ui._context_preview.ProviderDiscovery"
+        ) as MockDiscovery:
             mock_instance = MockDiscovery.return_value
             mock_instance.get_provider_by_name.return_value = None
 
@@ -117,7 +115,9 @@ class TestShowProviderContext:
             context=None,
             install_url="https://example.com",
         )
-        with patch("ai_launcher.ui._context_preview.ProviderDiscovery") as MockDiscovery:
+        with patch(
+            "ai_launcher.ui._context_preview.ProviderDiscovery"
+        ) as MockDiscovery:
             mock_instance = MockDiscovery.return_value
             mock_instance.get_provider_by_name.return_value = provider
 
@@ -143,7 +143,9 @@ class TestShowProviderContext:
             command="testcmd",
             context=context,
         )
-        with patch("ai_launcher.ui._context_preview.ProviderDiscovery") as MockDiscovery:
+        with patch(
+            "ai_launcher.ui._context_preview.ProviderDiscovery"
+        ) as MockDiscovery:
             mock_instance = MockDiscovery.return_value
             mock_instance.get_provider_by_name.return_value = provider
 
@@ -172,7 +174,9 @@ class TestShowProviderContext:
             command="testcmd",
             context=context,
         )
-        with patch("ai_launcher.ui._context_preview.ProviderDiscovery") as MockDiscovery:
+        with patch(
+            "ai_launcher.ui._context_preview.ProviderDiscovery"
+        ) as MockDiscovery:
             mock_instance = MockDiscovery.return_value
             mock_instance.get_provider_by_name.return_value = provider
 
@@ -191,14 +195,20 @@ class TestMain:
             assert exc_info.value.code == 1
 
     def test_provider_item(self, capsys):
-        with patch.object(sys, "argv", ["_context_preview.py", "PROVIDER:test-provider"]):
-            with patch("ai_launcher.ui._context_preview.show_provider_context") as mock_show:
+        with patch.object(
+            sys, "argv", ["_context_preview.py", "PROVIDER:test-provider"]
+        ):
+            with patch(
+                "ai_launcher.ui._context_preview.show_provider_context"
+            ) as mock_show:
                 main()
                 mock_show.assert_called_once_with("test-provider")
 
     def test_project_item(self, capsys, tmp_path):
         with patch.object(sys, "argv", ["_context_preview.py", f"PROJECT:{tmp_path}"]):
-            with patch("ai_launcher.ui._context_preview.show_project_context") as mock_show:
+            with patch(
+                "ai_launcher.ui._context_preview.show_project_context"
+            ) as mock_show:
                 main()
                 mock_show.assert_called_once_with(Path(str(tmp_path)))
 

@@ -3,8 +3,8 @@
 Author: Solent Labs™
 """
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+import subprocess
+from unittest.mock import patch
 
 import pytest
 
@@ -30,18 +30,20 @@ def cleanup_config():
 class TestGeminiMetadata:
     """Tests for Gemini provider metadata."""
 
-    def test_metadata_name(self, provider):
-        assert provider.metadata.name == "gemini"
-
-    def test_metadata_display_name(self, provider):
-        assert provider.metadata.display_name == "Gemini CLI"
-
-    def test_metadata_command(self, provider):
-        assert provider.metadata.command == "gemini"
+    @pytest.mark.parametrize(
+        "attr,expected",
+        [
+            ("name", "gemini"),
+            ("display_name", "Gemini CLI"),
+            ("command", "gemini"),
+        ],
+    )
+    def test_metadata_attributes(self, provider, attr, expected):
+        assert getattr(provider.metadata, attr) == expected
 
     def test_metadata_config_files(self, provider):
         assert "GEMINI.md" in provider.metadata.config_files
-        assert ".geminirc" in provider.metadata.config_files
+        assert ".geminirc" not in provider.metadata.config_files
 
     def test_metadata_description(self, provider):
         assert "Google" in provider.metadata.description
@@ -50,59 +52,57 @@ class TestGeminiMetadata:
 class TestGeminiIsInstalled:
     """Tests for Gemini installation check."""
 
-    def test_installed(self, provider):
-        with patch("shutil.which", return_value="/usr/bin/gemini"):
-            assert provider.is_installed() is True
-
-    def test_not_installed(self, provider):
-        with patch("shutil.which", return_value=None):
-            assert provider.is_installed() is False
+    @pytest.mark.parametrize(
+        "which_return,expected",
+        [
+            ("/usr/bin/gemini", True),
+            (None, False),
+        ],
+        ids=["installed", "not_installed"],
+    )
+    def test_is_installed(self, provider, which_return, expected):
+        with patch("shutil.which", return_value=which_return):
+            assert provider.is_installed() is expected
 
 
 class TestGeminiLaunch:
     """Tests for Gemini launch."""
 
     def test_launch_basic(self, provider, tmp_path):
-        with patch("subprocess.run") as mock_run:
-            with patch("os.chdir"):
+        with patch("subprocess.run") as mock_run, patch("os.chdir"):
+            provider.launch(tmp_path)
+            mock_run.assert_called_once_with(["gemini"], check=True)
+
+    @pytest.mark.parametrize(
+        "exception,exit_code",
+        [
+            (FileNotFoundError, 1),
+            (KeyboardInterrupt, 0),
+            (subprocess.CalledProcessError(1, "gemini"), 1),
+        ],
+        ids=["not_found", "keyboard_interrupt", "process_error"],
+    )
+    def test_launch_error_handling(self, provider, tmp_path, exception, exit_code):
+        with patch("subprocess.run", side_effect=exception), patch("os.chdir"):
+            with pytest.raises(SystemExit) as exc_info:
                 provider.launch(tmp_path)
-                mock_run.assert_called_once_with(["gemini"], check=True)
-
-    def test_launch_not_found(self, provider, tmp_path):
-        with patch("subprocess.run", side_effect=FileNotFoundError):
-            with patch("os.chdir"):
-                with pytest.raises(SystemExit) as exc_info:
-                    provider.launch(tmp_path)
-                assert exc_info.value.code == 1
-
-    def test_launch_keyboard_interrupt(self, provider, tmp_path):
-        with patch("subprocess.run", side_effect=KeyboardInterrupt):
-            with patch("os.chdir"):
-                with pytest.raises(SystemExit) as exc_info:
-                    provider.launch(tmp_path)
-                assert exc_info.value.code == 0
-
-    def test_launch_called_process_error(self, provider, tmp_path):
-        import subprocess
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "gemini")):
-            with patch("os.chdir"):
-                with pytest.raises(SystemExit) as exc_info:
-                    provider.launch(tmp_path)
-                assert exc_info.value.code == 1
+            assert exc_info.value.code == exit_code
 
 
 class TestGeminiCleanup:
     """Tests for Gemini cleanup."""
 
-    def test_cleanup_no_config(self, provider):
-        provider.cleanup_environment(verbose=False, cleanup_config=None)
-
-    def test_cleanup_disabled(self, provider):
-        config = CleanupConfig(enabled=False)
-        provider.cleanup_environment(verbose=False, cleanup_config=config)
-
-    def test_cleanup_provider_files_disabled(self, provider):
-        config = CleanupConfig(enabled=True, clean_provider_files=False)
+    @pytest.mark.parametrize(
+        "config",
+        [
+            None,
+            CleanupConfig(enabled=False),
+            CleanupConfig(enabled=True, clean_provider_files=False),
+        ],
+        ids=["no_config", "disabled", "provider_files_disabled"],
+    )
+    def test_cleanup_noop(self, provider, config):
+        """Test that cleanup is a no-op under various disabled configs."""
         provider.cleanup_environment(verbose=False, cleanup_config=config)
 
     def test_cleanup_removes_cache(self, provider, tmp_path, cleanup_config):
@@ -145,7 +145,20 @@ class TestGeminiCollectPreviewData:
 
     def test_global_config_paths(self, provider):
         paths = provider.get_global_context_paths()
-        assert len(paths) == 2
-        path_strs = [str(p) for p in paths]
-        assert any(".gemini" in s for s in path_strs)
-        assert any(".geminirc" in s for s in path_strs)
+        assert len(paths) == 1
+        assert any(".gemini" in str(p) for p in paths)
+
+
+class TestGeminiDocumentationUrls:
+    """Tests for Gemini documentation URLs."""
+
+    def test_has_documentation_urls(self, provider):
+        assert len(provider.get_documentation_urls()) > 0
+
+    @pytest.mark.parametrize(
+        "key",
+        ["Getting started", "GEMINI.md guide", "Installation", "Configuration"],
+    )
+    def test_documentation_url_entries(self, provider, key):
+        urls = provider.get_documentation_urls()
+        assert key in urls

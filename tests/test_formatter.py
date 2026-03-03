@@ -216,7 +216,6 @@ class TestSessionStatsFormatting:
         assert "and 5 more" in result
 
 
-
 class TestGlobalConfigFormatting:
     """Tests for global config paths formatting."""
 
@@ -456,56 +455,35 @@ class TestHelperMethods:
     def formatter(self):
         return PreviewFormatter()
 
-    def test_format_relative_time_just_now(self, formatter):
-        """Test relative time for recent timestamp."""
-        now = datetime.now()
-        result = formatter._format_relative_time(now)
-
-        assert result == "just now"
-
-    def test_format_relative_time_minutes(self, formatter):
-        """Test relative time for minutes ago."""
-        time = datetime.now() - timedelta(minutes=5)
+    @pytest.mark.parametrize(
+        "delta,expected_fragment",
+        [
+            (timedelta(0), "just now"),
+            (timedelta(minutes=5), "5 minute"),
+            (timedelta(hours=3), "3 hour"),
+            (timedelta(days=2), "2 day"),
+        ],
+        ids=["just_now", "minutes", "hours", "days"],
+    )
+    def test_format_relative_time(self, formatter, delta, expected_fragment):
+        """Test relative time formatting for various deltas."""
+        time = datetime.now() - delta
         result = formatter._format_relative_time(time)
+        assert expected_fragment in result
 
-        assert "5 minute" in result
-        assert "ago" in result
-
-    def test_format_relative_time_hours(self, formatter):
-        """Test relative time for hours ago."""
-        time = datetime.now() - timedelta(hours=3)
-        result = formatter._format_relative_time(time)
-
-        assert "3 hour" in result
-        assert "ago" in result
-
-    def test_format_relative_time_days(self, formatter):
-        """Test relative time for days ago."""
-        time = datetime.now() - timedelta(days=2)
-        result = formatter._format_relative_time(time)
-
-        assert "2 day" in result
-        assert "ago" in result
-
-    def test_humanize_size_bytes(self, formatter):
-        """Test humanizing size in bytes."""
-        result = formatter._humanize_size(512)
-        assert result == "512B"
-
-    def test_humanize_size_kilobytes(self, formatter):
-        """Test humanizing size in kilobytes."""
-        result = formatter._humanize_size(2048)
-        assert "2.0KB" in result
-
-    def test_humanize_size_megabytes(self, formatter):
-        """Test humanizing size in megabytes."""
-        result = formatter._humanize_size(5 * 1024 * 1024)
-        assert "5.0MB" in result
-
-    def test_humanize_size_gigabytes(self, formatter):
-        """Test humanizing size in gigabytes."""
-        result = formatter._humanize_size(2 * 1024 * 1024 * 1024)
-        assert "2.0GB" in result
+    @pytest.mark.parametrize(
+        "size,expected",
+        [
+            (512, "512B"),
+            (2048, "2.0KB"),
+            (5 * 1024 * 1024, "5.0MB"),
+            (2 * 1024 * 1024 * 1024, "2.0GB"),
+        ],
+        ids=["bytes", "kilobytes", "megabytes", "gigabytes"],
+    )
+    def test_humanize_size(self, formatter, size, expected):
+        """Test humanizing various byte sizes."""
+        assert expected in formatter._humanize_size(size)
 
 
 class TestProviderContextSection:
@@ -520,7 +498,11 @@ class TestProviderContextSection:
         provider_context = GlobalFiles(
             files=[Path("/home/user/.gemini/config.md")],
             common_root="~/.gemini",
-            by_category={"📋 Rule: Gemini provider instructions": [Path("/home/user/.gemini/config.md")]},
+            by_category={
+                "📋 Rule: Gemini provider instructions": [
+                    Path("/home/user/.gemini/config.md")
+                ]
+            },
         )
 
         result = formatter._format_provider_context_section(provider_context, "Gemini")
@@ -533,7 +515,11 @@ class TestProviderContextSection:
         provider_context = GlobalFiles(
             files=[Path("/home/user/.claude/skills/test.md")],
             common_root="~/.claude",
-            by_category={"🔧 Skill: Custom capabilities and tools": [Path("/home/user/.claude/skills/test.md")]},
+            by_category={
+                "🔧 Skill: Custom capabilities and tools": [
+                    Path("/home/user/.claude/skills/test.md")
+                ]
+            },
         )
 
         result = formatter._format_provider_context_section(provider_context)
@@ -545,10 +531,16 @@ class TestProviderContextSection:
         provider_context = GlobalFiles(
             files=[Path("/home/user/.claude/skills/test.md")],
             common_root="~/.claude",
-            by_category={"🔧 Skill: Custom capabilities and tools": [Path("/home/user/.claude/skills/test.md")]},
+            by_category={
+                "🔧 Skill: Custom capabilities and tools": [
+                    Path("/home/user/.claude/skills/test.md")
+                ]
+            },
         )
 
-        result = formatter._format_provider_context_section(provider_context, "Claude Code")
+        result = formatter._format_provider_context_section(
+            provider_context, "Claude Code"
+        )
 
         assert "Claude Code Context" in result
 
@@ -653,13 +645,48 @@ class TestPluginsSection:
         marketplace = MarketplaceInfo(
             name="claude-plugins-official",
             plugins=[
-                MarketplacePlugin(name="github", description="GitHub", source_type="external", has_mcp=True),
-                MarketplacePlugin(name="slack", description="Slack", source_type="external", has_mcp=True),
-                MarketplacePlugin(name="stripe", description="Stripe", source_type="external", has_mcp=True),
-                MarketplacePlugin(name="supabase", description="Supabase", source_type="external", has_mcp=True),
-                MarketplacePlugin(name="firebase", description="Firebase", source_type="external", has_mcp=True),
-                MarketplacePlugin(name="linear", description="Linear", source_type="external", has_mcp=True),
-                MarketplacePlugin(name="asana", description="Asana", source_type="external", has_mcp=True),
+                MarketplacePlugin(
+                    name="github",
+                    description="GitHub",
+                    source_type="external",
+                    has_mcp=True,
+                ),
+                MarketplacePlugin(
+                    name="slack",
+                    description="Slack",
+                    source_type="external",
+                    has_mcp=True,
+                ),
+                MarketplacePlugin(
+                    name="stripe",
+                    description="Stripe",
+                    source_type="external",
+                    has_mcp=True,
+                ),
+                MarketplacePlugin(
+                    name="supabase",
+                    description="Supabase",
+                    source_type="external",
+                    has_mcp=True,
+                ),
+                MarketplacePlugin(
+                    name="firebase",
+                    description="Firebase",
+                    source_type="external",
+                    has_mcp=True,
+                ),
+                MarketplacePlugin(
+                    name="linear",
+                    description="Linear",
+                    source_type="external",
+                    has_mcp=True,
+                ),
+                MarketplacePlugin(
+                    name="asana",
+                    description="Asana",
+                    source_type="external",
+                    has_mcp=True,
+                ),
             ],
         )
 
@@ -693,7 +720,9 @@ class TestPluginsSection:
         marketplace = MarketplaceInfo(
             name="claude-plugins-official",
             plugins=[
-                MarketplacePlugin(name="hookify", description="Hooks", commands=["hookify"]),
+                MarketplacePlugin(
+                    name="hookify", description="Hooks", commands=["hookify"]
+                ),
             ],
         )
 

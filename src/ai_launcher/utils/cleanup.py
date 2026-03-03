@@ -185,12 +185,16 @@ def cleanup_environment(
         if claude_debug_dir.exists() and claude_debug_dir.is_dir():
             try:
                 import time
+
                 current_time = time.time()
                 cutoff_time = current_time - (max_age_days * 24 * 60 * 60)
 
                 removed_count = 0
                 for debug_file in claude_debug_dir.glob("*.txt"):
-                    if debug_file.is_file() and debug_file.stat().st_mtime < cutoff_time:
+                    if (
+                        debug_file.is_file()
+                        and debug_file.stat().st_mtime < cutoff_time
+                    ):
                         debug_file.unlink(missing_ok=True)
                         removed_count += 1
 
@@ -223,6 +227,7 @@ def cleanup_environment(
                     if result.returncode == 0:
                         # Extract version number (e.g., "2.1.37" from "2.1.37 (Claude Code)")
                         import re
+
                         match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
                         if match:
                             current_version = match.group(1)

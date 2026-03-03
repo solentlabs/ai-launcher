@@ -2,6 +2,12 @@
 
 This module implements the AIProvider interface for Google's Gemini AI assistant.
 
+Installation:
+    npm install -g @google/gemini-cli
+
+Documentation:
+    https://geminicli.com/docs/get-started/
+
 Author: Solent Labs™
 Created: 2026-02-09
 """
@@ -11,7 +17,7 @@ import shutil
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from ai_launcher.core.provider_data import ContextFile, ProviderPreviewData
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
@@ -43,7 +49,7 @@ class GeminiProvider(AIProvider):
             display_name="Gemini CLI",
             command="gemini",
             description="Google's Gemini AI assistant",
-            config_files=["GEMINI.md", ".geminirc"],
+            config_files=["GEMINI.md"],
             requires_installation=True,
         )
 
@@ -73,8 +79,8 @@ class GeminiProvider(AIProvider):
             subprocess.run(["gemini"], check=True)  # nosec B603, B607
         except FileNotFoundError:
             print("Error: 'gemini' command not found.")
-            print("Make sure Gemini CLI is installed.")
-            print("Install: https://ai.google.dev/gemini-api/docs/cli")
+            print("Install: npm install -g @google/gemini-cli")
+            print("Docs: https://geminicli.com/docs/get-started/")
             sys.exit(1)
         except subprocess.CalledProcessError as e:
             print(f"Error launching Gemini: {e}")
@@ -137,7 +143,7 @@ class GeminiProvider(AIProvider):
         if gemini_md.exists():
             try:
                 stat = gemini_md.stat()
-                with open(gemini_md, "r", encoding="utf-8") as f:
+                with open(gemini_md, encoding="utf-8") as f:
                     lines = f.readlines()
                     context_files.append(
                         ContextFile(
@@ -168,5 +174,13 @@ class GeminiProvider(AIProvider):
         """Get paths to Gemini's global configuration."""
         return [
             Path.home() / ".gemini",
-            Path.home() / ".geminirc",
         ]
+
+    def get_documentation_urls(self) -> Dict[str, str]:
+        """Get Gemini documentation URLs."""
+        return {
+            "GEMINI.md guide": "https://geminicli.com/docs/cli/gemini-md/",
+            "Getting started": "https://geminicli.com/docs/get-started/",
+            "Installation": "https://geminicli.com/docs/get-started/installation/",
+            "Configuration": "https://geminicli.com/docs/get-started/configuration/",
+        }

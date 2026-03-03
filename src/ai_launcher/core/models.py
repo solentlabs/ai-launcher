@@ -155,7 +155,6 @@ class ConfigData:
     cleanup: CleanupConfig = field(default_factory=CleanupConfig)
 
 
-
 @dataclass
 class ProviderContext:
     """Context files and directories a provider accesses.

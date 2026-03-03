@@ -6,8 +6,6 @@ Author: Solent Labs™
 import sys
 from unittest.mock import patch
 
-import pytest
-
 from ai_launcher.ui._settings_preview import format_description, generate_preview, main
 
 
@@ -73,8 +71,6 @@ class TestFormatDescription:
 
     def test_escaped_newlines_converted(self):
         result = format_description("Line1\\nLine2")
-        lines = result.split("\n")
-        text_lines = [l for l in lines if l and not l.startswith("╭") and not l.startswith("│") and not l.startswith("╰")]
         assert "Line1" in result
         assert "Line2" in result
 

@@ -2,6 +2,10 @@
 
 Universal AI CLI launcher with local context management. Launch any AI coding assistant from a single entry point with persistent context across sessions.
 
+[![PyPI version](https://img.shields.io/pypi/v/ai-launcher)](https://pypi.org/project/ai-launcher/)
+[![Downloads](https://img.shields.io/pypi/dm/ai-launcher)](https://pypi.org/project/ai-launcher/)
+[![CI](https://github.com/solentlabs/ai-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/solentlabs/ai-launcher/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/solentlabs/ai-launcher/branch/main/graph/badge.svg)](https://codecov.io/gh/solentlabs/ai-launcher)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -19,7 +23,7 @@ A terminal-first launcher that:
 
 ## Current Status
 
-**v0.1.0** - Multi-provider support with Claude Code and Gemini CLI.
+**v0.1.0** - Multi-provider support with Claude Code, Gemini CLI, Cursor, Aider, and GitHub Copilot CLI.
 
 ## Install
 
@@ -101,6 +105,9 @@ default = "claude-code"
 
 - **claude-code** - Anthropic's Claude Code
 - **gemini** - Google's Gemini CLI
+- **cursor** - Cursor IDE
+- **aider** - Aider pair programmer
+- **copilot** - GitHub Copilot CLI
 
 ## Roadmap
 
@@ -113,7 +120,7 @@ default = "claude-code"
 - [ ] Universal context management (.ai-context/)
 - [ ] Context file templates and scaffolding
 - [ ] Cross-system sync (via git/rsync/dotfiles)
-- [ ] Additional provider integrations (Cursor, Aider, etc.)
+- [x] Additional provider integrations (Cursor, Aider, Copilot)
 
 ## Why Local-Only?
 

@@ -9,10 +9,12 @@ Created: 2026-02-10
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from ai_launcher.utils.humanize import (
     format_time_ago as _humanize_format_time_ago,
+)
+from ai_launcher.utils.humanize import (
     humanize_size,
 )
 
@@ -104,7 +106,9 @@ def get_session_size(session_dir: Path) -> int:
         Total size in bytes
 
     Examples:
-        >>> get_session_size(Path("/home/user/.claude/projects/-home-user-projects-foo"))
+        >>> get_session_size(
+        ...     Path("/home/user/.claude/projects/-home-user-projects-foo")
+        ... )
         1572864  # 1.5 MB
     """
     if not session_dir.exists():
@@ -132,7 +136,9 @@ def get_last_session_time(session_dir: Path) -> Optional[datetime]:
         Datetime of most recent session modification, or None if no sessions
 
     Examples:
-        >>> get_last_session_time(Path("/home/user/.claude/projects/-home-user-projects-foo"))
+        >>> get_last_session_time(
+        ...     Path("/home/user/.claude/projects/-home-user-projects-foo")
+        ... )
         datetime(2026, 2, 10, 10, 14, 35)
     """
     if not session_dir.exists():
@@ -150,7 +156,7 @@ def get_last_session_time(session_dir: Path) -> Optional[datetime]:
         return None
 
 
-def get_memory_files(session_dir: Path) -> list[Path]:
+def get_memory_files(session_dir: Path) -> List[Path]:
     """Get list of memory files in the session directory.
 
     Memory files are stored in the memory/ subdirectory and typically include:
@@ -164,7 +170,9 @@ def get_memory_files(session_dir: Path) -> list[Path]:
         List of memory file paths (relative to memory/ directory)
 
     Examples:
-        >>> get_memory_files(Path("/home/user/.claude/projects/-home-user-projects-foo"))
+        >>> get_memory_files(
+        ...     Path("/home/user/.claude/projects/-home-user-projects-foo")
+        ... )
         [Path('MEMORY.md'), Path('debugging.md'), Path('patterns.md')]
     """
     memory_dir = session_dir / "memory"
@@ -174,9 +182,7 @@ def get_memory_files(session_dir: Path) -> list[Path]:
     try:
         # Get all markdown files in memory directory
         memory_files = [
-            f.relative_to(memory_dir)
-            for f in memory_dir.glob("*.md")
-            if f.is_file()
+            f.relative_to(memory_dir) for f in memory_dir.glob("*.md") if f.is_file()
         ]
         return sorted(memory_files)
     except (PermissionError, OSError):
@@ -208,7 +214,7 @@ def format_time_ago(dt: datetime) -> str:
     return _format_time_ago(dt)
 
 
-def get_session_summary(project_path: Path) -> Optional[dict[str, any]]:
+def get_session_summary(project_path: Path) -> Optional[Dict[str, Any]]:
     """Get a complete summary of AI session data for a project.
 
     Combines all session detection into a single convenient function.
@@ -258,7 +264,9 @@ def get_session_summary(project_path: Path) -> Optional[dict[str, any]]:
         "session_size": session_size,
         "session_size_human": humanize_size(session_size),
         "last_session": last_session,
-        "last_session_ago": _humanize_format_time_ago(last_session) if last_session else None,
+        "last_session_ago": _humanize_format_time_ago(last_session)
+        if last_session
+        else None,
         "memory_files": [f.name for f in memory_files],
         "memory_count": len(memory_files),
     }

@@ -9,6 +9,7 @@ from typing import List
 
 from ai_launcher.core.models import Project, ProviderInfo
 from ai_launcher.utils.humanize import humanize_count, humanize_size
+from ai_launcher.utils.paths import is_relative_to
 
 
 def generate_discovery_report(
@@ -42,7 +43,7 @@ def generate_discovery_report(
         # Format paths with ~ shorthand
         home = Path.home()
         display_paths = [
-            f"~/{p.relative_to(home)}" if p.is_relative_to(home) else str(p)
+            f"~/{p.relative_to(home)}" if is_relative_to(p, home) else str(p)
             for p in scan_paths
         ]
         lines.append(f"Scan paths: {', '.join(display_paths)}")
@@ -65,9 +66,7 @@ def generate_discovery_report(
     lines.append("━" * 48)
 
     installed_count = sum(1 for p in providers if p.context is not None)
-    lines.append(
-        f"Found {installed_count}/{len(providers)} installed providers:"
-    )
+    lines.append(f"Found {installed_count}/{len(providers)} installed providers:")
     lines.append("")
 
     for provider in providers:
@@ -78,7 +77,7 @@ def generate_discovery_report(
                 status += f" v{provider.context.version}"
             lines.append(status)
             lines.append(f"  Command: {provider.command}")
-            lines.append(f"  Status: Ready to use")
+            lines.append("  Status: Ready to use")
 
             # Show context stats if available
             if provider.context.file_count > 0:
@@ -90,7 +89,7 @@ def generate_discovery_report(
             # Not installed
             lines.append(f"✗ {provider.name}")
             lines.append(f"  Command: {provider.command}")
-            lines.append(f"  Status: Not installed")
+            lines.append("  Status: Not installed")
             if provider.install_url:
                 lines.append(f"  Install: {provider.install_url}")
 

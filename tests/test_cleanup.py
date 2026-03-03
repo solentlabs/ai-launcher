@@ -5,7 +5,6 @@ Author: Solent Labs™
 
 import os
 import time
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -70,8 +69,10 @@ class TestCacheCleanup:
         monkeypatch.setenv("HOME", str(tmp_path))
         with patch("pathlib.Path.home", return_value=tmp_path):
             config = CleanupConfig(
-                enabled=True, clean_system_cache=False,
-                clean_provider_files=False, clean_npm_cache=False,
+                enabled=True,
+                clean_system_cache=False,
+                clean_provider_files=False,
+                clean_npm_cache=False,
             )
             cache_dir = tmp_path / ".cache"
             cache_dir.mkdir()
@@ -177,7 +178,9 @@ class TestProviderFileCleanup:
 class TestVerboseOutput:
     """Tests for verbose cleanup output."""
 
-    def test_verbose_prints_messages(self, tmp_path, monkeypatch, cleanup_config, capsys):
+    def test_verbose_prints_messages(
+        self, tmp_path, monkeypatch, cleanup_config, capsys
+    ):
         monkeypatch.setenv("HOME", str(tmp_path))
         with patch("pathlib.Path.home", return_value=tmp_path):
             cleanup_config.clean_npm_cache = False
@@ -188,7 +191,9 @@ class TestVerboseOutput:
         assert "Pre-launch cleanup:" in captured.out
         assert "Cleanup complete" in captured.out
 
-    def test_verbose_shows_cache_message(self, tmp_path, monkeypatch, cleanup_config, capsys):
+    def test_verbose_shows_cache_message(
+        self, tmp_path, monkeypatch, cleanup_config, capsys
+    ):
         monkeypatch.setenv("HOME", str(tmp_path))
         with patch("pathlib.Path.home", return_value=tmp_path):
             cleanup_config.clean_npm_cache = False
