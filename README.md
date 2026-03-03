@@ -21,23 +21,44 @@ A terminal-first launcher that:
 - 🤖 **Multi-Tool Support** - Works with Claude Code, Gemini CLI, and more
 - 👁️ **Context Transparency** - See exactly what files AI tools access
 
-## Current Status
-
-**v0.1.0** - Multi-provider support with Claude Code, Gemini CLI, Cursor, Aider, and GitHub Copilot CLI.
-
 ## Install
 
-**With pipx (recommended):**
+<details open>
+<summary><strong>Linux / macOS / WSL</strong></summary>
+
 ```bash
+# Recommended
 pipx install ai-launcher
+
+# Or with pip
+pip install ai-launcher
 ```
 
-**From source:**
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+# Recommended
+pipx install ai-launcher
+
+# Or with pip (use py -m to avoid launcher issues)
+py -m pip install ai-launcher
+```
+
+</details>
+
+<details>
+<summary><strong>From source</strong></summary>
+
 ```bash
 git clone https://github.com/solentlabs/ai-launcher.git
 cd ai-launcher
 pip install -e .
 ```
+
+</details>
 
 ## Use
 
