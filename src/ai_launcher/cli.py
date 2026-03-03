@@ -161,7 +161,7 @@ def _run_launcher(
         else []
     )
 
-    # Handle --discover
+    # Handle --discover (no fzf needed)
     if discover:
         from ai_launcher.core.provider_discovery import ProviderDiscovery
         from ai_launcher.ui.discovery import show_discovery_report
@@ -172,6 +172,17 @@ def _run_launcher(
         show_discovery_report(all_projects, provider_infos, scan_paths)
         sys.exit(0)
 
+    # Handle --list (no fzf needed)
+    if list_projects:
+        show_project_list(all_projects)
+        sys.exit(0)
+
+    # All remaining code paths require fzf — ensure it's available
+    from ai_launcher.utils.fzf import ensure_fzf
+
+    if not ensure_fzf():
+        sys.exit(1)
+
     # Handle --context
     if context:
         from ai_launcher.core.provider_discovery import ProviderDiscovery
@@ -181,11 +192,6 @@ def _run_launcher(
         provider_infos = discovery.detect_all()
 
         show_context_viewer(provider_infos, all_projects)
-        sys.exit(0)
-
-    # Handle --list
-    if list_projects:
-        show_project_list(all_projects)
         sys.exit(0)
 
     # Parse manual paths for display (convert to list of path strings)
