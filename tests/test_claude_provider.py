@@ -2,8 +2,10 @@
 
 Author: Solent Labs™
 Created: 2026-02-12
+Updated: 2026-03-03 (Cross-platform compatibility: mock_home fixture, os.sep)
 """
 
+import os
 import time
 from unittest.mock import MagicMock, patch
 
@@ -32,12 +34,10 @@ class TestClaudeCleanup:
             debug_logs_max_age_days=7,
         )
 
-    def test_cleanup_disabled_when_no_config(self, provider, tmp_path, monkeypatch):
+    def test_cleanup_disabled_when_no_config(self, provider, mock_home):
         """Test cleanup does nothing when config is None."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         # Create some files that would be cleaned
-        backup = tmp_path / ".claude.json.backup.123"
+        backup = mock_home / ".claude.json.backup.123"
         backup.write_text("backup")
 
         provider.cleanup_environment(verbose=False, cleanup_config=None)
@@ -45,14 +45,10 @@ class TestClaudeCleanup:
         # File should still exist
         assert backup.exists()
 
-    def test_cleanup_disabled_when_config_disabled(
-        self, provider, tmp_path, monkeypatch
-    ):
+    def test_cleanup_disabled_when_config_disabled(self, provider, mock_home):
         """Test cleanup does nothing when config.enabled is False."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         config = CleanupConfig(enabled=False)
-        backup = tmp_path / ".claude.json.backup.123"
+        backup = mock_home / ".claude.json.backup.123"
         backup.write_text("backup")
 
         provider.cleanup_environment(verbose=False, cleanup_config=config)
@@ -60,14 +56,10 @@ class TestClaudeCleanup:
         # File should still exist
         assert backup.exists()
 
-    def test_cleanup_disabled_when_provider_files_disabled(
-        self, provider, tmp_path, monkeypatch
-    ):
+    def test_cleanup_disabled_when_provider_files_disabled(self, provider, mock_home):
         """Test cleanup does nothing when clean_provider_files is False."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         config = CleanupConfig(enabled=True, clean_provider_files=False)
-        backup = tmp_path / ".claude.json.backup.123"
+        backup = mock_home / ".claude.json.backup.123"
         backup.write_text("backup")
 
         provider.cleanup_environment(verbose=False, cleanup_config=config)
@@ -75,16 +67,12 @@ class TestClaudeCleanup:
         # File should still exist
         assert backup.exists()
 
-    def test_cleanup_backup_files(
-        self, provider, tmp_path, monkeypatch, cleanup_config
-    ):
+    def test_cleanup_backup_files(self, provider, mock_home, cleanup_config):
         """Test cleanup removes .claude.json.backup.* files."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         # Create backup files
-        backup1 = tmp_path / ".claude.json.backup.123"
-        backup2 = tmp_path / ".claude.json.backup.456"
-        other_file = tmp_path / "other.txt"
+        backup1 = mock_home / ".claude.json.backup.123"
+        backup2 = mock_home / ".claude.json.backup.456"
+        other_file = mock_home / "other.txt"
 
         backup1.write_text("backup1")
         backup2.write_text("backup2")
@@ -98,13 +86,9 @@ class TestClaudeCleanup:
         # Other files should remain
         assert other_file.exists()
 
-    def test_cleanup_old_debug_logs(
-        self, provider, tmp_path, monkeypatch, cleanup_config
-    ):
+    def test_cleanup_old_debug_logs(self, provider, mock_home, cleanup_config):
         """Test cleanup removes old debug logs."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
-        debug_dir = tmp_path / ".claude" / "debug"
+        debug_dir = mock_home / ".claude" / "debug"
         debug_dir.mkdir(parents=True)
 
         # Create old log (10 days old)
@@ -113,8 +97,6 @@ class TestClaudeCleanup:
         old_time = time.time() - (10 * 24 * 60 * 60)  # 10 days ago
         old_log.touch()
         # Set mtime to 10 days ago
-        import os
-
         os.utime(old_log, (old_time, old_time))
 
         # Create recent log (1 day old)
@@ -128,13 +110,9 @@ class TestClaudeCleanup:
         # Recent log should remain
         assert recent_log.exists()
 
-    def test_cleanup_old_versions(
-        self, provider, tmp_path, monkeypatch, cleanup_config
-    ):
+    def test_cleanup_old_versions(self, provider, mock_home, cleanup_config):
         """Test cleanup removes old CLI versions."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
-        versions_dir = tmp_path / ".local" / "share" / "claude" / "versions"
+        versions_dir = mock_home / ".local" / "share" / "claude" / "versions"
         versions_dir.mkdir(parents=True)
 
         # Create version files
@@ -166,14 +144,10 @@ class TestClaudeCleanup:
         assert current.exists()
         assert other.exists()
 
-    def test_cleanup_verbose_output(
-        self, provider, tmp_path, monkeypatch, cleanup_config, capsys
-    ):
+    def test_cleanup_verbose_output(self, provider, mock_home, cleanup_config, capsys):
         """Test cleanup prints messages when verbose=True."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         # Create a backup file
-        backup = tmp_path / ".claude.json.backup.123"
+        backup = mock_home / ".claude.json.backup.123"
         backup.write_text("backup")
 
         provider.cleanup_environment(verbose=True, cleanup_config=cleanup_config)
@@ -184,11 +158,9 @@ class TestClaudeCleanup:
         assert "cleanup complete" in captured.out
 
     def test_cleanup_handles_permission_errors(
-        self, provider, tmp_path, monkeypatch, cleanup_config
+        self, provider, mock_home, cleanup_config
     ):
         """Test cleanup continues gracefully on permission errors."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         # This test verifies error handling doesn't crash
         # Even if files don't exist or can't be accessed
         provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
@@ -197,11 +169,9 @@ class TestClaudeCleanup:
         # (no assertions needed - test passes if no exception raised)
 
     def test_cleanup_no_crash_when_claude_not_installed(
-        self, provider, tmp_path, monkeypatch, cleanup_config
+        self, provider, mock_home, cleanup_config
     ):
         """Test cleanup handles missing claude CLI gracefully."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         with patch("shutil.which", return_value=None):
             provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
@@ -238,8 +208,8 @@ class TestClaudeProviderBasics:
         paths = provider.get_global_context_paths()
 
         assert len(paths) == 2
-        assert any("/.claude" in str(p) for p in paths)
-        assert any("/.claude.json" in str(p) for p in paths)
+        assert any(".claude" in str(p) for p in paths)
+        assert any(".claude.json" in str(p) for p in paths)
 
     def test_get_context_categories(self, provider):
         """Test getting context categories."""

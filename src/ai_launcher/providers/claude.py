@@ -425,7 +425,7 @@ def _encode_project_path(project_path: Path) -> str:
     Returns:
         Encoded directory name
     """
-    abs_path = project_path.resolve()
+    abs_path = Path(os.path.abspath(project_path))  # noqa: PTH100 - resolve() follows symlinks
     path_str = str(abs_path)
     encoded = path_str.replace(os.sep, "-")
     return encoded

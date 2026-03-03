@@ -45,8 +45,11 @@ def test_encode_project_path_uses_os_sep(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
     result = encode_project_path(project)
-    # Result should have hyphens where separators were
-    assert result.startswith("-")
+    # Result should have hyphens where separators were (no path separators remain)
+    import os
+
+    assert os.sep not in result
+    assert "-" in result
 
 
 # ============================================================================

@@ -59,7 +59,13 @@ class TestCacheCleanup:
 
             cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
-            # Subdir and file should be cleaned
+            # Subdir and file should be cleaned (on Windows, may need retry)
+            import sys
+
+            if sys.platform == "win32":
+                import time
+
+                time.sleep(0.1)  # Windows file deletion can be async
             assert not (cache_dir / "subdir").exists()
             assert not (cache_dir / "file.txt").exists()
             # Cache dir itself should remain

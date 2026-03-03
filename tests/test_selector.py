@@ -38,8 +38,8 @@ def test_show_project_list_with_projects(capsys):
 
     captured = capsys.readouterr()
     assert "2 project(s)" in captured.out
-    assert "/home/user/project1" in captured.out
-    assert "/home/user/project2" in captured.out
+    assert str(Path("/home/user/project1")) in captured.out
+    assert str(Path("/home/user/project2")) in captured.out
     assert "[git]" in captured.out
     assert "[manual]" in captured.out
 

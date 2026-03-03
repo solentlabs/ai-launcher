@@ -49,18 +49,16 @@ class TestEndToEndIntegration:
         # Should show file stats
         assert "lines" in result.lower() or "3 lines" in result
 
-    def test_generate_preview_with_session_data(self, tmp_path, monkeypatch):
+    def test_generate_preview_with_session_data(self, mock_home):
         """Test preview includes session data when available."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
-        project_path = tmp_path / "my-project"
+        project_path = mock_home / "my-project"
         project_path.mkdir()
 
         # Create session directory
         from ai_launcher.providers.claude import _encode_project_path
 
         encoded = _encode_project_path(project_path)
-        session_dir = tmp_path / ".claude" / "projects" / encoded
+        session_dir = mock_home / ".claude" / "projects" / encoded
         session_dir.mkdir(parents=True)
 
         # Create session file
@@ -75,16 +73,14 @@ class TestEndToEndIntegration:
         # Should mention sessions or history
         assert "session" in result.lower() or "history" in result.lower()
 
-    def test_generate_preview_with_personal_context(self, tmp_path, monkeypatch):
+    def test_generate_preview_with_personal_context(self, mock_home):
         """Test preview includes personal CLAUDE.md."""
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         # Create personal CLAUDE.md
-        personal_claude = tmp_path / "CLAUDE.md"
+        personal_claude = mock_home / "CLAUDE.md"
         personal_claude.write_text("# Personal Preferences\n\nMy personal settings.\n")
 
         # Create project
-        project_path = tmp_path / "project"
+        project_path = mock_home / "project"
         project_path.mkdir()
 
         # Generate preview

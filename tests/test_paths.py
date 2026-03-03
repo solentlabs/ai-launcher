@@ -16,12 +16,12 @@ def test_expand_path_with_tilde():
     assert result == Path.home() / "projects"
 
 
-def test_expand_path_with_env_var():
+def test_expand_path_with_env_var(tmp_path):
     """Test expanding path with environment variable."""
-    # Set a test environment variable
-    os.environ["TEST_PATH"] = "/test/directory"
+    # Use real tmp_path for cross-platform compatibility
+    os.environ["TEST_PATH"] = str(tmp_path)
     result = expand_path("$TEST_PATH/subdir")
-    assert result == Path("/test/directory/subdir")
+    assert result == (tmp_path / "subdir").resolve()
 
 
 def test_expand_path_with_both():
@@ -32,10 +32,10 @@ def test_expand_path_with_both():
     assert result == expected
 
 
-def test_expand_path_absolute():
-    """Test expanding absolute path."""
-    result = expand_path("/absolute/path")
-    assert result == Path("/absolute/path")
+def test_expand_path_absolute(tmp_path):
+    """Test expanding absolute path returns resolved absolute path."""
+    result = expand_path(str(tmp_path))
+    assert result == tmp_path.resolve()
 
 
 def test_validate_directory_exists(tmp_path):

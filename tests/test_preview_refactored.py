@@ -152,20 +152,17 @@ class TestIntegrationWithRealProviders:
         assert isinstance(result, str)
         assert "Context Files" in result
 
-    def test_generate_preview_with_session_data(self, tmp_path, monkeypatch):
+    def test_generate_preview_with_session_data(self, mock_home):
         """Test preview generation includes session data if available."""
-        # Set up home directory
-        monkeypatch.setenv("HOME", str(tmp_path))
-
         # Create project
-        project_path = tmp_path / "my-project"
+        project_path = mock_home / "my-project"
         project_path.mkdir()
 
         # Create Claude session directory with session data
         from ai_launcher.providers.claude import _encode_project_path
 
         encoded = _encode_project_path(project_path)
-        session_dir = tmp_path / ".claude" / "projects" / encoded
+        session_dir = mock_home / ".claude" / "projects" / encoded
         session_dir.mkdir(parents=True)
 
         # Create a session file

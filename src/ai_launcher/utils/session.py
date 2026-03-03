@@ -39,8 +39,8 @@ def encode_project_path(project_path: Path) -> str:
         >>> encode_project_path(Path("/home/user/work"))
         '-home-user-work'
     """
-    # Convert to absolute path and get the string representation
-    abs_path = project_path.resolve()
+    # Convert to absolute path without resolving symlinks
+    abs_path = Path(os.path.abspath(project_path))  # noqa: PTH100 - resolve() follows symlinks
     path_str = str(abs_path)
 
     # Replace path separator with hyphens

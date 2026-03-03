@@ -22,7 +22,6 @@ class TestFormatTerminalTitle:
         [
             ("{project} \u2192 {provider}", "my-app \u2192 Claude Code"),
             ("{parent}/{project} - {provider}", "projects/my-app - Claude Code"),
-            ("{path}", "/home/user/projects/my-app"),
             ("{project}", "my-app"),
             ("{provider}", "Claude Code"),
             ("\U0001f916 {project} | {provider}", "\U0001f916 my-app | Claude Code"),
@@ -30,7 +29,6 @@ class TestFormatTerminalTitle:
         ids=[
             "basic_arrow",
             "parent_slash",
-            "full_path",
             "project_only",
             "provider_only",
             "with_emoji",
@@ -44,6 +42,12 @@ class TestFormatTerminalTitle:
             "Claude Code",
         )
         assert result == expected
+
+    def test_format_full_path(self):
+        """Test {path} format uses platform-native path string."""
+        path = Path("/home/user/projects/my-app")
+        result = format_terminal_title("{path}", path, "Claude Code")
+        assert result == str(path)
 
     def test_format_invalid_variable(self):
         """Test that invalid format variables raise ValueError."""
@@ -113,7 +117,7 @@ class TestFormatTerminalTitle:
             "Claude Code",
         )
         assert result != " \u2192 Claude Code"
-        assert "/" in result or result.startswith("/")
+        assert os.sep in result or "/" in result
         assert "\u2192 Claude Code" in result
 
     def test_format_current_directory(self):

@@ -1,6 +1,21 @@
 """Pytest configuration and fixtures."""
 
+from pathlib import Path
+
 import pytest
+
+
+@pytest.fixture
+def mock_home(tmp_path, monkeypatch):
+    """Override both HOME env var and Path.home() for cross-platform tests.
+
+    On Windows, Path.home() uses USERPROFILE, not HOME. This fixture
+    ensures consistent behavior across all platforms.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    return tmp_path
 
 
 @pytest.fixture

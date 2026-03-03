@@ -823,7 +823,9 @@ class TestSessionConfigFormatting:
         config = SessionConfig(config_file_path="/etc/ai-launcher/config.json")
         result = formatter._format_session_config_section(config)
         assert "Source:" in result
-        assert "/etc/ai-launcher" in result
+        # Path separator varies by platform
+        assert "ai-launcher" in result
+        assert "config.json" in result
 
     def test_empty_config(self, formatter):
         from ai_launcher.core.provider_data import SessionConfig
