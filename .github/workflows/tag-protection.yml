@@ -35,11 +35,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           COMMIT=$(git rev-parse HEAD)
-          # GitHub Actions reports as check runs, not commit statuses
-          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$COMMIT/check-suites" \
-            --jq '[.check_suites[] | select(.app.slug == "github-actions" and .conclusion != null)] | map(.conclusion) | unique | if length == 0 then "pending" elif all(. == "success") then "success" else "failure" end')
+          # Check only CI workflow runs (exclude Tag Protection and other workflows)
+          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$COMMIT/check-runs" \
+            --paginate \
+            --jq '[.check_runs[] | select(.name | startswith("test ("))] | if length == 0 then "pending" elif all(.conclusion == "success") then "success" else "failure" end')
           if [ "$CONCLUSION" != "success" ]; then
-            echo "::error::CI check suites status is '$CONCLUSION' — must be 'success' to tag"
+            echo "::error::CI check runs status is '$CONCLUSION' — must be 'success' to tag"
             exit 1
           fi
           echo "✓ CI passed on tagged commit"
