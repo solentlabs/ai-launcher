@@ -1,6 +1,7 @@
 """Directory browser for ai-launcher."""
 
 import subprocess  # nosec B404
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -59,22 +60,9 @@ Select '.' to add current directory
 .. = Go up one level
 @ suffix = symlink"""
 
-        # Build preview command
-        preview_cmd = f"""
-if [[ {{}} == '.' ]]; then
-    echo 'Select: {current_path}'
-elif [[ {{}} == '..' ]]; then
-    echo 'Go to: {current_path.parent}'
-else
-    target='{current_path}/{{}}'
-    target=${{target%@}}
-    if [[ -L "$target" ]]; then
-        echo "Symlink to: $(readlink -f "$target")"
-        echo ''
-    fi
-    ls -la "$target" 2>/dev/null | head -20
-fi
-"""
+        # Build preview command (cross-platform Python helper)
+        helper_script = Path(__file__).parent / "_browser_preview.py"
+        preview_cmd = f"{sys.executable} {helper_script} {current_path} {{}}"
 
         # Run fzf
         try:

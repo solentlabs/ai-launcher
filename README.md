@@ -20,6 +20,7 @@ A terminal-first launcher that:
 - 🔍 **Project Switching** - Fuzzy search across all your projects
 - 🤖 **Multi-Tool Support** - Works with Claude Code, Gemini CLI, and more
 - 👁️ **Context Transparency** - See exactly what files AI tools access
+- 🖥️ **Cross-Platform** - Native support for Linux, macOS, WSL, and Windows
 
 ## Install
 
@@ -27,11 +28,12 @@ A terminal-first launcher that:
 <summary><strong>Linux / macOS / WSL</strong></summary>
 
 ```bash
-# Recommended
-pipx install ai-launcher
+# Install fzf (required)
+sudo apt install fzf    # Ubuntu/Debian/WSL
+brew install fzf         # macOS
 
-# Or with pip
-pip install ai-launcher
+# Install ai-launcher
+pipx install ai-launcher
 ```
 
 </details>
@@ -40,7 +42,12 @@ pip install ai-launcher
 <summary><strong>Windows (PowerShell)</strong></summary>
 
 ```powershell
-# Recommended
+# Install fzf (required - pick one)
+winget install junegunn.fzf
+scoop install fzf
+choco install fzf
+
+# Install ai-launcher
 pipx install ai-launcher
 
 # Or with pip (use py -m to avoid launcher issues)
@@ -62,10 +69,26 @@ pip install -e .
 
 ## Use
 
-**Basic usage:**
+<details open>
+<summary><strong>Linux / macOS / WSL</strong></summary>
+
 ```bash
 ai-launcher ~/projects
 ```
+
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+ai-launcher C:\Users\you\projects
+
+# If ai-launcher is not in PATH
+py -m ai_launcher C:\Users\you\projects
+```
+
+</details>
 
 **See what's available:**
 ```bash
@@ -101,8 +124,8 @@ Select a project, and your AI tool opens with full context.
 ## Requirements
 
 - Python 3.8+
-- fzf (for fuzzy search)
-- An AI CLI tool (Claude Code, Gemini CLI, etc.)
+- [fzf](https://github.com/junegunn/fzf) (fuzzy search — see install steps above)
+- An AI CLI tool (Claude Code, Gemini CLI, Cursor, Aider, or GitHub Copilot CLI)
 
 ## Configuration
 
@@ -110,7 +133,8 @@ First run creates `~/.config/ai-launcher/config.toml`:
 
 ```toml
 [scan]
-paths = ["~/projects", "~/work"]
+paths = ["~/projects", "~/work"]    # Linux/macOS/WSL
+# paths = ["C:/Users/you/projects"] # Windows
 max_depth = 5
 
 [provider]
@@ -118,8 +142,8 @@ default = "claude-code"
 
 # Per-project overrides (optional)
 [provider.per_project]
-"/home/user/gemini-project" = "gemini"
-"/home/user/claude-project" = "claude-code"
+"/home/user/gemini-project" = "gemini"         # Linux/macOS/WSL
+# "C:/Users/you/gemini-project" = "gemini"     # Windows
 ```
 
 ### Available Providers

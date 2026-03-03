@@ -17,6 +17,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        id: checkout
+        continue-on-error: true
+
+      - name: Retry checkout on failure
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -50,6 +56,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        id: checkout
+        continue-on-error: true
+
+      - name: Retry checkout on failure
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,5 +82,4 @@ jobs:
         with:
           file: ./coverage.xml
           flags: unittests
-          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false

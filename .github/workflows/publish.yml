@@ -21,6 +21,14 @@ jobs:
       (github.event.workflow_run.conclusion == 'success')
     steps:
       - uses: actions/checkout@v4
+        id: checkout
+        continue-on-error: true
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Retry checkout on failure
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 

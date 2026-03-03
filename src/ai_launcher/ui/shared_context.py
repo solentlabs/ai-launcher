@@ -1,6 +1,7 @@
 """Global context file management UI for ai-launcher."""
 
 import subprocess  # nosec B404
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -68,10 +69,8 @@ def add_global_files(
 
     # Run fzf to select files to add
     try:
-        preview_cmd = (
-            "path=$(echo {1} | sed 's|^~|'$HOME'|'); "
-            'if [ -f "$path" ]; then cat "$path"; fi'
-        )
+        helper_script = Path(__file__).parent / "_file_preview.py"
+        preview_cmd = f"{sys.executable} {helper_script} {{1}}"
 
         process = subprocess.Popen(
             [
@@ -151,11 +150,8 @@ def remove_global_files(config_manager: ConfigManager) -> bool:
 
     # Run fzf to select files to remove
     try:
-        preview_cmd = (
-            "path=$(echo {1} | sed 's|^~|'$HOME'|'); "
-            'if [ -f "$path" ]; then cat "$path"; '
-            "else echo 'File not found'; fi"
-        )
+        helper_script = Path(__file__).parent / "_file_preview.py"
+        preview_cmd = f"{sys.executable} {helper_script} {{1}}"
 
         process = subprocess.Popen(
             [

@@ -107,7 +107,7 @@ Type to filter • Arrows to navigate
         # Set environment variables for preview helper
         env = os.environ.copy()
         if scan_paths:
-            env["AI_LAUNCHER_SCAN_PATHS"] = ":".join(str(p) for p in scan_paths)
+            env["AI_LAUNCHER_SCAN_PATHS"] = os.pathsep.join(str(p) for p in scan_paths)
         if config and config.context.global_files:
             env["AI_LAUNCHER_GLOBAL_FILES"] = ",".join(config.context.global_files)
         if manual_paths:

@@ -27,7 +27,7 @@ def show_configuration_preview() -> None:
     print("\033[1m📁 Project Paths\033[0m")
     scan_paths_env = os.environ.get("AI_LAUNCHER_SCAN_PATHS", "")
     if scan_paths_env:
-        scan_paths = scan_paths_env.split(":")
+        scan_paths = scan_paths_env.split(os.pathsep)
         print(f"   Scan paths: {len(scan_paths)}")
         for sp in scan_paths:
             try:
@@ -85,7 +85,7 @@ def show_configuration_preview() -> None:
     # Build base command with path
     base_cmd = f"  ai-launcher {provider_cmd}"
     if scan_paths_env:
-        scan_paths = scan_paths_env.split(":")
+        scan_paths = scan_paths_env.split(os.pathsep)
         if scan_paths:
             # Use first scan path
             sp_path = Path(scan_paths[0])
@@ -291,7 +291,7 @@ def main() -> None:
             scan_paths_env = os.environ.get("AI_LAUNCHER_SCAN_PATHS", "")
             is_scan_root = False
             if scan_paths_env:
-                scan_paths = [Path(p) for p in scan_paths_env.split(":") if p]
+                scan_paths = [Path(p) for p in scan_paths_env.split(os.pathsep) if p]
                 is_scan_root = any(path.resolve() == sp.resolve() for sp in scan_paths)
 
             # Show manual paths and global files if this is a scan root

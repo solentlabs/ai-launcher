@@ -48,7 +48,10 @@ def build_tree_view(
 
             # If we only have root as common, use the parent of the first project as base
             # This avoids showing the entire filesystem
-            if not common_parts or (len(common_parts) == 1 and common_parts[0] == "/"):
+            if not common_parts or (
+                len(common_parts) == 1
+                and Path(common_parts[0]).parent == Path(common_parts[0])
+            ):
                 # No meaningful common path - use first project's parent
                 base = projects[0].path.parent
             else:
@@ -112,7 +115,7 @@ def build_tree_view(
                 child_prefix = prefix + "│   "
         else:
             # Base directory - only show if it's meaningful (not root)
-            if base != Path("/"):
+            if base.parent != base:
                 # Format base path with ~ shorthand
                 home = Path.home()
                 display_base = (
