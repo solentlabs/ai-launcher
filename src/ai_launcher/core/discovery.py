@@ -23,15 +23,28 @@ def scan_for_git_repos(
         List of discovered Project instances
     """
     projects = []
-    seen_paths = set()
+    seen_paths: set = set()
+    # Track visited real directories to prevent cycles when following symlinks
+    seen_real_dirs: set = set()
 
     for base_path in scan_paths:
         if not base_path.exists() or not base_path.is_dir():
             continue
 
-        base_str = str(base_path.resolve())
+        base_str = str(base_path)
 
-        for root, dirs, _ in os.walk(base_path, followlinks=False):
+        # followlinks=True so NTFS junctions and symlinks are traversed.
+        # Python 3.12+ treats junctions as symlinks, so followlinks=False
+        # silently skips them.  Cycle protection via seen_real_dirs and
+        # max_depth keeps this safe.
+        for root, dirs, files in os.walk(base_path, followlinks=True):
+            # Cycle detection: skip directories we've already visited
+            real_root = os.path.realpath(root)
+            if real_root in seen_real_dirs:
+                dirs[:] = []
+                continue
+            seen_real_dirs.add(real_root)
+
             # Calculate current depth
             depth = root[len(base_str) :].count(os.sep)
 
@@ -39,11 +52,14 @@ def scan_for_git_repos(
                 dirs[:] = []  # Stop deeper traversal
                 continue
 
+            # Check for .git before pruning (it's both in dirs and prune_dirs).
+            # .git can be a directory (normal repos) or a file (submodules).
+            has_git = ".git" in dirs or ".git" in files
+
             # Remove pruned directories from traversal
             dirs[:] = [d for d in dirs if d not in prune_dirs]
 
-            # Check if this is a git repository
-            if ".git" in os.listdir(root):
+            if has_git:
                 project_path = Path(root).resolve()
                 path_str = str(project_path)
 

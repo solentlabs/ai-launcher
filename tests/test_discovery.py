@@ -102,3 +102,51 @@ def test_scan_handles_missing_directory():
 
     # Should return empty list, not crash
     assert projects == []
+
+
+def test_scan_follows_symlinks(tmp_path):
+    """Test that symlinks/junctions are followed during scanning."""
+    # Create a real repo in a separate location
+    real_dir = tmp_path / "real_repos" / "my-project"
+    (real_dir / ".git").mkdir(parents=True)
+
+    # Create the scan root with a symlink to the real location
+    scan_root = tmp_path / "projects"
+    scan_root.mkdir()
+    link_target = scan_root / "linked-org"
+    link_target.symlink_to(tmp_path / "real_repos", target_is_directory=True)
+
+    projects = scan_for_git_repos([scan_root], max_depth=5, prune_dirs=[])
+
+    assert len(projects) == 1
+    assert projects[0].name == "my-project"
+
+
+def test_scan_handles_symlink_cycles(tmp_path):
+    """Test that circular symlinks don't cause infinite loops."""
+    # Create a repo
+    repo = tmp_path / "projects" / "repo"
+    (repo / ".git").mkdir(parents=True)
+
+    # Create a circular symlink: projects/loop -> projects
+    loop = tmp_path / "projects" / "loop"
+    loop.symlink_to(tmp_path / "projects", target_is_directory=True)
+
+    projects = scan_for_git_repos([tmp_path / "projects"], max_depth=5, prune_dirs=[])
+
+    # Should find the repo exactly once, not loop infinitely
+    assert len(projects) == 1
+    assert projects[0].name == "repo"
+
+
+def test_scan_detects_git_file(tmp_path):
+    """Test that .git files (submodules) are detected, not just .git dirs."""
+    # Create a submodule-style repo where .git is a file
+    repo = tmp_path / "my-submodule"
+    repo.mkdir()
+    (repo / ".git").write_text("gitdir: /some/other/path")
+
+    projects = scan_for_git_repos([tmp_path], max_depth=5, prune_dirs=[])
+
+    assert len(projects) == 1
+    assert projects[0].name == "my-submodule"

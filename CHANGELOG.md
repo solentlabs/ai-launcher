@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-03-03
+
+### Fixed
+- Project discovery on native Windows — follow NTFS junctions and symlinks (Python 3.12+ treats junctions as symlinks, causing `os.walk` to silently skip them)
+- Circular symlink protection during project scanning via real-path cycle detection
+- Detect `.git` files (Git submodules) in addition to `.git` directories
+- `verify-tag-ci.sh` pre-push hook now uses check-runs API (matches `tag-protection.yml`) instead of broken commit status API
+
+### Changed
+- Release script (`scripts/release.py`) extended with full lifecycle automation: PR merge, CI wait, tag, and GitHub release creation
+- Release script supports `--dry-run` to preview the full release plan
+- Eliminated redundant `os.listdir()` call in project discovery — uses `os.walk` data directly
+
 ## [0.1.2] - 2026-03-03
 
 ### Added
