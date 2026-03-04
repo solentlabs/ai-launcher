@@ -7,48 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2026-03-03
 
-### Fixed
-- Cross-platform encoding: all fzf subprocess calls use binary mode with explicit UTF-8 encode/decode, fixing Windows cp1252 mangling
-- Delimiter escaping: consistent `\\t\\t` in all fzf `--delimiter` args (raw tab chars were mangled by Windows command-line processing)
-- Removed references to non-existent `--setup` CLI flag in selector, config, and docs
-- Context viewer: replaced temp-file + `subprocess.run` with `Popen` + `communicate` for consistency with other fzf callers
-
-### Changed
-- Settings menu, shared context, browser, and context viewer all follow the same binary-mode fzf pattern
-- Selector: removed unnecessary `isinstance(stdout_bytes, bytes)` guard — always bytes now
-
-## [0.1.3] - 2026-03-03
-
-### Fixed
-- Project discovery on native Windows — follow NTFS junctions and symlinks (Python 3.12+ treats junctions as symlinks, causing `os.walk` to silently skip them)
-- Circular symlink protection during project scanning via real-path cycle detection
-- Detect `.git` files (Git submodules) in addition to `.git` directories
-- `verify-tag-ci.sh` pre-push hook now uses check-runs API (matches `tag-protection.yml`) instead of broken commit status API
-
-### Changed
-- Release script (`scripts/release.py`) extended with full lifecycle automation: PR merge, CI wait, tag, and GitHub release creation
-- Release script supports `--dry-run` to preview the full release plan
-- Eliminated redundant `os.listdir()` call in project discovery — uses `os.walk` data directly
-
-## [0.1.2] - 2026-03-03
-
 ### Added
 - Auto-download fzf when missing — prompts user and fetches from GitHub releases
 - Cross-platform Python helpers for fzf preview commands (`_browser_preview.py`, `_file_preview.py`)
 
 ### Fixed
+- Cross-platform encoding: all fzf subprocess calls use binary mode with explicit UTF-8 encode/decode, fixing Windows cp1252 mangling
+- Delimiter escaping: consistent `\\t\\t` in all fzf `--delimiter` args (raw tab chars were mangled by Windows command-line processing)
+- Project discovery on native Windows — follow NTFS junctions and symlinks (Python 3.12+ treats junctions as symlinks, causing `os.walk` to silently skip them)
+- Circular symlink protection during project scanning via real-path cycle detection
+- Detect `.git` files (Git submodules) in addition to `.git` directories
 - Replace hardcoded `:` path separators with `os.pathsep` for Windows
 - Fix root path detection to work on Windows (no hardcoded `/`)
-- CI checkout retry on transient GitHub 500 errors
-- Codecov integration (tokenless org-level auth)
-- README install instructions now mention fzf dependency
-
-## [0.1.1] - 2026-03-03
-
-### Fixed
 - Cross-platform test compatibility (macOS symlink resolution, Windows subprocess handling)
-- Publish workflow now depends on tag-protection validation before uploading
-- Tag protection uses check-suites API for correct GitHub Actions CI status
+- Removed references to non-existent `--setup` CLI flag
+- Codecov integration (tokenless org-level auth)
+
+### Changed
+- All fzf callers (settings, shared context, browser, context viewer) use consistent binary-mode pattern
+- Release script (`scripts/release.py`) extended with full lifecycle automation: PR merge, CI wait, tag, and GitHub release creation
+- Tag protection and publish workflows hardened for CI reliability
+
+> **Note:** Versions 0.1.1–0.1.3 were incremental debugging releases and have been yanked from PyPI. All their fixes are included in 0.2.0.
 
 ## [0.1.0] - 2026-03-03
 
