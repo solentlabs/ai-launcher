@@ -51,9 +51,7 @@ def select_project(
     current_projects = projects
     while True:
         if not current_projects:
-            print(
-                "No projects found. Add scan paths with --setup or add manual paths with --add"
-            )
+            print("No projects found. Pass a scan directory or use --manual-paths")
             return None
 
         # Clear screen before launching fzf
@@ -124,7 +122,7 @@ Type to filter • Arrows to navigate
                 "--layout=reverse",  # Nav at top
                 "--border=rounded",
                 "--border-label= Projects ",
-                "--delimiter=\t\t",  # Use double-tab as delimiter
+                "--delimiter=\\t\\t",  # Double-tab delimiter (fzf interprets \t)
                 "--with-nth=2..",  # Show only the tree display (field 2 onwards)
                 "--preview-window=right:70%:wrap:border-left:nohidden",  # Preview 70%, list 30%
                 f"--preview={preview_cmd}",
@@ -134,20 +132,19 @@ Type to filter • Arrows to navigate
                 "--ansi",  # Enable ANSI color codes
             ]
 
-            # Pass choices via stdin
+            # Pass choices via stdin as raw UTF-8 bytes to avoid
+            # Windows codepage mangling (cp1252 vs UTF-8).
             input_data = "\n".join(choices)
+            input_bytes = input_data.encode("utf-8")
 
-            # Run fzf with stdin, but let it use the terminal for UI
-            # Do NOT capture stdout/stderr - fzf needs direct terminal access
             process = subprocess.Popen(  # nosec B603
                 fzf_cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                text=True,
                 env=env,
             )
 
-            stdout, _ = process.communicate(input=input_data)
+            stdout_bytes, _ = process.communicate(input=input_bytes)
             result_code = process.returncode
 
             # Check if user cancelled (exit code 130 = Ctrl+C, 1 = no match/cancelled)
@@ -160,8 +157,8 @@ Type to filter • Arrows to navigate
                 print(f"Error running fzf: exit code {result_code}")
                 return None
 
-            # Get selected line
-            selected = stdout.strip()
+            # Get selected line (decode from raw bytes)
+            selected = stdout_bytes.decode("utf-8", errors="replace").strip()
             if not selected:
                 return None
 

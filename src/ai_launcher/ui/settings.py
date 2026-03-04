@@ -67,7 +67,7 @@ SPACE to toggle • ENTER to open • ESC to go back
                 "--layout=reverse",
                 "--border=rounded",
                 "--border-label= Settings ",
-                "--delimiter=\t\t",
+                "--delimiter=\\t\\t",
                 "--with-nth=2..",  # Show only the display part
                 "--preview-window=right:60%:wrap:border-left",
                 f"--preview={preview_cmd}",
@@ -83,10 +83,9 @@ SPACE to toggle • ENTER to open • ESC to go back
                 fzf_cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                text=True,
             )
 
-            stdout, _ = process.communicate(input=input_data)
+            stdout_bytes, _ = process.communicate(input=input_data.encode("utf-8"))
             result_code = process.returncode
 
             # User cancelled (ESC or Ctrl+C)
@@ -96,6 +95,8 @@ SPACE to toggle • ENTER to open • ESC to go back
             if result_code != 0:
                 print(f"Error running fzf: exit code {result_code}")
                 break
+
+            stdout = stdout_bytes.decode("utf-8", errors="replace")
 
             # Parse output: first line is the key pressed, second is the selection
             # NOTE: Don't strip before split - we need to preserve empty first line for Enter key

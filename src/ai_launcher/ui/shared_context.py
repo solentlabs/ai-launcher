@@ -81,7 +81,7 @@ def add_global_files(
                 "--layout=reverse",
                 "--border=rounded",
                 "--border-label= Add Global Files ",
-                "--delimiter=\t\t",
+                "--delimiter=\\t\\t",
                 "--with-nth=2..",
                 "--preview-window=right:60%:wrap:border-left",
                 f"--preview={preview_cmd}",
@@ -90,10 +90,10 @@ def add_global_files(
             ],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            text=True,
         )
 
-        stdout, _ = process.communicate(input="\n".join(items))
+        stdout_bytes, _ = process.communicate(input="\n".join(items).encode("utf-8"))
+        stdout = stdout_bytes.decode("utf-8", errors="replace")
 
         if process.returncode != 0 or not stdout.strip():
             return False
@@ -162,7 +162,7 @@ def remove_global_files(config_manager: ConfigManager) -> bool:
                 "--layout=reverse",
                 "--border=rounded",
                 "--border-label= Remove Global Files ",
-                "--delimiter=\t\t",
+                "--delimiter=\\t\\t",
                 "--with-nth=2..",
                 "--preview-window=right:60%:wrap:border-left",
                 f"--preview={preview_cmd}",
@@ -171,10 +171,10 @@ def remove_global_files(config_manager: ConfigManager) -> bool:
             ],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            text=True,
         )
 
-        stdout, _ = process.communicate(input="\n".join(items))
+        stdout_bytes, _ = process.communicate(input="\n".join(items).encode("utf-8"))
+        stdout = stdout_bytes.decode("utf-8", errors="replace")
 
         if process.returncode != 0 or not stdout.strip():
             return False

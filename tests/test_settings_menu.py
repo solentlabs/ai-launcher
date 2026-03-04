@@ -124,7 +124,7 @@ class TestShowSettingsMenu:
         config_manager.load.return_value = ConfigData()
 
         mock_process = MagicMock()
-        mock_process.communicate.return_value = ("", "")
+        mock_process.communicate.return_value = (b"", b"")
         mock_process.returncode = 130  # Ctrl+C
 
         with patch("subprocess.Popen", return_value=mock_process):
@@ -137,7 +137,7 @@ class TestShowSettingsMenu:
         config_manager.load.return_value = ConfigData()
 
         mock_process = MagicMock()
-        mock_process.communicate.return_value = ("", "")
+        mock_process.communicate.return_value = (b"", b"")
         mock_process.returncode = 1  # ESC
 
         with patch("subprocess.Popen", return_value=mock_process):

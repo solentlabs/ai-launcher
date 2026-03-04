@@ -476,8 +476,7 @@ echo '[provider]
 default = "your-tool"' >> ~/.config/ai-launcher/config.toml
 
 # 4. Test per-project override
-ai-launcher --setup
-# Edit config to add per-project override
+# Edit ~/.config/ai-launcher/config.toml
 ```
 
 ## Common Patterns

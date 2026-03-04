@@ -11,7 +11,7 @@ def test_browse_directory_navigation(mock_popen):
     """Test directory browser navigation - user cancels."""
     mock_process = MagicMock()
     mock_process.returncode = 1  # User cancelled
-    mock_process.communicate.return_value = ("", "")
+    mock_process.communicate.return_value = (b"", b"")
     mock_popen.return_value = mock_process
 
     result = browse_directory(Path.home())
@@ -27,7 +27,7 @@ def test_browse_directory_select_current(mock_popen, tmp_path):
 
     mock_process = MagicMock()
     mock_process.returncode = 0
-    mock_process.communicate.return_value = (".\n", "")
+    mock_process.communicate.return_value = (b".\n", b"")
     mock_popen.return_value = mock_process
 
     result = browse_directory(test_dir)
@@ -44,12 +44,12 @@ def test_browse_directory_navigate_into(mock_popen, tmp_path):
     # First call: user selects subdir (navigates into it)
     mock_process_1 = MagicMock()
     mock_process_1.returncode = 0
-    mock_process_1.communicate.return_value = ("subdir\n", "")
+    mock_process_1.communicate.return_value = (b"subdir\n", b"")
 
     # Second call: user cancels
     mock_process_2 = MagicMock()
     mock_process_2.returncode = 1
-    mock_process_2.communicate.return_value = ("", "")
+    mock_process_2.communicate.return_value = (b"", b"")
 
     mock_popen.side_effect = [mock_process_1, mock_process_2]
 
@@ -68,12 +68,12 @@ def test_browse_directory_select_subdirectory(mock_popen, tmp_path):
     # First call: user selects subdir (navigates into it)
     mock_process_1 = MagicMock()
     mock_process_1.returncode = 0
-    mock_process_1.communicate.return_value = ("subdir\n", "")
+    mock_process_1.communicate.return_value = (b"subdir\n", b"")
 
     # Second call: user selects "." (selects current = subdir)
     mock_process_2 = MagicMock()
     mock_process_2.returncode = 0
-    mock_process_2.communicate.return_value = (".\n", "")
+    mock_process_2.communicate.return_value = (b".\n", b"")
 
     mock_popen.side_effect = [mock_process_1, mock_process_2]
 
@@ -91,12 +91,12 @@ def test_browse_directory_navigate_up(mock_popen, tmp_path):
     # First: user selects ".." (parent)
     mock_process_1 = MagicMock()
     mock_process_1.returncode = 0
-    mock_process_1.communicate.return_value = ("..\n", "")
+    mock_process_1.communicate.return_value = (b"..\n", b"")
 
     # Second: user cancels
     mock_process_2 = MagicMock()
     mock_process_2.returncode = 1
-    mock_process_2.communicate.return_value = ("", "")
+    mock_process_2.communicate.return_value = (b"", b"")
 
     mock_popen.side_effect = [mock_process_1, mock_process_2]
 
@@ -114,7 +114,7 @@ def test_browse_directory_empty_directory(mock_popen, tmp_path):
     # User selects "." to pick this empty directory
     mock_process = MagicMock()
     mock_process.returncode = 0
-    mock_process.communicate.return_value = (".\n", "")
+    mock_process.communicate.return_value = (b".\n", b"")
     mock_popen.return_value = mock_process
 
     result = browse_directory(empty_dir)

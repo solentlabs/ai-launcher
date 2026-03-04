@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-03
+
+### Fixed
+- Cross-platform encoding: all fzf subprocess calls use binary mode with explicit UTF-8 encode/decode, fixing Windows cp1252 mangling
+- Delimiter escaping: consistent `\\t\\t` in all fzf `--delimiter` args (raw tab chars were mangled by Windows command-line processing)
+- Removed references to non-existent `--setup` CLI flag in selector, config, and docs
+- Context viewer: replaced temp-file + `subprocess.run` with `Popen` + `communicate` for consistency with other fzf callers
+
+### Changed
+- Settings menu, shared context, browser, and context viewer all follow the same binary-mode fzf pattern
+- Selector: removed unnecessary `isinstance(stdout_bytes, bytes)` guard — always bytes now
+
 ## [0.1.3] - 2026-03-03
 
 ### Fixed

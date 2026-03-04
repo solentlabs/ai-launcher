@@ -277,7 +277,9 @@ class ConfigManager:
                     print(f"  Error: {e}")
 
             if not paths:
-                print("\nNo paths added. You can add them later with --setup")
+                print(
+                    "\nNo paths added. Pass a scan directory as argument when launching."
+                )
 
             # Create config
             config = self._get_defaults()

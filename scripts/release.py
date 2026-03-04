@@ -199,12 +199,22 @@ def extract_changelog_section(version: str) -> str:
     return section if section else f"Release v{version}"
 
 
+def _parse_pr_checks_text(output: str) -> list[dict[str, str]]:
+    """Parse tab-separated output from 'gh pr checks' (no --json support)."""
+    checks = []
+    for line in output.strip().splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            checks.append({"name": parts[0].strip(), "state": parts[1].strip()})
+    return checks
+
+
 def poll_pr_checks(pr_number: int) -> bool:
     """Poll PR checks until all pass or any fails. Returns True if all passed."""
     elapsed = 0
     while elapsed < POLL_TIMEOUT:
         result = run_gh(
-            ["pr", "checks", str(pr_number), "--json", "name,state,bucket"],
+            ["pr", "checks", str(pr_number)],
             check=False,
         )
         if result.returncode != 0 or not result.stdout.strip():
@@ -213,15 +223,15 @@ def poll_pr_checks(pr_number: int) -> bool:
             elapsed += POLL_INTERVAL
             continue
 
-        checks = json.loads(result.stdout)
+        checks = _parse_pr_checks_text(result.stdout)
         if not checks:
             info(f"No checks found yet... ({elapsed}s)")
             time.sleep(POLL_INTERVAL)
             elapsed += POLL_INTERVAL
             continue
 
-        pending = [c for c in checks if c.get("bucket", c.get("state")) == "pending"]
-        failed = [c for c in checks if c.get("bucket", c.get("state")) == "fail"]
+        failed = [c for c in checks if c["state"] == "fail"]
+        pending = [c for c in checks if c["state"] not in ("pass", "fail")]
 
         if failed:
             error("The following checks failed:")

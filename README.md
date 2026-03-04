@@ -3,9 +3,8 @@
 Universal AI CLI launcher with local context management. Launch any AI coding assistant from a single entry point with persistent context across sessions.
 
 [![PyPI version](https://img.shields.io/pypi/v/ai-launcher)](https://pypi.org/project/ai-launcher/)
-[![Downloads](https://img.shields.io/pypi/dm/ai-launcher)](https://pypi.org/project/ai-launcher/)
 [![CI](https://github.com/solentlabs/ai-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/solentlabs/ai-launcher/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/solentlabs/ai-launcher/branch/main/graph/badge.svg)](https://codecov.io/gh/solentlabs/ai-launcher)
+[![codecov](https://codecov.io/gh/solentlabs/ai-launcher/graph/badge.svg)](https://codecov.io/gh/solentlabs/ai-launcher)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 

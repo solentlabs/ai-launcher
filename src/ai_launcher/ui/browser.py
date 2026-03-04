@@ -80,15 +80,16 @@ Select '.' to add current directory
                 ],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                text=True,
             )
 
-            stdout, _ = process.communicate(input="\n".join(items))
+            stdout_bytes, _ = process.communicate(
+                input="\n".join(items).encode("utf-8")
+            )
 
             if process.returncode != 0:
                 return None
 
-            selected = stdout.strip()
+            selected = stdout_bytes.decode("utf-8", errors="replace").strip()
             if not selected:
                 return None
 

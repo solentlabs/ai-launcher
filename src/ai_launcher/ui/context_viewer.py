@@ -4,11 +4,8 @@ Author: Solent Labs™
 Created: 2026-02-09
 """
 
-import contextlib
-import os
 import subprocess  # nosec B404
 import sys
-import tempfile
 from pathlib import Path
 from typing import List
 
@@ -61,12 +58,7 @@ def show_context_viewer(
         remaining = len(projects) - 20
         items.append(f"__INFO__\t\t  ... and {remaining} more projects")
 
-    # Write items to temp file
     try:
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
-            f.write("\n".join(items))
-            items_file = f.name
-
         # Get path to preview helper script
         helper_script = Path(__file__).parent / "_context_preview.py"
 
@@ -81,7 +73,7 @@ def show_context_viewer(
             "--layout=reverse",
             "--border=rounded",
             "--border-label= Context Visualization ",
-            "--delimiter=\t\t",
+            "--delimiter=\\t\\t",
             "--with-nth=2..",
             "--preview-window=right:60%:wrap:border-left",
             f"--preview={preview_cmd}",
@@ -89,18 +81,13 @@ def show_context_viewer(
             "--disabled",  # Disable search, just for browsing
         ]
 
-        try:
-            with open(items_file) as f:
-                result = subprocess.run(
-                    fzf_cmd,
-                    stdin=f,
-                    capture_output=True,
-                    text=True,
-                )  # nosec B603
-        finally:
-            # Clean up temp file
-            with contextlib.suppress(OSError):
-                os.unlink(items_file)
+        input_data = "\n".join(items)
+        process = subprocess.Popen(  # nosec B603
+            fzf_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        process.communicate(input=input_data.encode("utf-8"))
 
     except FileNotFoundError:
         print("Error: fzf not found. Please install fzf to use the context viewer.")

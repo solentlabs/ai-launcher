@@ -163,7 +163,7 @@ class TestAddGlobalFiles:
         md_file.write_text("standards")
 
         mock_process = MagicMock()
-        mock_process.communicate.return_value = ("", "")
+        mock_process.communicate.return_value = (b"", b"")
         mock_process.returncode = 1
 
         with patch("pathlib.Path.home", return_value=tmp_path):
@@ -214,7 +214,7 @@ class TestRemoveGlobalFiles:
         config_manager.load.return_value = config
 
         mock_process = MagicMock()
-        mock_process.communicate.return_value = ("", "")
+        mock_process.communicate.return_value = (b"", b"")
         mock_process.returncode = 1
 
         with patch("subprocess.Popen", return_value=mock_process):

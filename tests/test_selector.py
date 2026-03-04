@@ -74,7 +74,7 @@ def test_select_project_with_selection(mock_clear, mock_tree, mock_popen, tmp_pa
     # Mock fzf to return the selected choice
     mock_process = MagicMock()
     mock_process.returncode = 0
-    mock_process.communicate.return_value = (f"{choice_str}\n", "")
+    mock_process.communicate.return_value = (f"{choice_str}\n".encode(), b"")
     mock_popen.return_value = mock_process
 
     result = select_project([project])
@@ -100,7 +100,7 @@ def test_select_project_cancelled(mock_clear, mock_tree, mock_popen, tmp_path):
     # Mock fzf cancellation (exit code 1)
     mock_process = MagicMock()
     mock_process.returncode = 1
-    mock_process.communicate.return_value = ("", "")
+    mock_process.communicate.return_value = (b"", b"")
     mock_popen.return_value = mock_process
 
     result = select_project([project])
