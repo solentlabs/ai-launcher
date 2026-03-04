@@ -27,11 +27,7 @@ A terminal-first launcher that:
 <summary><strong>Linux / macOS / WSL</strong></summary>
 
 ```bash
-# Install fzf (required)
-sudo apt install fzf    # Ubuntu/Debian/WSL
-brew install fzf         # macOS
-
-# Install ai-launcher
+# Install ai-launcher (fzf auto-downloads if missing)
 pipx install ai-launcher
 ```
 
@@ -41,12 +37,7 @@ pipx install ai-launcher
 <summary><strong>Windows (PowerShell)</strong></summary>
 
 ```powershell
-# Install fzf (required - pick one)
-winget install junegunn.fzf
-scoop install fzf
-choco install fzf
-
-# Install ai-launcher
+# Install ai-launcher (fzf auto-downloads if missing)
 pipx install ai-launcher
 
 # Or with pip (use py -m to avoid launcher issues)
@@ -123,7 +114,7 @@ Select a project, and your AI tool opens with full context.
 ## Requirements
 
 - Python 3.8+
-- [fzf](https://github.com/junegunn/fzf) (fuzzy search — see install steps above)
+- [fzf](https://github.com/junegunn/fzf) (auto-downloaded if missing)
 - An AI CLI tool (Claude Code, Gemini CLI, Cursor, Aider, or GitHub Copilot CLI)
 
 ## Configuration
