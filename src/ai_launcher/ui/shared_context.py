@@ -1,12 +1,12 @@
 """Global context file management UI for ai-launcher."""
 
 import subprocess  # nosec B404
-import sys
 from pathlib import Path
 from typing import List, Optional
 
 from ai_launcher.core.config import ConfigManager
 from ai_launcher.utils.logging import get_logger
+from ai_launcher.utils.paths import fzf_preview_cmd
 
 logger = get_logger(__name__)
 
@@ -70,7 +70,7 @@ def add_global_files(
     # Run fzf to select files to add
     try:
         helper_script = Path(__file__).parent / "_file_preview.py"
-        preview_cmd = f"{sys.executable} {helper_script} {{1}}"
+        preview_cmd = fzf_preview_cmd(helper_script, "{1}")
 
         process = subprocess.Popen(
             [
@@ -151,7 +151,7 @@ def remove_global_files(config_manager: ConfigManager) -> bool:
     # Run fzf to select files to remove
     try:
         helper_script = Path(__file__).parent / "_file_preview.py"
-        preview_cmd = f"{sys.executable} {helper_script} {{1}}"
+        preview_cmd = fzf_preview_cmd(helper_script, "{1}")
 
         process = subprocess.Popen(
             [

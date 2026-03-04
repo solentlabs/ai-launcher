@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-03-04
+
+### Fixed
+- Quote `sys.executable` and helper script paths in all fzf `--preview` commands — fixes `'C:\Program' is not recognized` errors on Windows when Python is installed under `C:\Program Files\...`
+
+### Changed
+- Added `quote_for_fzf` and `fzf_preview_cmd` helpers to `utils/paths.py` to centralise fzf command quoting
+- Removed redundant `import sys` from UI modules that no longer reference it directly
+
 ## [0.2.0] - 2026-03-03
 
 ### Added

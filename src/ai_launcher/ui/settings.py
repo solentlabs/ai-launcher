@@ -9,12 +9,12 @@ Created: 2026-02-10
 """
 
 import subprocess  # nosec B404
-import sys
 from pathlib import Path
 from typing import List, Optional
 
 from ai_launcher.core.config import ConfigManager
 from ai_launcher.core.models import ConfigData
+from ai_launcher.utils.paths import fzf_preview_cmd
 
 
 def show_settings_menu(
@@ -56,7 +56,7 @@ SPACE to toggle • ENTER to open • ESC to go back
 
         # Build preview command using helper script
         helper_script = Path(__file__).parent / "_settings_preview.py"
-        preview_cmd = f"{sys.executable} {helper_script} {{}}"
+        preview_cmd = fzf_preview_cmd(helper_script, "{}")
 
         # Run fzf
         try:

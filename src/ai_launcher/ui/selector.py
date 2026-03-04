@@ -10,14 +10,13 @@ Last Modified: 2026-02-10 (Added settings menu item)
 
 import os
 import subprocess  # nosec B404
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
 # ConfigManager removed - using runtime config from CLI flags
 from ai_launcher.core.models import Project
 from ai_launcher.ui.preview import build_tree_view
-from ai_launcher.utils.paths import is_relative_to
+from ai_launcher.utils.paths import fzf_preview_cmd, is_relative_to
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import ConfigData
@@ -100,7 +99,7 @@ Type to filter • Arrows to navigate
 
         # Build preview command using helper script
         helper_script = Path(__file__).parent / "_preview_helper.py"
-        preview_cmd = f"{sys.executable} {helper_script} {{}}"
+        preview_cmd = fzf_preview_cmd(helper_script, "{}")
 
         # Set environment variables for preview helper
         env = os.environ.copy()

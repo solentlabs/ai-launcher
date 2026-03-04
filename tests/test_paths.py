@@ -1,87 +1,151 @@
-"""Tests for path utilities."""
+"""Tests for path utilities.
 
-import os
+- expand_path
+- validate_directory
+- get_relative_path
+- quote_for_fzf
+- fzf_preview_cmd
+"""
+
 from pathlib import Path
+
+import pytest
 
 from ai_launcher.utils.paths import (
     expand_path,
+    fzf_preview_cmd,
     get_relative_path,
+    quote_for_fzf,
     validate_directory,
 )
 
-
-def test_expand_path_with_tilde():
-    """Test expanding path with ~ to home directory."""
-    result = expand_path("~/projects")
-    assert result == Path.home() / "projects"
+P = Path  # shorthand for table readability
 
 
-def test_expand_path_with_env_var(tmp_path):
-    """Test expanding path with environment variable."""
-    # Use real tmp_path for cross-platform compatibility
-    os.environ["TEST_PATH"] = str(tmp_path)
-    result = expand_path("$TEST_PATH/subdir")
-    assert result == (tmp_path / "subdir").resolve()
+# -- expand_path --------------------------------------------------------------
+
+# fmt: off
+EXPAND_TILDE_CASES = [
+    # input_str          expected_suffix
+    ("~/projects",       ("projects",)),
+    ("~/a/b/c",          ("a", "b", "c")),
+]
+# fmt: on
 
 
-def test_expand_path_with_both():
-    """Test expanding path with both ~ and env vars."""
-    os.environ["TEST_SUBDIR"] = "projects"
-    result = expand_path("~/$TEST_SUBDIR/foo")
-    expected = Path.home() / "projects" / "foo"
-    assert result == expected
+@pytest.mark.parametrize("input_str, expected_suffix", EXPAND_TILDE_CASES)
+def test_expand_path_tilde(input_str, expected_suffix):
+    assert expand_path(input_str) == Path.home().joinpath(*expected_suffix)
+
+
+def test_expand_path_env_var(tmp_path, monkeypatch):
+    monkeypatch.setenv("TEST_PATH", str(tmp_path))
+    assert expand_path("$TEST_PATH/subdir") == (tmp_path / "subdir").resolve()
+
+
+def test_expand_path_tilde_and_env_var(monkeypatch):
+    monkeypatch.setenv("TEST_SUBDIR", "projects")
+    assert expand_path("~/$TEST_SUBDIR/foo") == Path.home() / "projects" / "foo"
 
 
 def test_expand_path_absolute(tmp_path):
-    """Test expanding absolute path returns resolved absolute path."""
-    result = expand_path(str(tmp_path))
-    assert result == tmp_path.resolve()
+    assert expand_path(str(tmp_path)) == tmp_path.resolve()
 
 
-def test_validate_directory_exists(tmp_path):
-    """Test validating existing directory."""
-    test_dir = tmp_path / "test_dir"
-    test_dir.mkdir()
+# -- validate_directory --------------------------------------------------------
 
-    assert validate_directory(test_dir) is True
-
-
-def test_validate_directory_not_exists(tmp_path):
-    """Test validating non-existent directory."""
-    test_dir = tmp_path / "nonexistent"
-
-    assert validate_directory(test_dir) is False
+# fmt: off
+VALIDATE_DIR_CASES = [
+    # setup      expected
+    ("dir",      True),
+    ("missing",  False),
+    ("file",     False),
+]
+# fmt: on
 
 
-def test_validate_directory_is_file(tmp_path):
-    """Test validating path that is a file, not directory."""
-    test_file = tmp_path / "test_file.txt"
-    test_file.write_text("test")
+@pytest.mark.parametrize("setup, expected", VALIDATE_DIR_CASES)
+def test_validate_directory(tmp_path, setup, expected):
+    if setup == "dir":
+        path = tmp_path / "test_dir"
+        path.mkdir()
+    elif setup == "file":
+        path = tmp_path / "test_file.txt"
+        path.write_text("test")
+    else:
+        path = tmp_path / "nonexistent"
 
-    assert validate_directory(test_file) is False
+    assert validate_directory(path) is expected
 
 
-def test_get_relative_path_success(tmp_path):
-    """Test getting relative path when path is under base."""
-    base = tmp_path
+# -- get_relative_path ---------------------------------------------------------
+
+
+def test_get_relative_path_under_base(tmp_path):
     sub_path = tmp_path / "projects" / "foo"
     sub_path.mkdir(parents=True)
-
-    result = get_relative_path(sub_path, base)
-    assert result == Path("projects/foo")
+    assert get_relative_path(sub_path, tmp_path) == Path("projects/foo")
 
 
 def test_get_relative_path_not_relative(tmp_path):
-    """Test getting relative path when path is not under base."""
-    base = tmp_path / "base"
-    other_path = tmp_path / "other" / "path"
-
-    # Path is not relative to base, should return original
-    result = get_relative_path(other_path, base)
-    assert result == other_path
+    other = tmp_path / "other" / "path"
+    assert get_relative_path(other, tmp_path / "base") == other
 
 
-def test_get_relative_path_same_path(tmp_path):
-    """Test getting relative path when path equals base."""
-    result = get_relative_path(tmp_path, tmp_path)
-    assert result == Path()
+def test_get_relative_path_same(tmp_path):
+    assert get_relative_path(tmp_path, tmp_path) == Path()
+
+
+# -- quote_for_fzf -------------------------------------------------------------
+
+# fmt: off
+QUOTE_CASES = [
+    # id                  input_path                              expected
+    ("string",            "/usr/bin/python3",                     '"/usr/bin/python3"'),
+    ("string-spaces",     r"C:\Program Files\Python\python.exe",  r'"C:\Program Files\Python\python.exe"'),
+    ("path-obj",          P("/usr/bin/python3"),                   f'"{P("/usr/bin/python3")}"'),
+    ("path-obj-spaces",   P("/opt/my app/bin/tool"),               f'"{P("/opt/my app/bin/tool")}"'),
+    ("empty",             "",                                      '""'),
+]
+# fmt: on
+
+
+@pytest.mark.parametrize(
+    "input_path, expected",
+    [(path, exp) for _, path, exp in QUOTE_CASES],
+    ids=[id for id, _, _ in QUOTE_CASES],
+)
+def test_quote_for_fzf(input_path, expected):
+    assert quote_for_fzf(input_path) == expected
+
+
+# -- fzf_preview_cmd ----------------------------------------------------------
+
+PY = "/usr/bin/python3"
+WIN_PY = r"C:\Program Files\Python\python.exe"
+
+
+# Helper: build expected string using platform Path rendering for script args
+def _expect(exe, script_str, *tail):
+    return " ".join([f'"{exe}"', f'"{P(script_str)}"', *tail])
+
+
+# fmt: off
+PREVIEW_CMD_CASES = [
+    # id                  executable  script                   extra_args                     expected
+    ("basic",             PY,         P("/some/helper.py"),    ("{}",),                       _expect(PY, "/some/helper.py", "{}")),
+    ("spaces-win",        WIN_PY,     P("/my scripts/h.py"),   ("{}",),                       _expect(WIN_PY, "/my scripts/h.py", "{}")),
+    ("extra-quoted-arg",  PY,         P("/helper.py"),         ('"/path with spaces"', "{}"), _expect(PY, "/helper.py", '"/path with spaces"', "{}")),
+    ("field-placeholder", PY,         P("/helper.py"),         ("{1}",),                      _expect(PY, "/helper.py", "{1}")),
+]
+# fmt: on
+
+
+@pytest.mark.parametrize(
+    "executable, script, extra_args, expected",
+    [(exe, s, args, exp) for _, exe, s, args, exp in PREVIEW_CMD_CASES],
+    ids=[id for id, *_ in PREVIEW_CMD_CASES],
+)
+def test_fzf_preview_cmd(monkeypatch, executable, script, extra_args, expected):
+    monkeypatch.setattr("ai_launcher.utils.paths.sys.executable", executable)
+    assert fzf_preview_cmd(script, *extra_args) == expected

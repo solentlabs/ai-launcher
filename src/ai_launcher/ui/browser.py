@@ -1,9 +1,10 @@
 """Directory browser for ai-launcher."""
 
 import subprocess  # nosec B404
-import sys
 from pathlib import Path
 from typing import Optional
+
+from ai_launcher.utils.paths import fzf_preview_cmd, quote_for_fzf
 
 
 def browse_directory(start_path: Optional[Path] = None) -> Optional[Path]:
@@ -62,7 +63,7 @@ Select '.' to add current directory
 
         # Build preview command (cross-platform Python helper)
         helper_script = Path(__file__).parent / "_browser_preview.py"
-        preview_cmd = f"{sys.executable} {helper_script} {current_path} {{}}"
+        preview_cmd = fzf_preview_cmd(helper_script, quote_for_fzf(current_path), "{}")
 
         # Run fzf
         try:

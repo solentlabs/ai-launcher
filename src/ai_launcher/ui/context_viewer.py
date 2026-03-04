@@ -11,6 +11,7 @@ from typing import List
 
 from ai_launcher.core.models import Project, ProviderInfo
 from ai_launcher.utils.logging import get_logger
+from ai_launcher.utils.paths import fzf_preview_cmd
 
 logger = get_logger(__name__)
 
@@ -63,7 +64,7 @@ def show_context_viewer(
         helper_script = Path(__file__).parent / "_context_preview.py"
 
         # Build preview command
-        preview_cmd = f"{sys.executable} {helper_script} {{}}"
+        preview_cmd = fzf_preview_cmd(helper_script, "{}")
 
         # Run fzf
         fzf_cmd = [
