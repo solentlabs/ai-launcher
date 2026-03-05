@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-05
+
+### Removed
+- **Dead code cleanup** — removed `ConfigManager` (`core/config.py`), `settings.py`, and `shared_context.py` which were never called by the CLI
+- Removed `HistoryConfig` dataclass from `core/models.py` (only used by deleted ConfigManager)
+- Removed `docs/terminal-title.md` — folded troubleshooting content into `docs/troubleshooting.md`
+- Removed `docs/CONTEXT_TRANSPARENCY_IMPLEMENTATION.md` and `docs/REFACTORING_2026_02.md` (completed checklists, archived to journal)
+- Removed tests for deleted code (`test_config.py`, `test_integration.py`, `test_settings_menu.py`, `test_shared_context.py`)
+
+### Changed
+- **CLAUDE.md rewrite** — trimmed from 698 to ~320 lines by removing duplication and linking to canonical docs
+- **Documentation accuracy pass** — fixed all CLI syntax (`ai-launcher ~/projects` → `ai-launcher claude ~/projects`), removed references to non-existent flags (`--providers`, `--startup-report`, `--context-health`)
+- **README.md** — converted relative doc links to full GitHub URLs for PyPI compatibility, added PyPI downloads badge
+- **docs/configuration.md** — complete rewrite from config.toml reference to CLI flags reference
+- **docs/troubleshooting.md** — removed stale config.toml references, added terminal title troubleshooting section
+- **docs/adding-providers.md** — updated provider status table, replaced manual registration with auto-discovery
+- **docs/context-transparency.md** — removed proposed/unimplemented CLI commands
+- Renamed docs to lowercase kebab-case for consistency (`ARCHITECTURE.md` → `architecture.md`, etc.)
+- Added `docs/README.md` index for documentation navigation
+
 ## [0.2.1] - 2026-03-04
 
 ### Fixed
@@ -53,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Provider registry** - Centralized provider management
 - **Discovery mode** (`--discover`) - Shows installed providers and context
 - **Context viewer** (`--context`) - Interactive visualization of AI context files
-- **Provider listing** (`--providers`) - Quick overview of available tools
+- **Provider listing** (via `--discover`) - Quick overview of available tools
 - **Per-project provider override** - Different AI tools per project
 - **Context analysis** - Categorizes and analyzes provider context files
 - **Provider metadata** - Version detection, installation status, context stats

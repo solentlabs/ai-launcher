@@ -28,7 +28,7 @@ Add this profile to the `profiles.list` array:
 
 ```json
 {
-    "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher ~/projects'",
+    "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher claude ~/projects'",
     "guid": "{YOUR-UNIQUE-GUID}",
     "icon": "C:\\Users\\YOUR_USERNAME\\AppData\\Local\\wsl\\DISTRO_ID\\shortcut.ico",
     "name": "AI Launcher",
@@ -64,11 +64,11 @@ Create separate profiles for different project folders:
 ```json
 {
     "name": "Work Projects",
-    "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher ~/work'"
+    "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher claude ~/work'"
 },
 {
     "name": "Personal Projects",
-    "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher ~/personal'"
+    "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher claude ~/personal'"
 }
 ```
 
@@ -79,7 +79,7 @@ Create separate profiles for different project folders:
 1. Verify WSL is installed: `wsl --list`
 2. Test command in PowerShell:
    ```powershell
-   wsl.exe -d Ubuntu bash -lic 'ai-launcher ~/projects'
+   wsl.exe -d Ubuntu bash -lic 'ai-launcher claude ~/projects'
    ```
 
 ### AI provider CLI not found

@@ -3,6 +3,7 @@
 Universal AI CLI launcher with local context management. Launch any AI coding assistant from a single entry point with persistent context across sessions.
 
 [![PyPI version](https://img.shields.io/pypi/v/ai-launcher)](https://pypi.org/project/ai-launcher/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/ai-launcher)](https://pypi.org/project/ai-launcher/)
 [![CI](https://github.com/solentlabs/ai-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/solentlabs/ai-launcher/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/solentlabs/ai-launcher/graph/badge.svg)](https://codecov.io/gh/solentlabs/ai-launcher)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -63,7 +64,7 @@ pip install -e .
 <summary><strong>Linux / macOS / WSL</strong></summary>
 
 ```bash
-ai-launcher ~/projects
+ai-launcher claude ~/projects
 ```
 
 </details>
@@ -72,18 +73,18 @@ ai-launcher ~/projects
 <summary><strong>Windows (PowerShell)</strong></summary>
 
 ```powershell
-ai-launcher C:\Users\you\projects
+ai-launcher claude C:\Users\you\projects
 
 # If ai-launcher is not in PATH
-py -m ai_launcher C:\Users\you\projects
+py -m ai_launcher claude C:\Users\you\projects
 ```
 
 </details>
 
 **See what's available:**
 ```bash
-ai-launcher --discover ~/projects
-ai-launcher --context
+ai-launcher claude --discover ~/projects
+ai-launcher claude --context
 ```
 
 Select a project, and your AI tool opens with full context.
@@ -117,32 +118,19 @@ Select a project, and your AI tool opens with full context.
 - [fzf](https://github.com/junegunn/fzf) (auto-downloaded if missing)
 - An AI CLI tool (Claude Code, Gemini CLI, Cursor, Aider, or GitHub Copilot CLI)
 
-## Configuration
+## Providers
 
-First run creates `~/.config/ai-launcher/config.toml`:
+Each AI tool is a subcommand:
 
-```toml
-[scan]
-paths = ["~/projects", "~/work"]    # Linux/macOS/WSL
-# paths = ["C:/Users/you/projects"] # Windows
-max_depth = 5
-
-[provider]
-default = "claude-code"
-
-# Per-project overrides (optional)
-[provider.per_project]
-"/home/user/gemini-project" = "gemini"         # Linux/macOS/WSL
-# "C:/Users/you/gemini-project" = "gemini"     # Windows
+```bash
+ai-launcher claude ~/projects     # Anthropic's Claude Code
+ai-launcher gemini ~/projects     # Google's Gemini CLI
+ai-launcher cursor ~/projects     # Cursor IDE
+ai-launcher aider ~/projects      # Aider pair programmer
+ai-launcher copilot ~/projects    # GitHub Copilot CLI
 ```
 
-### Available Providers
-
-- **claude-code** - Anthropic's Claude Code
-- **gemini** - Google's Gemini CLI
-- **cursor** - Cursor IDE
-- **aider** - Aider pair programmer
-- **copilot** - GitHub Copilot CLI
+See [Configuration](https://github.com/solentlabs/ai-launcher/blob/main/docs/configuration.md) for all CLI options.
 
 ## Why Local-Only?
 
@@ -154,14 +142,14 @@ Your code and context should stay on your machine. AI Launcher:
 
 ## Documentation
 
-- [Installation Guide](docs/installation.md)
-- [Configuration](docs/configuration.md)
-- [Windows Terminal Setup](docs/windows-terminal.md)
-- [Troubleshooting](docs/troubleshooting.md)
+- [Installation Guide](https://github.com/solentlabs/ai-launcher/blob/main/docs/installation.md)
+- [Configuration](https://github.com/solentlabs/ai-launcher/blob/main/docs/configuration.md)
+- [Windows Terminal Setup](https://github.com/solentlabs/ai-launcher/blob/main/docs/windows-terminal.md)
+- [Troubleshooting](https://github.com/solentlabs/ai-launcher/blob/main/docs/troubleshooting.md)
 
 ## License
 
-MIT - see [LICENSE](LICENSE)
+MIT - see [LICENSE](https://github.com/solentlabs/ai-launcher/blob/main/LICENSE)
 
 ---
 

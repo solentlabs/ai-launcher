@@ -172,15 +172,11 @@ See also:
 
 The AI Launcher provides transparency into what context is loaded when you start a Claude Code session.
 
-#### Full Report
-```bash
-ai-launcher --startup-report
+#### Startup Report
 
-# Or from within AI Launcher after selecting a project
-ai-launcher --startup-report ~/projects/my-app
-```
+When you select a project, AI Launcher automatically displays a context summary before launching Claude Code.
 
-**Output:**
+**Example output:**
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Claude Code Startup Context Report                            │
@@ -245,12 +241,10 @@ ai-launcher --startup-report ~/projects/my-app
    • Settings: https://code.claude.com/docs/en/settings
 ```
 
-#### Summary Mode (at Session Start)
-```bash
-ai-launcher ~/projects  # Automatically shows summary when launching
-```
+#### Summary Mode
 
-**Output:**
+A compact summary is also shown at launch:
+
 ```
 ═══════════════════════════════════════════════════════════════
   CONTEXT LOADED FOR THIS SESSION
@@ -261,8 +255,6 @@ ai-launcher ~/projects  # Automatically shows summary when launching
 ✅ Global Settings: loaded (model: sonnet)
 ⚪ Project Settings Override: not present
 ✅ Git Context: loaded
-
-💡 Run 'ai-launcher --startup-report' for detailed context breakdown
 ═══════════════════════════════════════════════════════════════
 ```
 
@@ -339,46 +331,12 @@ cat ~/.claude/projects/-home-user-my-app/memory/MEMORY.md
 "Review MEMORY.md and move detailed notes to topic files"
 ```
 
-### 5. Use the Startup Report Before Important Work
+### 5. Review Context Before Important Work
+
+Launch AI Launcher and review the startup report to verify context is loaded correctly before starting critical work:
 ```bash
-ai-launcher --startup-report ~/projects/my-app
-
-# Verify all context is loaded correctly
-# Check for outdated information
-# Ensure project settings are correct
+ai-launcher claude ~/projects
 ```
-
----
-
-## Integration with AI Launcher
-
-### Proposed CLI Commands
-
-```bash
-# Show full startup report for a project
-ai-launcher --startup-report [PROJECT_PATH]
-
-# Show summary at launch (automatic)
-ai-launcher ~/projects
-  └─> Shows summary before project selection
-
-# Export report to file
-ai-launcher --startup-report ~/projects/my-app > context-report.txt
-
-# Check all projects' context health
-ai-launcher --context-health ~/projects
-  └─> Shows which projects have CLAUDE.md, memory, etc.
-```
-
-### Implementation Status
-
-- ✅ **Startup Report Module** - `src/ai_launcher/ui/startup_report.py`
-- ✅ **Path Encoding Logic** - Handles `/` and `_` conversion
-- ✅ **Full Report Format** - Detailed breakdown with hints
-- ✅ **Summary Format** - Compact view for session start
-- ⏳ **CLI Integration** - Add `--startup-report` flag to main CLI
-- ⏳ **Automatic Summary** - Show at project launch
-- ⏳ **Context Health Check** - Scan all projects
 
 ---
 
@@ -446,7 +404,7 @@ Think of CLAUDE.md as "the manual" and MEMORY.md as "the journal".
 
 ## Next Steps
 
-1. ✅ **Check your context:** Run `ai-launcher --startup-report`
+1. ✅ **Check your context:** Launch a project and review the startup report
 2. ✅ **Create CLAUDE.md:** Add project-specific rules
 3. ✅ **Let memory grow:** Tell Claude to remember important things
 4. ✅ **Review periodically:** Keep context fresh and relevant
