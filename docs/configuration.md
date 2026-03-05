@@ -1,131 +1,61 @@
 # Configuration
 
-Configuration is stored in platform-specific locations:
+AI Launcher is configured entirely through CLI flags. There is no config file.
 
-- **Linux/WSL:** `~/.config/ai-launcher/config.toml`
-- **macOS:** `~/Library/Application Support/ai-launcher/config.toml`
-- **Windows:** `%LOCALAPPDATA%\ai-launcher\config.toml`
+## CLI Options
 
-## Default Configuration
+All options are passed as flags to a provider subcommand:
 
-```toml
-[scan]
-# Directories to scan for git repositories
-paths = [
-    "~/projects",
-    "~/work",
-]
-
-# Maximum directory depth to scan
-max_depth = 5
-
-# Directories to skip during scanning
-prune_dirs = [
-    "node_modules",
-    ".cache",
-    "venv",
-    "__pycache__",
-    ".git",
-]
-
-[ui]
-# Preview pane width (percentage)
-preview_width = 70
-
-# Show git status in preview
-show_git_status = true
-
-[history]
-# Maximum access history entries to keep
-max_entries = 50
+```bash
+ai-launcher claude [OPTIONS] [PATH]
 ```
 
-## Scan Configuration
+| Flag | Description | Example |
+|------|-------------|---------|
+| `PATH` | Directory to scan for projects | `~/projects` |
+| `--global-files` | Comma-separated context files to load for all projects | `--global-files ~/standards.md,~/ops.md` |
+| `--manual-paths` | Comma-separated non-git directories to include | `--manual-paths ~/scripts,~/notes` |
+| `--discover` / `-d` | Show discovery report (installed providers, projects) | |
+| `--context` / `-c` | Interactive context viewer | |
+| `--list` | List all discovered projects | |
+| `--verbose` | Enable verbose logging | |
+| `--debug` | Enable debug mode | |
+| `--cleanup` | Clean AI assistant cache/logs before launch | |
+| `--clean-provider` | Clean provider-specific files only | |
+| `--clean-cache` | Clean system cache | |
+| `--clean-npm` | Clean npm cache | |
 
-### paths
+## Available Providers
 
-List of directories to scan for projects.
+Each provider is a subcommand:
 
-```toml
-[scan]
-paths = [
-    "~/projects",
-    "~/work",
-    "/mnt/c/dev",  # WSL example
-]
+```bash
+ai-launcher claude ~/projects
+ai-launcher gemini ~/projects
+ai-launcher cursor ~/projects
+ai-launcher aider ~/projects
+ai-launcher copilot ~/projects
 ```
 
-**Supports:**
-- Tilde expansion (`~`)
-- Environment variables (`$HOME`)
-- Absolute paths
-- Relative paths (from home directory)
+## Examples
 
-### max_depth
-
-Maximum directory depth to traverse when scanning.
-
-```toml
-[scan]
-max_depth = 5  # Default: 5
+**Basic usage:**
+```bash
+ai-launcher claude ~/projects
 ```
 
-Lower values = faster scanning, but might miss nested projects.
-
-### prune_dirs
-
-Directories to skip during scanning to improve performance.
-
-```toml
-[scan]
-prune_dirs = [
-    "node_modules",  # NPM packages
-    ".cache",        # Cache directories
-    "venv",          # Python virtual environments
-    "__pycache__",   # Python cache
-    ".git",          # Git internals
-]
+**With global context files and manual paths:**
+```bash
+ai-launcher claude ~/projects/solentlabs \
+  --global-files ~/projects/solentlabs/operations/ai-skills/insights-journal.md \
+  --manual-paths ~/projects/personal
 ```
 
-## UI Configuration
-
-### preview_width
-
-Preview pane width as a percentage (0-100).
-
-```toml
-[ui]
-preview_width = 70  # 70% of screen, 30% for project list
+**Discovery mode (no fzf needed):**
+```bash
+ai-launcher claude --discover ~/projects
 ```
 
-### show_git_status
+## Windows Terminal Integration
 
-Show git status in the preview pane.
-
-```toml
-[ui]
-show_git_status = true  # false to disable
-```
-
-## History Configuration
-
-### max_entries
-
-Maximum number of access history entries to keep.
-
-```toml
-[history]
-max_entries = 50  # Default: 50
-```
-
-## Manual Projects
-
-Manual projects are stored separately in SQLite:
-
-- **Linux/WSL:** `~/.local/share/ai-launcher/projects.db`
-- **macOS:** `~/Library/Application Support/ai-launcher/projects.db`
-- **Windows:** `%LOCALAPPDATA%\ai-launcher\projects.db`
-
-Managed via the UI:
-- `+ Add path` - Add a project
-- `- Remove path` - Remove a project
+See [windows-terminal.md](windows-terminal.md) for setting up AI Launcher as a Windows Terminal profile.

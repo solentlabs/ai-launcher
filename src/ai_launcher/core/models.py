@@ -93,13 +93,6 @@ class UIConfig:
 
 
 @dataclass
-class HistoryConfig:
-    """Configuration for history tracking."""
-
-    max_entries: int = 50
-
-
-@dataclass
 class ProviderConfig:
     """Configuration for AI provider selection.
 
@@ -149,7 +142,6 @@ class ConfigData:
 
     scan: ScanConfig = field(default_factory=ScanConfig)
     ui: UIConfig = field(default_factory=UIConfig)
-    history: HistoryConfig = field(default_factory=HistoryConfig)
     provider: ProviderConfig = field(default_factory=ProviderConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
     cleanup: CleanupConfig = field(default_factory=CleanupConfig)

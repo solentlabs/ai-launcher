@@ -50,19 +50,19 @@ py -m ai_launcher --version
 ### Linux / macOS / WSL
 
 ```bash
-ai-launcher ~/projects
+ai-launcher claude ~/projects
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-ai-launcher C:\Users\you\projects
+ai-launcher claude C:\Users\you\projects
 ```
 
 Or if the entry point isn't in PATH:
 
 ```powershell
-py -m ai_launcher C:\Users\you\projects
+py -m ai_launcher claude C:\Users\you\projects
 ```
 
 ## From Source

@@ -8,9 +8,9 @@ This guide shows how to add support for new AI CLI tools to AI Launcher.
 |------|-------------|---------------|--------|
 | **Claude Code** | `claude` | `CLAUDE.md`, `.clauderc` | ✅ Built-in |
 | **Gemini CLI** | `gemini` | `GEMINI.md`, `.geminirc` | ✅ Built-in |
-| **Aider** | `aider` | `.aider.conf.yml`, `AIDER.md` | 📝 Template below |
-| **Cursor** | `cursor` | `.cursorrules`, `CURSOR.md` | 📝 Template below |
-| **GitHub Copilot** | `gh copilot` | None (uses git context) | 📝 Template below |
+| **Aider** | `aider` | `.aider.conf.yml`, `AIDER.md` | ✅ Built-in |
+| **Cursor** | `cursor` | `.cursorrules`, `CURSOR.md` | ✅ Built-in |
+| **GitHub Copilot** | `gh copilot` | None (uses git context) | ✅ Built-in |
 | **Continue** | `continue` | `.continuerc.json` | 📝 Template below |
 | **Windsurf** | `windsurf` | `.windsurfrules` | 📝 Template below |
 | **Cody** | `cody` | `.cody/config.json` | 📝 Template below |
@@ -24,9 +24,9 @@ providers/
 ├── registry.py         # Provider registry
 ├── claude.py           # ClaudeProvider ✅
 ├── gemini.py           # GeminiProvider ✅
-├── aider.py            # AiderProvider (add this)
-├── cursor.py           # CursorProvider (add this)
-└── copilot.py          # CopilotProvider (add this)
+├── aider.py            # AiderProvider ✅
+├── cursor.py           # CursorProvider ✅
+└── copilot.py          # CopilotProvider ✅
 ```
 
 ## Step-by-Step: Adding a Provider
@@ -104,37 +104,18 @@ class YourToolProvider(AIProvider):
                 print(f"  → Cleaned {self.metadata.display_name} cache")
 ```
 
-### 2. Register Provider
+### 2. That's It — Auto-Discovery Handles Registration
 
-Edit `src/ai_launcher/providers/registry.py`:
-
-```python
-from ai_launcher.providers.claude import ClaudeProvider
-from ai_launcher.providers.gemini import GeminiProvider
-from ai_launcher.providers.yourtool import YourToolProvider  # Add import
-
-class ProviderRegistry:
-    def __init__(self) -> None:
-        self._providers: Dict[str, AIProvider] = {}
-
-        self.register(ClaudeProvider())
-        self.register(GeminiProvider())
-        self.register(YourToolProvider())  # Add registration
-```
+The `ProviderRegistry` automatically discovers all `AIProvider` subclasses in the `providers/` directory at runtime. No manual registration needed.
 
 ### 3. Test Provider
 
 ```bash
-# Check if recognized
-ai-launcher --providers
+# Check if detected via discovery
+ai-launcher your-tool --discover ~/projects
 
 # Launch with your tool
 ai-launcher your-tool ~/projects
-
-# Or set as default
-# ~/.config/ai-launcher/config.toml
-[provider]
-default = "your-tool"
 ```
 
 ## Ready-to-Use Providers
@@ -462,21 +443,11 @@ def cleanup_environment(self, verbose: bool, cleanup_config) -> None:
 
 ```bash
 # 1. Check if detected
-ai-launcher --providers
-
-Expected output:
-  ✓ Your Tool (yourtool)
-    Status: Installed
+ai-launcher your-tool --discover ~/projects
 
 # 2. Launch directly
 ai-launcher your-tool ~/projects
 
-# 3. Set as default
-echo '[provider]
-default = "your-tool"' >> ~/.config/ai-launcher/config.toml
-
-# 4. Test per-project override
-# Edit ~/.config/ai-launcher/config.toml
 ```
 
 ## Common Patterns
@@ -524,15 +495,14 @@ If adding a provider to the official repo:
 2. **Docstrings** - Include tool description and install instructions
 3. **Type hints** - Full type annotations required
 4. **Error handling** - Helpful error messages with install links
-5. **Register** - Add to `registry.py`
-6. **Test** - Verify `--providers` shows it, launching works
+5. **Auto-discovered** - No registry edits needed (providers are found automatically)
+6. **Test** - Verify `--discover` shows it, launching works
 7. **Document** - Add to this guide's Quick Reference table
 
 ## Future Enhancements
 
 Planned improvements to provider system:
 
-- **Auto-discovery** - Scan `providers/` directory automatically
 - **Plugin system** - Load providers from `~/.local/share/ai-launcher/plugins/`
 - **Capability flags** - Declare what features each provider supports
 - **Launch options** - Pass provider-specific CLI arguments

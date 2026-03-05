@@ -92,17 +92,14 @@ py -m pip show ai-launcher
 ### No projects found
 
 **Causes:**
-1. No scan paths configured
+1. No scan paths provided on the command line
 2. Paths don't contain git repositories
 3. Permissions issue
 
 **Fix:**
 
 ```bash
-# Check configuration
-cat ~/.config/ai-launcher/config.toml
-
-# Verify paths exist and contain git repos
+# Verify the path you're passing contains git repos
 ls ~/projects
 find ~/projects -name .git -type d
 ```
@@ -110,7 +107,6 @@ find ~/projects -name .git -type d
 On Windows:
 
 ```powershell
-Get-Content ~\.config\ai-launcher\config.toml
 Get-ChildItem -Path C:\Users\you\projects -Filter .git -Recurse -Directory
 ```
 
@@ -143,15 +139,30 @@ cp projects.db.backup.TIMESTAMP projects.db
 
 **Symptom:** Warnings about unreadable directories.
 
-**Fix:** These are automatically skipped. To reduce warnings, add to `prune_dirs` in config:
+**Fix:** These are automatically skipped. Directories like `node_modules`, `.cache`, and `venv` are pruned by default. No configuration needed.
 
-```toml
-[scan]
-prune_dirs = [
-    "node_modules",
-    ".cache",
-    "restricted-dir",
-]
+## Terminal Title Issues
+
+AI Launcher automatically sets the terminal window title (e.g., `my-app → Claude Code`) when launching a project. This works on most modern terminals including xterm, iTerm2, GNOME Terminal, Windows Terminal, tmux, and VS Code. Basic CMD.exe on Windows is not supported.
+
+### Terminal title not changing?
+
+1. **Check if your terminal supports title setting:**
+   Most modern terminals do, but some minimal terminals don't.
+
+2. **Try setting TERM environment variable:**
+   ```bash
+   export TERM=xterm-256color
+   ai-launcher claude ~/projects
+   ```
+
+### Terminal title persists after closing AI tool?
+
+This is normal. Most terminals keep the last set title until the window is closed or another program sets a new title.
+
+To manually clear the title:
+```bash
+echo -ne "\033]0;\007"
 ```
 
 ## Windows Terminal Issues
@@ -191,36 +202,26 @@ source ~/.bashrc
 
 ### Slow project scanning
 
-**Cause:** Scanning too many files or too deep.
+**Cause:** Scanning too many directories or too deep.
 
-**Fix:** Reduce `max_depth` or add more `prune_dirs`:
+**Fix:** Pass a more specific path to reduce scan scope:
 
-```toml
-[scan]
-max_depth = 3
-prune_dirs = [
-    "node_modules",
-    ".cache",
-    "venv",
-    "build",
-    "dist",
-    ".venv",
-]
+```bash
+# Instead of scanning everything
+ai-launcher claude ~/projects
+
+# Scan a narrower subtree
+ai-launcher claude ~/projects/solentlabs
 ```
 
 ### Slow startup
 
-**Cause:** Too many manual projects or large history.
+**Cause:** Large database from many scanned projects.
 
-**Fix:** Clean up:
+**Fix:** Check database size:
 
 ```bash
-# Check database size
 ls -lh ~/.local/share/ai-launcher/projects.db
-
-# Reduce history in config
-[history]
-max_entries = 10
 ```
 
 ## Getting Help
@@ -230,7 +231,7 @@ If issues persist:
 1. **Check GitHub Issues:** https://github.com/solentlabs/ai-launcher/issues
 2. **Enable verbose logging:**
    ```bash
-   ai-launcher --verbose ~/projects
+   ai-launcher claude --verbose ~/projects
    ```
 3. **Report bug with:**
    - OS and version
