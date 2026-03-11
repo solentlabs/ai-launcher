@@ -11,6 +11,16 @@ Universal AI CLI launcher with local context management. Launch any AI coding as
 
 > **Local-First Design** - All context and data stays on your machine. No cloud dependencies.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/solentlabs/ai-launcher/main/docs/images/project-selector.png" alt="AI Launcher - Project Selector" width="700">
+</p>
+<p align="center"><em>Interactive project selector with tree view and context preview</em></p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/solentlabs/ai-launcher/main/docs/images/startup-report.png" alt="AI Launcher - Startup Report" width="700">
+</p>
+<p align="center"><em>Startup transparency report showing context, plugins, and session details</em></p>
+
 ## What Is This?
 
 A terminal-first launcher that:
