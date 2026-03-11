@@ -25,7 +25,7 @@ from ai_launcher.core.provider_data import (
 )
 from ai_launcher.providers.base import ProviderMetadata
 from ai_launcher.ui.startup_report import (
-    _check_boundary_protection,
+    _check_sibling_projects,
     _get_file_description,
     _pad_line,
     _visual_length,
@@ -34,16 +34,16 @@ from ai_launcher.ui.startup_report import (
 )
 
 
-class TestCheckBoundaryProtection:
-    """Tests for _check_boundary_protection()."""
+class TestCheckSiblingProjects:
+    """Tests for _check_sibling_projects()."""
 
     def test_no_siblings(self, tmp_path):
         project = tmp_path / "only-project"
         project.mkdir()
-        result = _check_boundary_protection(project)
+        result = _check_sibling_projects(project)
         assert result["sibling_count"] == 0
-        assert result["allowed_project"] == "only-project"
-        assert result["forbidden_projects"] == []
+        assert result["selected_project"] == "only-project"
+        assert result["sibling_names"] == []
 
     def test_with_siblings(self, tmp_path):
         project = tmp_path / "my-project"
@@ -51,10 +51,10 @@ class TestCheckBoundaryProtection:
         (tmp_path / "sibling1").mkdir()
         (tmp_path / "sibling2").mkdir()
 
-        result = _check_boundary_protection(project)
+        result = _check_sibling_projects(project)
         assert result["sibling_count"] == 2
-        assert result["allowed_project"] == "my-project"
-        assert len(result["forbidden_projects"]) == 2
+        assert result["selected_project"] == "my-project"
+        assert len(result["sibling_names"]) == 2
 
     def test_hidden_dirs_excluded(self, tmp_path):
         project = tmp_path / "my-project"
@@ -62,9 +62,9 @@ class TestCheckBoundaryProtection:
         (tmp_path / ".hidden").mkdir()
         (tmp_path / "visible").mkdir()
 
-        result = _check_boundary_protection(project)
+        result = _check_sibling_projects(project)
         assert result["sibling_count"] == 1
-        assert ".hidden" not in result["forbidden_projects"]
+        assert ".hidden" not in result["sibling_names"]
 
     def test_limit_to_6_siblings(self, tmp_path):
         project = tmp_path / "my-project"
@@ -72,9 +72,9 @@ class TestCheckBoundaryProtection:
         for i in range(10):
             (tmp_path / f"sibling-{i}").mkdir()
 
-        result = _check_boundary_protection(project)
+        result = _check_sibling_projects(project)
         assert result["sibling_count"] == 10
-        assert len(result["forbidden_projects"]) == 6
+        assert len(result["sibling_names"]) == 6
 
 
 class TestGetFileDescription:
@@ -342,7 +342,7 @@ class TestDisplayLaunchInfo:
         captured = capsys.readouterr()
         assert "No global context files" in captured.out
 
-    def test_verbose_boundary_protection(self, tmp_path, capsys):
+    def test_verbose_sibling_projects(self, tmp_path, capsys):
         project = tmp_path / "my-proj"
         project.mkdir()
         (tmp_path / "sibling1").mkdir()
@@ -352,8 +352,8 @@ class TestDisplayLaunchInfo:
         provider = self._make_provider(preview_data=data)
         display_launch_info(project, provider, verbose=True)
         captured = capsys.readouterr()
-        assert "Boundary Protection" in captured.out
-        assert "2 sibling projects" in captured.out
+        assert "Sibling Projects" in captured.out
+        assert "2 nearby projects" in captured.out
 
     def test_verbose_session_stats(self, tmp_path, capsys):
         stats = SessionStats(

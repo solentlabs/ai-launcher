@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-03-11
+
+### Changed
+- **Rename "Boundary Protection" to "Sibling Projects"** — the old name implied enforcement that doesn't exist. The feature only shows nearby projects for awareness, so the labeling now reflects that honestly. "Forbidden"/"Allowed" replaced with "Other"/"Selected".
+
 ## [0.3.0] - 2026-03-05
 
 ### Removed
@@ -91,9 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Plan files (active plans)
   - Plugin READMEs
   - Project memories and journals from other projects
-- **Boundary Protection** - Sibling project detection for security
-  - Shows forbidden projects
-  - Confirms allowed project scope
+- **Sibling Projects** - Sibling project awareness
+  - Shows nearby projects in the same parent directory
+  - Highlights which project is selected
 - **Complete transparency** - Every file loaded into context is now visible
 - Available in both Python and bash implementations
 

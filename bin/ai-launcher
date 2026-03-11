@@ -1030,7 +1030,7 @@ main() {
 
         echo ""
 
-        # Show Boundary Protection
+        # Show Sibling Projects
         local parent_dir
         parent_dir=$(dirname "$selected_path")
         local sibling_count
@@ -1038,13 +1038,13 @@ main() {
         sibling_count="${sibling_count// /}"
 
         if [[ "$sibling_count" -gt 0 ]]; then
-            echo -e "${bold}🔒 Boundary Protection:${reset}"
-            echo -e "  ${green}✓${reset} $sibling_count sibling projects detected"
-            local forbidden
-            forbidden=$(find "$parent_dir" -maxdepth 1 -type d ! -name "$(basename "$parent_dir")" ! -name ".*" ! -path "$selected_path" -exec basename {} \; 2>/dev/null | head -n 3 | tr '\n' ', ' | sed 's/,$//')
-            [[ "$sibling_count" -gt 3 ]] && forbidden="$forbidden, ... +$((sibling_count - 3)) more"
-            echo -e "  ${green}✓${reset} Forbidden: $forbidden"
-            echo -e "  ${green}✓${reset} Allowed: $(basename "$selected_path") only"
+            echo -e "${bold}📂 Sibling Projects:${reset}"
+            echo -e "  ${green}✓${reset} $sibling_count nearby projects detected"
+            local others
+            others=$(find "$parent_dir" -maxdepth 1 -type d ! -name "$(basename "$parent_dir")" ! -name ".*" ! -path "$selected_path" -exec basename {} \; 2>/dev/null | head -n 3 | tr '\n' ', ' | sed 's/,$//')
+            [[ "$sibling_count" -gt 3 ]] && others="$others, ... +$((sibling_count - 3)) more"
+            echo -e "  ○ Other: $others"
+            echo -e "  ${green}✓${reset} Selected: $(basename "$selected_path")"
             echo ""
         fi
 

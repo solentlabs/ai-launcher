@@ -530,18 +530,18 @@ def _pad_line(text: str, width: int) -> str:
     return text + "│"
 
 
-def _check_boundary_protection(project_path: Path) -> dict:
-    """Check for sibling projects (boundary protection).
+def _check_sibling_projects(project_path: Path) -> dict:
+    """Check for sibling projects in the same parent directory.
 
     Returns dict with:
     - sibling_count: Number of sibling projects
-    - allowed_project: Name of the allowed project
-    - forbidden_projects: List of forbidden project names
+    - selected_project: Name of the selected project
+    - sibling_names: List of sibling project names
     """
-    protection = {
+    info = {
         "sibling_count": 0,
-        "allowed_project": project_path.name,
-        "forbidden_projects": [],
+        "selected_project": project_path.name,
+        "sibling_names": [],
     }
 
     # Check for sibling directories
@@ -552,10 +552,10 @@ def _check_boundary_protection(project_path: Path) -> dict:
             for d in parent.iterdir()
             if d.is_dir() and d != project_path and not d.name.startswith(".")
         ]
-        protection["sibling_count"] = len(siblings)
-        protection["forbidden_projects"] = [s.name for s in siblings[:6]]  # Limit to 6
+        info["sibling_count"] = len(siblings)
+        info["sibling_names"] = [s.name for s in siblings[:6]]  # Limit to 6
 
-    return protection
+    return info
 
 
 def display_launch_info(
@@ -752,21 +752,21 @@ def display_launch_info(
 
     print(_pad_line("│", width))
 
-    # Boundary Protection section (generic, not provider-specific)
-    boundary = _check_boundary_protection(project_path)
-    if boundary["sibling_count"] > 0:
-        print(_pad_line("│ 🔒 Boundary Protection:", width))
+    # Sibling Projects section (generic, not provider-specific)
+    siblings = _check_sibling_projects(project_path)
+    if siblings["sibling_count"] > 0:
+        print(_pad_line("│ 📂 Sibling Projects:", width))
         print(
             _pad_line(
-                f"│   ✓ {boundary['sibling_count']} sibling projects detected", width
+                f"│   ✓ {siblings['sibling_count']} nearby projects detected", width
             )
         )
 
-        forbidden_list = ", ".join(boundary["forbidden_projects"][:3])
-        if boundary["sibling_count"] > 3:
-            forbidden_list += f", ... +{boundary['sibling_count'] - 3} more"
-        print(_pad_line(f"│   ✓ Forbidden: {forbidden_list}", width))
-        print(_pad_line(f"│   ✓ Allowed: {boundary['allowed_project']} only", width))
+        other_list = ", ".join(siblings["sibling_names"][:3])
+        if siblings["sibling_count"] > 3:
+            other_list += f", ... +{siblings['sibling_count'] - 3} more"
+        print(_pad_line(f"│   ○ Other: {other_list}", width))
+        print(_pad_line(f"│   ✓ Selected: {siblings['selected_project']}", width))
         print(_pad_line("│", width))
 
     # Provider-specific context loading section
