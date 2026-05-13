@@ -883,11 +883,15 @@ def display_launch_info(
                     print(_pad_line(f"│     • {mf.name}", width))
             else:
                 memory_dir = stats.memory_files[0].path.parent
+                # Render with forward slashes regardless of OS — this is a
+                # display string, not a filesystem path, and the wrap logic
+                # below splits on "/". Native separators (e.g. "\" on Windows)
+                # would skip wrapping entirely and overflow the box.
                 try:
                     rel = memory_dir.relative_to(Path.home())
-                    dir_str = f"~/{rel}"
+                    dir_str = f"~/{rel.as_posix()}"
                 except ValueError:
-                    dir_str = str(memory_dir)
+                    dir_str = memory_dir.as_posix()
                 print(
                     _pad_line(f"│   Memory:     {len(stats.memory_files)} files", width)
                 )
