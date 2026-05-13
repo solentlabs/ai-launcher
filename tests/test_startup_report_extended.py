@@ -381,6 +381,147 @@ class TestDisplayLaunchInfo:
         assert "10 sessions" in captured.out
         assert "MEMORY.md" in captured.out
 
+    @staticmethod
+    def _build_memory_stats(memory_dir, count, name_pattern="mem{i:02d}.md"):
+        """Build SessionStats with `count` MemoryFile entries under memory_dir."""
+        files = [
+            MemoryFile(
+                path=memory_dir / name_pattern.format(i=i),
+                name=name_pattern.format(i=i),
+                size_bytes=100,
+                last_modified=datetime.now(),
+            )
+            for i in range(count)
+        ]
+        return SessionStats(
+            session_count=1,
+            total_size_bytes=100,
+            last_session_time=datetime.now(),
+            memory_files=files,
+        )
+
+    @pytest.mark.parametrize(
+        "count,expected_substrings,forbidden_substrings",
+        [
+            # ≤ threshold: each filename rendered as a bullet
+            (5, ["5 files", "mem00.md", "mem04.md"], []),
+            # > threshold: count + path, individual names suppressed
+            (16, ["16 files", "memory"], ["mem00.md"]),
+        ],
+        ids=["at_threshold_lists_files", "over_threshold_summarizes"],
+    )
+    def test_memory_display_by_count(
+        self, tmp_path, capsys, count, expected_substrings, forbidden_substrings
+    ):
+        """Memory section shape changes at the threshold (≤5 vs >5 files)."""
+        memory_dir = tmp_path / "memory"
+        memory_dir.mkdir()
+        stats = self._build_memory_stats(memory_dir, count)
+        data = ProviderPreviewData(provider_name="Test", session_stats=stats)
+        provider = self._make_provider(preview_data=data)
+        display_launch_info(tmp_path, provider, verbose=True)
+        captured = capsys.readouterr()
+        for s in expected_substrings:
+            assert s in captured.out, f"missing {s!r}"
+        for s in forbidden_substrings:
+            assert s not in captured.out, f"unexpected {s!r}"
+
+    @pytest.fixture
+    def memory_dir_in_fake_home(self, tmp_path, monkeypatch):
+        """Factory that creates a memory dir under a fake $HOME and patches Path.home."""
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+
+        def _factory(*segments):
+            memory_dir = fake_home.joinpath(*segments, "memory")
+            memory_dir.mkdir(parents=True)
+            return fake_home, memory_dir
+
+        return _factory
+
+    @pytest.mark.parametrize(
+        "project_segments,expected_path_token,reassembled_must_contain",
+        [
+            # Short path under home → renders as ~/...
+            (
+                (".claude", "projects", "p"),
+                "~/.claude/projects/p/memory",
+                None,
+            ),
+            # Long encoded path → wraps on `/` boundaries, segments stay intact
+            (
+                (
+                    ".claude",
+                    "projects",
+                    "home-kwschulz-projects-solentlabs-utilities-har-capture",
+                ),
+                None,
+                "home-kwschulz-projects-solentlabs-utilities-har-capture",
+            ),
+        ],
+        ids=["short_path_tilde", "long_path_wraps_on_segments"],
+    )
+    def test_memory_path_rendering(
+        self,
+        memory_dir_in_fake_home,
+        capsys,
+        project_segments,
+        expected_path_token,
+        reassembled_must_contain,
+    ):
+        """Memory directory path renders correctly under home and wraps cleanly when long."""
+        fake_home, memory_dir = memory_dir_in_fake_home(*project_segments)
+        stats = self._build_memory_stats(memory_dir, count=16)
+        data = ProviderPreviewData(provider_name="Test", session_stats=stats)
+        provider = self._make_provider(preview_data=data)
+        display_launch_info(fake_home / "project", provider, verbose=True)
+        captured = capsys.readouterr()
+        if expected_path_token is not None:
+            assert expected_path_token in captured.out.replace("\n", "")
+        if reassembled_must_contain is not None:
+            # Reassemble the wrapped path (strip whitespace + newlines) and assert
+            # the long segment survived intact, not split mid-token.
+            joined = captured.out.replace("\n", "").replace(" ", "")
+            assert reassembled_must_contain in joined
+
+    def test_box_never_overflows_85_columns(self, memory_dir_in_fake_home, capsys):
+        """Regression guard: every box line fits in 85 columns under worst-case input.
+
+        Standalone (not parametrized) because this is an invariant check, not a
+        shape-shared scenario — see CONTRIBUTING.md § Test structure.
+        """
+        fake_home, memory_dir = memory_dir_in_fake_home(
+            ".claude",
+            "projects",
+            "home-kwschulz-projects-solentlabs-utilities-har-capture",
+        )
+        stats = self._build_memory_stats(
+            memory_dir,
+            count=16,
+            name_pattern="feedback_long_filename_number_{i:02d}.md",
+        )
+        stats.session_count = 10
+        stats.total_size_bytes = 20_000_000
+        data = ProviderPreviewData(provider_name="Test", session_stats=stats)
+        provider = self._make_provider(preview_data=data)
+        display_launch_info(fake_home / "project-name", provider, verbose=True)
+        captured = capsys.readouterr()
+        box_lines = [
+            line
+            for line in captured.out.splitlines()
+            if line.startswith(("│", "╭", "├", "╰"))
+        ]
+        assert box_lines, "expected at least one box line in output"
+        from ai_launcher.ui.startup_report import _visual_length
+
+        offenders = [
+            (i, line) for i, line in enumerate(box_lines) if _visual_length(line) > 85
+        ]
+        assert not offenders, "box lines exceeded 85 columns: " + ", ".join(
+            f"line {i}: len={_visual_length(line)}" for i, line in offenders
+        )
+
     def test_collect_preview_data_error_fallback(self, tmp_path, capsys):
         provider = self._make_provider()
         provider.collect_preview_data.side_effect = Exception("fail")

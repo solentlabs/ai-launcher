@@ -28,6 +28,10 @@ Hard constraints. When in doubt, the principle wins.
 3. **No external actions without instruction.** No pushes, PRs, tags, issues, or releases.
 4. **No "pre-existing" framing for failing tests.** Full tree is in scope; fix it or surface it.
 5. **Read before writing.** Always read a file before overwriting it.
+6. **Tests ship with the code, not after.** Every PR that adds or changes behavior must include
+   tests for that behavior. Coverage targets in
+   [CONTRIBUTING.md](CONTRIBUTING.md#coverage-expectations) are floors, not goals. A patch-coverage
+   shortfall on the Codecov comment is a blocker, not a follow-up item.
 
 ### Project Invariants
 

@@ -151,6 +151,24 @@ truth.
 Test failures must be resolved before a change is considered done. "Pre-existing failures" is not a
 valid pass — see [CLAUDE.md](CLAUDE.md) for the rule.
 
+### Test structure: table-driven or fixture-driven
+
+**No one-off test functions for repeated scenarios.** When several tests differ only in inputs and
+expected outputs, use one of these patterns:
+
+- **Table-driven** (`@pytest.mark.parametrize`) — when the test body is identical across cases. Each
+  row in the parametrize table is a `(input..., expected)` tuple. Pair with `ids=[...]` so failures
+  name the scenario, not just `[0]`.
+- **Fixture-driven** (`@pytest.fixture`) — when several tests share non-trivial setup (a temp
+  project layout, a mock provider, a fake home directory). Define the fixture once; inject it.
+
+Reach for a one-off function only when the scenario is genuinely unique (an invariant check, a
+regression guard, a workflow with no sibling). If you find yourself writing a third test that copies
+the body of the first two, refactor to a parametrize table before adding it.
+
+Reference: `tests/test_claude_data.py::TestAnalyzePermissions::test_analyze_permissions` is the
+canonical table-driven example.
+
 ## Commits and Pull Requests
 
 ### Commit messages
