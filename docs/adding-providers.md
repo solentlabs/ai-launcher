@@ -4,20 +4,20 @@ This guide shows how to add support for new AI CLI tools to AI Launcher.
 
 ## Quick Reference: Popular AI Tools
 
-| Tool | CLI Command | Context Files | Status |
-|------|-------------|---------------|--------|
-| **Claude Code** | `claude` | `CLAUDE.md`, `.clauderc` | ✅ Built-in |
-| **Gemini CLI** | `gemini` | `GEMINI.md`, `.geminirc` | ✅ Built-in |
-| **Aider** | `aider` | `.aider.conf.yml`, `AIDER.md` | ✅ Built-in |
-| **Cursor** | `cursor` | `.cursorrules`, `CURSOR.md` | ✅ Built-in |
-| **GitHub Copilot** | `gh copilot` | None (uses git context) | ✅ Built-in |
-| **Continue** | `continue` | `.continuerc.json` | 📝 Template below |
-| **Windsurf** | `windsurf` | `.windsurfrules` | 📝 Template below |
-| **Cody** | `cody` | `.cody/config.json` | 📝 Template below |
+| Tool               | CLI Command  | Context Files                 | Status            |
+| ------------------ | ------------ | ----------------------------- | ----------------- |
+| **Claude Code**    | `claude`     | `CLAUDE.md`, `.clauderc`      | ✅ Built-in       |
+| **Gemini CLI**     | `gemini`     | `GEMINI.md`, `.geminirc`      | ✅ Built-in       |
+| **Aider**          | `aider`      | `.aider.conf.yml`, `AIDER.md` | ✅ Built-in       |
+| **Cursor**         | `cursor`     | `.cursorrules`, `CURSOR.md`   | ✅ Built-in       |
+| **GitHub Copilot** | `gh copilot` | None (uses git context)       | ✅ Built-in       |
+| **Continue**       | `continue`   | `.continuerc.json`            | 📝 Template below |
+| **Windsurf**       | `windsurf`   | `.windsurfrules`              | 📝 Template below |
+| **Cody**           | `cody`       | `.cody/config.json`           | 📝 Template below |
 
 ## Architecture Overview
 
-```
+```text
 providers/
 ├── __init__.py         # Package exports
 ├── base.py             # AIProvider ABC
@@ -106,7 +106,8 @@ class YourToolProvider(AIProvider):
 
 ### 2. That's It — Auto-Discovery Handles Registration
 
-The `ProviderRegistry` automatically discovers all `AIProvider` subclasses in the `providers/` directory at runtime. No manual registration needed.
+The `ProviderRegistry` automatically discovers all `AIProvider` subclasses in the `providers/`
+directory at runtime. No manual registration needed.
 
 ### 3. Test Provider
 

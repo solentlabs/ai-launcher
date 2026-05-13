@@ -724,9 +724,6 @@ def _discover_claude_context_files() -> Optional["GlobalFiles"]:
 def _analyze_permissions(
     project_permissions: List[str],
     global_permissions: List[str],
-    global_deny: List[str],  # noqa: ARG001 — reserved for deny-rule analysis
-    global_ask: List[str],  # noqa: ARG001 — surfaced in the launch box; see below
-    config_file_path: Optional[str] = None,  # noqa: ARG001 — kept for API compat
 ) -> tuple:
     """Analyze permissions and generate diagnostic warnings + fix recommendations.
 
@@ -748,14 +745,15 @@ def _analyze_permissions(
     - Redundant project permissions when global already has Bash(*)
     - Very long patterns (>120 chars) that suggest accidental approvals
       of full commands rather than intentional wildcard rules
-    - Ask-before rules that override Bash(*) for specific commands
+
+    Note on deny/ask rules: the caller carries these on ``SessionConfig``
+    and the formatter renders them in the launch box. This function does
+    not inspect them — deny rules are enforced by Claude Code itself, and
+    ask rules are intentional safety gates rather than diagnostic targets.
 
     Args:
         project_permissions: Allow list from project settings.local.json
         global_permissions: Merged allow list from global settings
-        global_deny: Deny list from global settings
-        global_ask: Ask list from global settings
-        config_file_path: Path to project settings file (for fix commands)
 
     Returns:
         Tuple of (warnings list, recommendations list, has_broad_bash boolean)
@@ -930,9 +928,6 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     ) = _analyze_permissions(
         config.permissions,
         global_allow,
-        global_deny,
-        global_ask,
-        config.config_file_path,
     )
 
     # Check global MCP servers

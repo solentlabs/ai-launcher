@@ -18,7 +18,7 @@ When prompted, choose "Yes" to configure Windows Terminal and specify your proje
 
 Open Windows Terminal and press `Ctrl+,` to open settings, or edit:
 
-```
+```text
 %LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json
 ```
 
@@ -28,15 +28,16 @@ Add this profile to the `profiles.list` array:
 
 ```json
 {
-    "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher claude ~/projects'",
-    "guid": "{YOUR-UNIQUE-GUID}",
-    "icon": "C:\\Users\\YOUR_USERNAME\\AppData\\Local\\wsl\\DISTRO_ID\\shortcut.ico",
-    "name": "AI Launcher",
-    "startingDirectory": "//wsl.localhost/Ubuntu/home/YOUR_USERNAME/projects"
+  "commandline": "wsl.exe -d Ubuntu bash -lic 'ai-launcher claude ~/projects'",
+  "guid": "{YOUR-UNIQUE-GUID}",
+  "icon": "C:\\Users\\YOUR_USERNAME\\AppData\\Local\\wsl\\DISTRO_ID\\shortcut.ico",
+  "name": "AI Launcher",
+  "startingDirectory": "//wsl.localhost/Ubuntu/home/YOUR_USERNAME/projects"
 }
 ```
 
 **Replace:**
+
 - `YOUR-UNIQUE-GUID` - Generate with PowerShell: `New-Guid`
 - `YOUR_USERNAME` - Your Windows username
 - `DISTRO_ID` - Your WSL distro ID (check in `%LOCALAPPDATA%\wsl\`)
@@ -78,6 +79,7 @@ Create separate profiles for different project folders:
 
 1. Verify WSL is installed: `wsl --list`
 2. Test command in PowerShell:
+
    ```powershell
    wsl.exe -d Ubuntu bash -lic 'ai-launcher claude ~/projects'
    ```
@@ -85,6 +87,7 @@ Create separate profiles for different project folders:
 ### AI provider CLI not found
 
 Ensure your chosen AI provider CLI is installed in WSL:
+
 ```bash
 which claude   # Claude Code
 which gemini   # Gemini CLI
@@ -98,11 +101,13 @@ If not found, install the appropriate CLI in your WSL environment.
 ### Path issues
 
 Make sure `~/.local/bin` is in your PATH:
+
 ```bash
 echo $PATH | grep .local/bin
 ```
 
 If missing, add to `~/.bashrc`:
+
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```

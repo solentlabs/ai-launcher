@@ -1,6 +1,7 @@
 # AI Launcher
 
-Universal AI CLI launcher with local context management. Launch any AI coding assistant from a single entry point with persistent context across sessions.
+Universal AI CLI launcher with local context management. Launch any AI coding assistant from a
+single entry point with persistent context across sessions.
 
 [![PyPI version](https://img.shields.io/pypi/v/ai-launcher)](https://pypi.org/project/ai-launcher/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/ai-launcher)](https://pypi.org/project/ai-launcher/)
@@ -12,18 +13,25 @@ Universal AI CLI launcher with local context management. Launch any AI coding as
 > **Local-First Design** - All context and data stays on your machine. No cloud dependencies.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/solentlabs/ai-launcher/main/docs/images/project-selector.png" alt="AI Launcher - Project Selector" width="700">
+  <img
+    src="https://raw.githubusercontent.com/solentlabs/ai-launcher/main/docs/images/project-selector.png"
+    alt="AI Launcher - Project Selector"
+    width="700">
 </p>
 <p align="center"><em>Interactive project selector with tree view and context preview</em></p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/solentlabs/ai-launcher/main/docs/images/startup-report.png" alt="AI Launcher - Startup Report" width="700">
+  <img
+    src="https://raw.githubusercontent.com/solentlabs/ai-launcher/main/docs/images/startup-report.png"
+    alt="AI Launcher - Startup Report"
+    width="700">
 </p>
 <p align="center"><em>Startup transparency report showing context, plugins, and session details</em></p>
 
 ## What Is This?
 
 A terminal-first launcher that:
+
 - 🎯 **Single Entry Point** - One command to access all your AI coding tools
 - 🧠 **Context Management** - Maintains persistent context across sessions
 - 🔒 **Local-Only** - Everything stays on your machine
@@ -92,6 +100,7 @@ py -m ai_launcher claude C:\Users\you\projects
 </details>
 
 **See what's available:**
+
 ```bash
 ai-launcher claude --discover ~/projects
 ai-launcher claude --context
@@ -102,6 +111,7 @@ Select a project, and your AI tool opens with full context.
 ## Features
 
 ### Project Management
+
 - 🔍 **Fuzzy search** - Type to filter projects instantly
 - 📁 **Tree navigation** - See your project structure at a glance
 - 📋 **Preview pane** - Git status, context files, directory contents
@@ -110,6 +120,7 @@ Select a project, and your AI tool opens with full context.
 - 🔗 **Symlink support** - Works with linked directories
 
 ### Multi-Provider Support
+
 - 🤖 **Provider abstraction** - Switch between Claude Code, Gemini, and more
 - 🔧 **Per-project configuration** - Different AI tools for different projects
 - 📊 **Discovery mode** - See what providers are installed
@@ -117,10 +128,12 @@ Select a project, and your AI tool opens with full context.
 - 🧠 **Context awareness** - Detects CLAUDE.md, GEMINI.md, and other context files
 
 ### Terminal Window Title
+
 - 📺 **Auto title setting** - Terminal shows "project → provider" for easy window identification
 - 🎨 **Customizable format** - Configure your preferred title style
 - 🪟 **Multi-window workflow** - Instantly identify which terminal has which project
-- 🖥️ **Broad compatibility** - Works with xterm, iTerm2, GNOME Terminal, Windows Terminal, tmux, and more
+- 🖥️ **Broad compatibility** - Works with xterm, iTerm2, GNOME Terminal, Windows Terminal, tmux, and
+  more
 
 ## Requirements
 
@@ -140,11 +153,13 @@ ai-launcher aider ~/projects      # Aider pair programmer
 ai-launcher copilot ~/projects    # GitHub Copilot CLI
 ```
 
-See [Configuration](https://github.com/solentlabs/ai-launcher/blob/main/docs/configuration.md) for all CLI options.
+See [Configuration](https://github.com/solentlabs/ai-launcher/blob/main/docs/configuration.md) for
+all CLI options.
 
 ## Why Local-Only?
 
 Your code and context should stay on your machine. AI Launcher:
+
 - Never sends data to external services
 - Works offline
 - Respects your privacy
@@ -163,4 +178,5 @@ MIT - see [LICENSE](https://github.com/solentlabs/ai-launcher/blob/main/LICENSE)
 
 ---
 
-**Made by [Solent Labs™](https://github.com/solentlabs)** - Building tools for developers who value privacy and local-first software.
+**Made by [Solent Labs™](https://github.com/solentlabs)** - Building tools for developers who value
+privacy and local-first software.

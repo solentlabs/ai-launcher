@@ -2,31 +2,37 @@
 
 ## Overview
 
-AI Launcher is designed as a local-first, privacy-focused tool for managing AI coding assistant contexts across multiple projects. This document explains the architectural decisions and design patterns.
+AI Launcher is designed as a local-first, privacy-focused tool for managing AI coding assistant
+contexts across multiple projects. This document explains the architectural decisions and design
+patterns.
 
 ---
 
 ## Design Principles
 
 ### 1. Local-First
+
 - All data stays on the user's machine
 - No cloud dependencies or telemetry
 - Works completely offline
 - User maintains full control
 
 ### 2. Privacy-First
+
 - No data collection or tracking
 - No external API calls (except Claude CLI itself)
 - Sensitive paths stay local
 - History stored locally only
 
 ### 3. Developer Experience
+
 - Fast fuzzy search (<100ms response)
 - Minimal configuration required
 - Intuitive keyboard navigation
 - Clear visual feedback
 
 ### 4. Extensibility
+
 - Plugin architecture for future AI tools
 - Shared context system for org-wide standards
 - Configurable via simple TOML files
@@ -38,6 +44,7 @@ AI Launcher is designed as a local-first, privacy-focused tool for managing AI c
 ### Why Two Versions?
 
 **Bash Script (`bin/ai-launcher`):**
+
 - **Purpose:** Rapid prototyping and iteration
 - **Benefits:**
   - No dependencies to install
@@ -50,6 +57,7 @@ AI Launcher is designed as a local-first, privacy-focused tool for managing AI c
   - No typing or IDE support
 
 **Python Package (`src/ai_launcher/`):**
+
 - **Purpose:** Production-ready distribution
 - **Benefits:**
   - Proper testing (pytest, coverage)
@@ -62,7 +70,8 @@ AI Launcher is designed as a local-first, privacy-focused tool for managing AI c
   - More ceremony (imports, packaging)
 
 ### Development Flow
-```
+
+```text
 1. Prototype feature in bash
 2. Test manually with real projects
 3. Iterate quickly
@@ -80,7 +89,8 @@ This approach lets us move fast while maintaining quality.
 ### Automatic Discovery
 
 **Algorithm:**
-```
+
+```text
 for each scan_path in config.scan.paths:
     traverse_directory(scan_path, max_depth=config.scan.max_depth):
         if directory in config.scan.prune_dirs:
@@ -90,6 +100,7 @@ for each scan_path in config.scan.paths:
 ```
 
 **Why `.git` detection?**
+
 - Reliable indicator of project root
 - Most projects are git repos
 - Faster than other heuristics
@@ -98,16 +109,19 @@ for each scan_path in config.scan.paths:
 ### Manual Projects
 
 **Use cases:**
+
 - Non-git projects (legacy, experimental)
 - Symlinked directories
 - Network mounts
 - Specific subdirectories
 
 **Storage:**
+
 - Bash: Text file (`~/.config/ai-launcher/manual-paths`)
 - Python: SQLite database
 
 **Operations:**
+
 - Add: Interactive directory browser
 - Remove: Interactive selection from list
 - List: Show all manual paths
@@ -119,6 +133,7 @@ for each scan_path in config.scan.paths:
 ### Problem Statement
 
 Organizations often have:
+
 - Common coding standards across projects
 - Shared patterns and best practices
 - Consistent security/testing guidelines
@@ -128,7 +143,7 @@ Organizations often have:
 
 ### Solution: Three-Tier Hierarchy
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │  Organization Level (Solent Labs™)      │  ← Shared standards
 ├─────────────────────────────────────────┤
@@ -141,7 +156,8 @@ Organizations often have:
 ### Implementation
 
 **1. Central Knowledge Base:**
-```
+
+```text
 ~/projects/solentlabs/devkit/shared-context/
 ├── README.md                # How to use this system
 ├── STANDARDS.md             # Coding standards
@@ -152,7 +168,8 @@ Organizations often have:
 ```
 
 **2. Project Integration:**
-```
+
+```text
 ~/projects/solentlabs/my-app/
 ├── CLAUDE.md                # Project-specific rules
 └── .solent/                 # Solent Labs integration
@@ -160,15 +177,19 @@ Organizations often have:
 ```
 
 **3. Reference Pattern:**
+
 ```markdown
 # Project CLAUDE.md
 
 ## Solent Labs™ Standards
+
 See shared context:
+
 - [Coding Standards](/.solent/context/STANDARDS.md)
 - [DevKit Patterns](/.solent/context/DEVKIT-PATTERNS.md)
 
 ## Project-Specific Rules
+
 [Unique to this project...]
 ```
 
@@ -184,12 +205,14 @@ See shared context:
 ### Future Enhancements
 
 **AI Launcher Integration:**
+
 - Detect `.solent/` directory
 - Show "✓ Solent Labs Standards" in preview
 - `--init-solent` command to set up symlinks
 - Validate CLAUDE.md references shared context
 
 **DevKit CLI:**
+
 ```bash
 # Future commands
 devkit init-project my-app    # Create with Solent Labs structure
@@ -203,8 +226,8 @@ devkit update-shared-context  # Pull latest standards
 
 ### Configuration
 
-**Format:** TOML (Tom's Obvious, Minimal Language)
-**Location:** Platform-specific via `platformdirs`
+**Format:** TOML (Tom's Obvious, Minimal Language) **Location:** Platform-specific via
+`platformdirs`
 
 ```toml
 [scan]
@@ -221,6 +244,7 @@ max_entries = 50
 ```
 
 **Why TOML?**
+
 - Human-readable and writable
 - Comments supported
 - Strong typing (arrays, tables, strings)
@@ -232,25 +256,31 @@ max_entries = 50
 **Purpose:** Remember last-opened project (Bash script only)
 
 **Format (Bash only):**
-```
+
+```text
 1738856400|/home/user/projects/my-app
 1738855000|/home/user/projects/other-app
 ```
+
 Timestamp | Path
 
-**Note:** The Python version does not track history or last-opened projects. This feature is exclusive to the bash script prototype.
+**Note:** The Python version does not track history or last-opened projects. This feature is
+exclusive to the bash script prototype.
 
 **Benefits (Bash only):**
+
 - Cursor starts on recent project (marked with ⭐)
 - Reduce navigation time
 
 ### Manual Paths
 
 **Storage:**
+
 - Bash: Line-separated text file
 - Python: SQLite table
 
 **Why separate from config?**
+
 - Config is manually edited
 - Manual paths added via UI
 - Don't mix user edits with programmatic changes
@@ -261,7 +291,7 @@ Timestamp | Path
 
 ### Component Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │                    Welcome Screen                       │
 │  - Shows branding                                       │
@@ -298,10 +328,12 @@ Timestamp | Path
 **Critical: Always show in this order:**
 
 1. **CLAUDE.md** (first 20 lines) - if exists
+
    - Shows project context immediately
    - Most important information
 
 2. **Git Status** (up to 15 files) - if git repo
+
    - Shows uncommitted changes
    - Helps user decide if clean state
 
@@ -311,13 +343,14 @@ Timestamp | Path
    - Never omit this section
 
 **Why this order?**
+
 - Context before details
 - Most relevant info first
 - Consistent user experience
 
 ### Tree View Format
 
-```
+```text
 projects/
   utilities/
     ★ ai-launcher
@@ -330,6 +363,7 @@ projects/
 ```
 
 **Features:**
+
 - Hierarchical display (2 spaces per level)
 - ★ marks recently opened
 - Folders end with `/` (visual distinction)
@@ -341,26 +375,29 @@ projects/
 
 ### Supported Platforms
 
-| Platform     | Status | Notes                          |
-|--------------|--------|--------------------------------|
-| Linux        | ✅ Full | Primary development platform  |
-| WSL          | ✅ Full | Windows Subsystem for Linux   |
-| macOS        | ✅ Full | Tested with homebrew          |
-| Windows      | ⚠️ Partial | PowerShell for install only |
+| Platform | Status     | Notes                        |
+| -------- | ---------- | ---------------------------- |
+| Linux    | ✅ Full    | Primary development platform |
+| WSL      | ✅ Full    | Windows Subsystem for Linux  |
+| macOS    | ✅ Full    | Tested with homebrew         |
+| Windows  | ⚠️ Partial | PowerShell for install only  |
 
 ### Platform-Specific Paths
 
 **Config Directory:**
+
 - Linux/WSL: `~/.config/ai-launcher/`
 - macOS: `~/Library/Application Support/ai-launcher/`
 - Windows: `%LOCALAPPDATA%\ai-launcher\`
 
 **Data Directory:**
+
 - Linux/WSL: `~/.local/share/ai-launcher/`
 - macOS: `~/Library/Application Support/ai-launcher/`
 - Windows: `%LOCALAPPDATA%\ai-launcher\`
 
 **Log Directory:**
+
 - Linux/WSL: `~/.local/state/ai-launcher/` or `~/.cache/ai-launcher/`
 - macOS: `~/Library/Logs/ai-launcher/`
 - Windows: `%LOCALAPPDATA%\ai-launcher\Logs\`
@@ -370,6 +407,7 @@ projects/
 ### Claude CLI Installation
 
 **Platform Detection:**
+
 ```bash
 detect_platform() {
     case "$(uname -s)" in
@@ -391,6 +429,7 @@ detect_platform() {
 ```
 
 **Install Commands:**
+
 - Linux/macOS/WSL: `curl -fsSL https://claude.ai/install.sh | bash`
 - Windows: `irm https://claude.ai/install.ps1 | iex`
 
@@ -401,19 +440,22 @@ detect_platform() {
 ### Threat Model
 
 **In Scope:**
+
 - Shell injection via user input
 - Path traversal attacks
 - Symlink exploits
 - Malicious config files
 
 **Out of Scope:**
+
 - Physical access attacks
 - Compromised Claude CLI
 - OS-level vulnerabilities
 
 ### Mitigations
 
-**1. Input Validation**
+### 1. Input Validation
+
 ```bash
 # Always quote variables
 cd "$selected_path"  # Not: cd $selected_path
@@ -422,17 +464,20 @@ cd "$selected_path"  # Not: cd $selected_path
 [[ -d "$path" ]] || die "Invalid path"
 ```
 
-**2. No Arbitrary Code Execution**
+### 2. No Arbitrary Code Execution
+
 - Don't eval user input
 - Don't source unknown files
 - Config is data (TOML), not code
 
-**3. Symlink Handling**
+### 3. Symlink Handling
+
 - Preserve symlinks (don't resolve)
 - Validate target exists before following
 - Don't allow .. traversal
 
-**4. Secure Defaults**
+### 4. Secure Defaults
+
 - Config files created with 0644 permissions
 - History/data files with 0600 permissions
 - No world-writable files
@@ -443,17 +488,18 @@ cd "$selected_path"  # Not: cd $selected_path
 
 ### Benchmarks (Estimated)
 
-| Operation              | Time     | Notes                    |
-|------------------------|----------|--------------------------|
-| Launch + scan 100 dirs | <500ms   | Cold start               |
-| Launch (cached)        | <100ms   | Warm start               |
-| Fuzzy search keystroke | <10ms    | fzf is very fast         |
-| Preview update         | <50ms    | Read CLAUDE.md + git     |
-| Project switch         | <100ms   | cd + exec claude         |
+| Operation              | Time   | Notes                |
+| ---------------------- | ------ | -------------------- |
+| Launch + scan 100 dirs | <500ms | Cold start           |
+| Launch (cached)        | <100ms | Warm start           |
+| Fuzzy search keystroke | <10ms  | fzf is very fast     |
+| Preview update         | <50ms  | Read CLAUDE.md + git |
+| Project switch         | <100ms | cd + exec claude     |
 
 ### Optimization Strategies
 
-**1. Prune Directories**
+### 1. Prune Directories
+
 ```toml
 prune_dirs = [
     "node_modules",  # Can have 1000s of dirs
@@ -462,17 +508,20 @@ prune_dirs = [
 ]
 ```
 
-**2. Limit Scan Depth**
+### 2. Limit Scan Depth
+
 ```toml
 max_depth = 5  # Don't recurse forever
 ```
 
-**3. Lazy Loading**
+### 3. Lazy Loading
+
 - Only scan when needed
 - Cache discovery results
 - Update incrementally on rescan
 
-**4. Async Operations (Future)**
+### 4. Async Operations (Future)
+
 - Scan in background
 - Update UI progressively
 - Show partial results immediately
@@ -484,10 +533,12 @@ max_depth = 5  # Don't recurse forever
 ### Bash Script
 
 **Current State:**
+
 - Manual testing only
 - No automated tests
 
 **Future:**
+
 - BATS (Bash Automated Testing System)
 - Integration tests with fixtures
 - Mock fzf for testing selections
@@ -495,12 +546,14 @@ max_depth = 5  # Don't recurse forever
 ### Python Package
 
 **Current State:**
+
 - Unit tests for core logic
 - pytest with coverage
 - Type checking with mypy
 
 **Test Structure:**
-```
+
+```text
 tests/
 ├── test_cli.py           # CLI entry point
 ├── test_config.py        # Config loading/saving
@@ -517,11 +570,14 @@ tests/
 
 ### Problem
 
-Claude Code's three-layer permission system accumulates narrow auto-approved patterns when users click "allow" on command prompts. These exact-match patterns (e.g., `Bash(python3 -m pytest tests/ -v)`) never match again with different arguments, causing persistent permission prompts. Users have no visibility into their effective permissions across layers.
+Claude Code's three-layer permission system accumulates narrow auto-approved patterns when users
+click "allow" on command prompts. These exact-match patterns (e.g.,
+`Bash(python3 -m pytest tests/ -v)`) never match again with different arguments, causing persistent
+permission prompts. Users have no visibility into their effective permissions across layers.
 
 ### Where It Sits in the Stack
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │  CLI Layer (cli.py)                                 │
 │  --check-permissions flag → permissions_report.py   │
@@ -544,7 +600,7 @@ Claude Code's three-layer permission system accumulates narrow auto-approved pat
 
 ### Data Flow
 
-```
+```text
 Settings files → _get_claude_session_config() → _analyze_permissions()
                                                        │
                                                        ↓
@@ -561,20 +617,25 @@ Settings files → _get_claude_session_config() → _analyze_permissions()
 
 `SessionConfig` (in `provider_data.py`) carries both raw data and analyzed results:
 
-- **Raw data**: `permissions`, `global_permissions`, `global_deny`, `global_ask`, `mcp_servers`, `hooks_configured`, `model`
+- **Raw data**: `permissions`, `global_permissions`, `global_deny`, `global_ask`, `mcp_servers`,
+  `hooks_configured`, `model`
 - **Diagnostics**: `permission_warnings`, `permission_recommendations`, `has_broad_bash`
 - **Provenance**: `config_file_path`, `global_config_file_path`
 
-The analysis runs once in `_get_claude_session_config()`. Presentation layers read the pre-computed diagnostics — they never re-analyze.
+The analysis runs once in `_get_claude_session_config()`. Presentation layers read the pre-computed
+diagnostics — they never re-analyze.
 
 ### Why the Analysis Lives in `claude.py`
 
 Permission accumulation is Claude Code-specific. Other providers don't have:
+
 - A three-layer settings hierarchy
 - Auto-approved pattern accumulation
 - Ask/deny override semantics
 
-Putting the analysis in `claude.py` (the provider module) keeps it co-located with the settings file reading logic and avoids polluting the core or presentation layers with Claude-specific knowledge. Non-Claude providers return `SessionConfig` with empty diagnostic fields.
+Putting the analysis in `claude.py` (the provider module) keeps it co-located with the settings file
+reading logic and avoids polluting the core or presentation layers with Claude-specific knowledge.
+Non-Claude providers return `SessionConfig` with empty diagnostic fields.
 
 See [Permission Transparency](permission-transparency.md) for the full feature specification.
 
@@ -587,6 +648,7 @@ See [Permission Transparency](permission-transparency.md) for the full feature s
 **Goal:** Support multiple AI coding assistants
 
 **Design:**
+
 ```toml
 [ai-tools]
 default = "claude-code"
@@ -605,6 +667,7 @@ supports_context = false
 ```
 
 **Launcher Logic:**
+
 ```bash
 case "$tool" in
     claude-code)
@@ -621,6 +684,7 @@ esac
 **Goal:** Third-party extensions
 
 **Example:**
+
 ```python
 # ~/.config/ai-launcher/plugins/custom_preview.py
 def preview(project: Project) -> str:
@@ -629,6 +693,7 @@ def preview(project: Project) -> str:
 ```
 
 **Integration:**
+
 ```python
 from ai_launcher.plugins import load_plugins
 
@@ -642,12 +707,11 @@ for plugin in plugins:
 
 ## References
 
-- **fzf:** https://github.com/junegunn/fzf
-- **platformdirs:** https://pypi.org/project/platformdirs/
-- **TOML spec:** https://toml.io/en/
-- **Claude Code:** https://code.claude.com/docs/en/setup
+- **fzf:** <https://github.com/junegunn/fzf>
+- **platformdirs:** <https://pypi.org/project/platformdirs/>
+- **TOML spec:** <https://toml.io/en/>
+- **Claude Code:** <https://code.claude.com/docs/en/setup>
 
 ---
 
-**Last Updated:** 2026-03-25
-**Status:** Living document, will evolve with project
+**Last Updated:** 2026-03-25 **Status:** Living document, will evolve with project

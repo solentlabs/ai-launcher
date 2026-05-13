@@ -501,14 +501,12 @@ class TestAnalyzePermissions:
     """Tests for _analyze_permissions() — permission health diagnostics."""
 
     @pytest.mark.parametrize(
-        "project_perms,global_perms,global_deny,global_ask,expected_broad,warning_fragment",
+        "project_perms,global_perms,expected_broad,warning_fragment",
         [
             # Healthy: Bash(*) in project
             (
                 ["Bash(*)"],
                 ["Read", "Edit"],
-                [],
-                [],
                 True,
                 None,
             ),
@@ -516,8 +514,6 @@ class TestAnalyzePermissions:
             (
                 [],
                 ["Bash(*)", "Read"],
-                [],
-                [],
                 True,
                 None,
             ),
@@ -525,8 +521,6 @@ class TestAnalyzePermissions:
             (
                 [f"Bash(cmd{i})" for i in range(15)],
                 ["Read"],
-                [],
-                [],
                 False,
                 "15 accumulated patterns",
             ),
@@ -534,8 +528,6 @@ class TestAnalyzePermissions:
             (
                 [f"Bash(cmd{i})" for i in range(7)],
                 ["Read"],
-                [],
-                [],
                 False,
                 "7 patterns",
             ),
@@ -543,8 +535,6 @@ class TestAnalyzePermissions:
             (
                 ["Bash(npm test)", "Bash(git status)"],
                 ["Bash(*)", "Read"],
-                [],
-                [],
                 True,
                 "redundant",
             ),
@@ -552,17 +542,13 @@ class TestAnalyzePermissions:
             (
                 ["Bash(" + "x" * 130 + ")"],
                 [],
-                [],
-                [],
                 False,
                 "long pattern",
             ),
-            # Ask rules with Bash(*) — no warning (shown separately as info)
+            # Bash(*) in project — no warning even with permissive global
             (
                 ["Bash(*)"],
                 ["Read"],
-                [],
-                ["Bash(git commit:*)", "Bash(git push:*)"],
                 True,
                 None,
             ),
@@ -574,21 +560,19 @@ class TestAnalyzePermissions:
             "moderate_7_patterns",
             "redundant_with_global_broad",
             "long_pattern_detected",
-            "ask_rules_no_warning",
+            "project_broad_no_warning",
         ],
     )
     def test_analyze_permissions(
         self,
         project_perms,
         global_perms,
-        global_deny,
-        global_ask,
         expected_broad,
         warning_fragment,
     ):
         """Test permission analysis with various scenarios."""
         warnings, recommendations, has_broad = _analyze_permissions(
-            project_perms, global_perms, global_deny, global_ask
+            project_perms, global_perms
         )
 
         assert has_broad == expected_broad
@@ -602,7 +586,7 @@ class TestAnalyzePermissions:
 
     def test_no_permissions_no_warnings(self):
         """Test that empty permissions produce no warnings."""
-        warnings, recommendations, has_broad = _analyze_permissions([], [], [], [])
+        warnings, recommendations, has_broad = _analyze_permissions([], [])
         assert warnings == []
         assert recommendations == []
         assert has_broad is False
@@ -610,9 +594,7 @@ class TestAnalyzePermissions:
     def test_accumulated_patterns_include_fix_recommendation(self):
         """Test that accumulated patterns produce a fix recommendation."""
         perms = [f"Bash(cmd{i})" for i in range(12)]
-        warnings, recommendations, _ = _analyze_permissions(
-            perms, ["Read"], [], [], "/project/.claude/settings.local.json"
-        )
+        warnings, recommendations, _ = _analyze_permissions(perms, ["Read"])
         assert len(recommendations) > 0
         assert any("Bash(*)" in r for r in recommendations)
 
@@ -621,9 +603,6 @@ class TestAnalyzePermissions:
         warnings, recommendations, _ = _analyze_permissions(
             ["Bash(npm test)"],
             ["Bash(*)"],
-            [],
-            [],
-            "/project/.claude/settings.local.json",
         )
         assert len(recommendations) > 0
         assert any("Bash(*)" in r for r in recommendations)
@@ -638,7 +617,7 @@ class TestAnalyzePermissions:
             "WebFetch(domain:baz.com)",
             "WebFetch(domain:qux.com)",
         ]
-        warnings, recommendations, _ = _analyze_permissions(perms, ["Read"], [], [])
+        warnings, recommendations, _ = _analyze_permissions(perms, ["Read"])
         # 5 Bash + 6 WebFetch = 11 total, triggers >10 threshold
         assert len(warnings) == 1
         assert "11 accumulated" in warnings[0]
@@ -646,7 +625,7 @@ class TestAnalyzePermissions:
     def test_single_consolidated_warning(self):
         """Test that multiple symptoms produce one warning, one fix."""
         perms = [f"Bash(cmd{i})" for i in range(12)]
-        warnings, recommendations, _ = _analyze_permissions(perms, ["Bash(*)"], [], [])
+        warnings, recommendations, _ = _analyze_permissions(perms, ["Bash(*)"])
         # Redundant wins when global has Bash(*)
         assert len(warnings) == 1
         assert "redundant" in warnings[0]

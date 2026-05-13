@@ -29,9 +29,9 @@ pipx install ai-launcher
 py -m pip install ai-launcher
 ```
 
-> **Note:** On Windows, use `py -m pip` instead of `pip` directly if you get
-> "Fatal error in launcher: Unable to create process". This is a known Windows
-> pip launcher issue, not specific to ai-launcher.
+> **Note:** On Windows, use `py -m pip` instead of `pip` directly if you get "Fatal error in
+> launcher: Unable to create process". This is a known Windows pip launcher issue, not specific to
+> ai-launcher.
 
 ## Verify Installation
 
@@ -75,12 +75,12 @@ pip install -e ".[dev]"
 
 ## Dependencies
 
-| Dependency | Required | Install |
-|---|---|---|
-| Python 3.8+ | Yes | [python.org](https://www.python.org/downloads/) |
-| fzf | Yes | `apt install fzf` / `brew install fzf` / `winget install junegunn.fzf` |
-| An AI CLI tool | Yes | Claude Code, Gemini CLI, Cursor, Aider, or GitHub Copilot CLI |
-| Git | No | For project discovery (recommended) |
+| Dependency     | Required | Install                                                                |
+| -------------- | -------- | ---------------------------------------------------------------------- |
+| Python 3.8+    | Yes      | [python.org](https://www.python.org/downloads/)                        |
+| fzf            | Yes      | `apt install fzf` / `brew install fzf` / `winget install junegunn.fzf` |
+| An AI CLI tool | Yes      | Claude Code, Gemini CLI, Cursor, Aider, or GitHub Copilot CLI          |
+| Git            | No       | For project discovery (recommended)                                    |
 
 ## Troubleshooting
 
