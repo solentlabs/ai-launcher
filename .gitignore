@@ -33,9 +33,7 @@ venv.bak/
 # PyCharm
 .idea/
 
-# VS Code (but keep tasks.json)
-.vscode/*
-!.vscode/tasks.json
+# .vscode/ is shared workspace config — track all of it.
 
 # pytest
 .pytest_cache/

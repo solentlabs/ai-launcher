@@ -12,7 +12,10 @@ Updated: 2026-03-03 (Cross-platform compatibility: mock_home fixture, os.sep)
 import os
 from datetime import datetime
 
+import pytest
+
 from ai_launcher.providers.claude import (
+    _analyze_permissions,
     _encode_project_path,
     _get_claude_session_config,
     _get_global_context_summary,
@@ -492,3 +495,299 @@ class TestGetGlobalContextSummary:
         result = _get_global_context_summary()
 
         assert result is None
+
+
+class TestAnalyzePermissions:
+    """Tests for _analyze_permissions() — permission health diagnostics."""
+
+    @pytest.mark.parametrize(
+        "project_perms,global_perms,global_deny,global_ask,expected_broad,warning_fragment",
+        [
+            # Healthy: Bash(*) in project
+            (
+                ["Bash(*)"],
+                ["Read", "Edit"],
+                [],
+                [],
+                True,
+                None,
+            ),
+            # Healthy: Bash(*) in global only
+            (
+                [],
+                ["Bash(*)", "Read"],
+                [],
+                [],
+                True,
+                None,
+            ),
+            # Accumulated: >10 narrow patterns, no Bash(*)
+            (
+                [f"Bash(cmd{i})" for i in range(15)],
+                ["Read"],
+                [],
+                [],
+                False,
+                "15 accumulated patterns",
+            ),
+            # Moderate accumulation: 6-10 narrow patterns
+            (
+                [f"Bash(cmd{i})" for i in range(7)],
+                ["Read"],
+                [],
+                [],
+                False,
+                "7 patterns",
+            ),
+            # Redundant: project has narrow patterns but global has Bash(*)
+            (
+                ["Bash(npm test)", "Bash(git status)"],
+                ["Bash(*)", "Read"],
+                [],
+                [],
+                True,
+                "redundant",
+            ),
+            # Long patterns detected
+            (
+                ["Bash(" + "x" * 130 + ")"],
+                [],
+                [],
+                [],
+                False,
+                "long pattern",
+            ),
+            # Ask rules with Bash(*) — no warning (shown separately as info)
+            (
+                ["Bash(*)"],
+                ["Read"],
+                [],
+                ["Bash(git commit:*)", "Bash(git push:*)"],
+                True,
+                None,
+            ),
+        ],
+        ids=[
+            "healthy_project_broad",
+            "healthy_global_broad",
+            "accumulated_15_patterns",
+            "moderate_7_patterns",
+            "redundant_with_global_broad",
+            "long_pattern_detected",
+            "ask_rules_no_warning",
+        ],
+    )
+    def test_analyze_permissions(
+        self,
+        project_perms,
+        global_perms,
+        global_deny,
+        global_ask,
+        expected_broad,
+        warning_fragment,
+    ):
+        """Test permission analysis with various scenarios."""
+        warnings, recommendations, has_broad = _analyze_permissions(
+            project_perms, global_perms, global_deny, global_ask
+        )
+
+        assert has_broad == expected_broad
+
+        if warning_fragment is None:
+            assert len(warnings) == 0
+        else:
+            assert any(warning_fragment in w for w in warnings), (
+                f"Expected warning containing '{warning_fragment}', got: {warnings}"
+            )
+
+    def test_no_permissions_no_warnings(self):
+        """Test that empty permissions produce no warnings."""
+        warnings, recommendations, has_broad = _analyze_permissions([], [], [], [])
+        assert warnings == []
+        assert recommendations == []
+        assert has_broad is False
+
+    def test_accumulated_patterns_include_fix_recommendation(self):
+        """Test that accumulated patterns produce a fix recommendation."""
+        perms = [f"Bash(cmd{i})" for i in range(12)]
+        warnings, recommendations, _ = _analyze_permissions(
+            perms, ["Read"], [], [], "/project/.claude/settings.local.json"
+        )
+        assert len(recommendations) > 0
+        assert any("Bash(*)" in r for r in recommendations)
+
+    def test_redundant_patterns_include_fix_recommendation(self):
+        """Test that redundant patterns produce a fix recommendation."""
+        warnings, recommendations, _ = _analyze_permissions(
+            ["Bash(npm test)"],
+            ["Bash(*)"],
+            [],
+            [],
+            "/project/.claude/settings.local.json",
+        )
+        assert len(recommendations) > 0
+        assert any("Bash(*)" in r for r in recommendations)
+
+    def test_webfetch_counted_in_total(self):
+        """Test that WebFetch patterns count toward total accumulation."""
+        perms = [f"Bash(cmd{i})" for i in range(5)] + [
+            "WebFetch(domain:github.com)",
+            "WebFetch(domain:example.com)",
+            "WebFetch(domain:foo.com)",
+            "WebFetch(domain:bar.com)",
+            "WebFetch(domain:baz.com)",
+            "WebFetch(domain:qux.com)",
+        ]
+        warnings, recommendations, _ = _analyze_permissions(perms, ["Read"], [], [])
+        # 5 Bash + 6 WebFetch = 11 total, triggers >10 threshold
+        assert len(warnings) == 1
+        assert "11 accumulated" in warnings[0]
+
+    def test_single_consolidated_warning(self):
+        """Test that multiple symptoms produce one warning, one fix."""
+        perms = [f"Bash(cmd{i})" for i in range(12)]
+        warnings, recommendations, _ = _analyze_permissions(perms, ["Bash(*)"], [], [])
+        # Redundant wins when global has Bash(*)
+        assert len(warnings) == 1
+        assert "redundant" in warnings[0]
+        assert len(recommendations) == 1
+
+
+class TestSessionConfigGlobalPermissions:
+    """Tests for _get_claude_session_config() reading global permissions."""
+
+    def test_reads_global_settings_permissions(self, mock_home):
+        """Test reading allow/deny/ask from global settings.json."""
+        import json
+
+        project_path = mock_home / "my-project"
+        project_path.mkdir()
+
+        claude_dir = mock_home / ".claude"
+        claude_dir.mkdir()
+        settings = claude_dir / "settings.json"
+        settings.write_text(
+            json.dumps(
+                {
+                    "permissions": {
+                        "allow": ["Bash(*)", "Read", "Edit"],
+                        "deny": ["Bash(rm -rf:*)"],
+                        "ask": ["Bash(git push:*)"],
+                    }
+                }
+            )
+        )
+
+        result = _get_claude_session_config(project_path)
+
+        assert result is not None
+        assert "Bash(*)" in result.global_permissions
+        assert result.global_permissions_count == 3
+        assert "Bash(rm -rf:*)" in result.global_deny
+        assert "Bash(git push:*)" in result.global_ask
+
+    def test_reads_global_local_settings_permissions(self, mock_home):
+        """Test reading permissions from global settings.local.json."""
+        import json
+
+        project_path = mock_home / "my-project"
+        project_path.mkdir()
+
+        claude_dir = mock_home / ".claude"
+        claude_dir.mkdir()
+        local_settings = claude_dir / "settings.local.json"
+        local_settings.write_text(
+            json.dumps({"permissions": {"allow": ["Bash(*)", "WebSearch"]}})
+        )
+
+        result = _get_claude_session_config(project_path)
+
+        assert result is not None
+        assert "Bash(*)" in result.global_permissions
+        assert "WebSearch" in result.global_permissions
+        assert result.global_config_file_path == str(local_settings)
+
+    def test_merges_global_settings_without_duplicates(self, mock_home):
+        """Test that global settings.json and settings.local.json merge without dupes."""
+        import json
+
+        project_path = mock_home / "my-project"
+        project_path.mkdir()
+
+        claude_dir = mock_home / ".claude"
+        claude_dir.mkdir()
+
+        # settings.json has Bash(*) and Read
+        (claude_dir / "settings.json").write_text(
+            json.dumps({"permissions": {"allow": ["Bash(*)", "Read"]}})
+        )
+        # settings.local.json also has Bash(*) and adds WebSearch
+        (claude_dir / "settings.local.json").write_text(
+            json.dumps({"permissions": {"allow": ["Bash(*)", "WebSearch"]}})
+        )
+
+        result = _get_claude_session_config(project_path)
+
+        assert result is not None
+        # Bash(*) should appear once, not twice
+        assert result.global_permissions.count("Bash(*)") == 1
+        assert "Read" in result.global_permissions
+        assert "WebSearch" in result.global_permissions
+        assert result.global_permissions_count == 3
+
+    def test_permission_warnings_populated(self, mock_home):
+        """Test that accumulated project patterns generate warnings."""
+        import json
+
+        project_path = mock_home / "my-project"
+        project_path.mkdir()
+
+        # Create project settings with 12 narrow patterns
+        claude_dir = project_path / ".claude"
+        claude_dir.mkdir()
+        perms = [f"Bash(cmd{i}:*)" for i in range(12)]
+        (claude_dir / "settings.local.json").write_text(
+            json.dumps({"permissions": {"allow": perms}})
+        )
+
+        result = _get_claude_session_config(project_path)
+
+        assert result is not None
+        assert len(result.permission_warnings) > 0
+        assert any("accumulated" in w for w in result.permission_warnings)
+        assert result.has_broad_bash is False
+
+    def test_has_broad_bash_from_project(self, mock_home):
+        """Test has_broad_bash when Bash(*) is in project settings."""
+        import json
+
+        project_path = mock_home / "my-project"
+        project_path.mkdir()
+
+        claude_dir = project_path / ".claude"
+        claude_dir.mkdir()
+        (claude_dir / "settings.local.json").write_text(
+            json.dumps({"permissions": {"allow": ["Bash(*)"]}})
+        )
+
+        result = _get_claude_session_config(project_path)
+
+        assert result is not None
+        assert result.has_broad_bash is True
+
+    def test_global_config_file_path_fallback_to_settings_json(self, mock_home):
+        """Test global_config_file_path falls back to settings.json when no local."""
+        import json
+
+        project_path = mock_home / "my-project"
+        project_path.mkdir()
+
+        claude_dir = mock_home / ".claude"
+        claude_dir.mkdir()
+        settings = claude_dir / "settings.json"
+        settings.write_text(json.dumps({"model": "opus"}))
+
+        result = _get_claude_session_config(project_path)
+
+        assert result is not None
+        assert result.global_config_file_path == str(settings)

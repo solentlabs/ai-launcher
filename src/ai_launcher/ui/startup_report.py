@@ -643,12 +643,62 @@ def display_launch_info(
     print(_pad_line("│ 🔧 Session Configuration:", width))
 
     if session_config:
-        # Permissions
+        # Permission warnings (show first — most actionable)
+        if session_config.permission_warnings:
+            for warning in session_config.permission_warnings:
+                print(_pad_line(f"│   ⚠ {warning}", width))
+            # Actionable fix recommendations
+            if session_config.permission_recommendations:
+                for rec in session_config.permission_recommendations:
+                    print(_pad_line(f"│   💡 {rec}", width))
+
+        # Project-level permissions
         if session_config.permissions_count > 0:
-            perm_text = f"✓ {session_config.permissions_count} auto-approved commands"
-            print(_pad_line(f"│   {perm_text}", width))
+            if (
+                session_config.has_broad_bash
+                and "Bash(*)" in session_config.permissions
+            ):
+                print(_pad_line("│   ✓ Bash(*) (project)", width))
+            else:
+                perm_text = f"✓ {session_config.permissions_count} auto-approved commands (project)"
+                print(_pad_line(f"│   {perm_text}", width))
         else:
-            print(_pad_line("│   ○ No pre-approved permissions", width))
+            print(_pad_line("│   ○ No project permissions (inherits global)", width))
+
+        # Global-level permissions
+        if session_config.global_permissions_count > 0:
+            if (
+                session_config.has_broad_bash
+                and "Bash(*)" in session_config.global_permissions
+            ):
+                print(
+                    _pad_line(
+                        f"│   ✓ Bash(*) + {session_config.global_permissions_count - 1} more (global)",
+                        width,
+                    )
+                )
+            else:
+                print(
+                    _pad_line(
+                        f"│   ✓ {session_config.global_permissions_count} auto-approved commands (global)",
+                        width,
+                    )
+                )
+
+        # Ask rules
+        if session_config.global_ask:
+            ask_labels = []
+            for pattern in session_config.global_ask:
+                if pattern.startswith("Bash(") and pattern.endswith(")"):
+                    inner = pattern[5:-1]
+                    ask_labels.append(inner.split(":")[0])
+                else:
+                    ask_labels.append(pattern)
+            print(_pad_line(f"│   🚫 Ask before: {', '.join(ask_labels)}", width))
+
+        # Permission health summary (always shown)
+        if not session_config.permission_warnings and session_config.has_broad_bash:
+            print(_pad_line("│   ✓ Permission health: clean", width))
 
         # MCP Servers
         if session_config.mcp_servers:
@@ -671,7 +721,13 @@ def display_launch_info(
         else:
             print(_pad_line("│   ○ Model: default (sonnet)", width))
     else:
-        print(_pad_line("│   ○ No pre-approved permissions", width))
+        # No settings files at all — every command will prompt
+        print(
+            _pad_line(
+                "│   ⚠ No permissions configured — all commands will prompt", width
+            )
+        )
+        print(_pad_line("│   💡 Set Bash(*) in .claude/settings.local.json", width))
         print(_pad_line("│   ○ No MCP servers configured", width))
         print(_pad_line("│   ○ No hooks configured", width))
         print(_pad_line("│   ○ Model: default (sonnet)", width))
@@ -814,13 +870,57 @@ def display_launch_info(
             )
         )
 
-        # Memory notes
+        # Memory notes — list each file when small; otherwise summarize with
+        # a count + the directory so the user can browse on their own. The
+        # encoded memory directory can be very long, so it gets its own line(s).
         if stats.memory_files:
-            memory_names = [mf.name for mf in stats.memory_files[:3]]
-            memory_files_str = ", ".join(memory_names)
-            if len(stats.memory_files) > 3:
-                memory_files_str += f", +{len(stats.memory_files) - 3} more"
-            print(_pad_line(f"│   Memory:     {memory_files_str}", width))
+            MEMORY_LIST_THRESHOLD = 5
+            if len(stats.memory_files) <= MEMORY_LIST_THRESHOLD:
+                print(
+                    _pad_line(f"│   Memory:     {len(stats.memory_files)} files", width)
+                )
+                for mf in stats.memory_files:
+                    print(_pad_line(f"│     • {mf.name}", width))
+            else:
+                memory_dir = stats.memory_files[0].path.parent
+                try:
+                    rel = memory_dir.relative_to(Path.home())
+                    dir_str = f"~/{rel}"
+                except ValueError:
+                    dir_str = str(memory_dir)
+                print(
+                    _pad_line(f"│   Memory:     {len(stats.memory_files)} files", width)
+                )
+                # Wrap path across lines, breaking at "/" boundaries when
+                # possible so directory segments stay intact.
+                path_prefix = "│     "
+                cont_prefix = "│       "
+                segments = dir_str.split("/")
+                lines_to_print: List[str] = []
+                current = ""
+                first = True
+                for seg in segments:
+                    sep = "" if (current == "" or current.endswith("/")) else "/"
+                    candidate = current + sep + seg if current else seg
+                    prefix = (
+                        path_prefix if first and not lines_to_print else cont_prefix
+                    )
+                    budget = width - _visual_length(prefix) - 1
+                    if len(candidate) <= budget:
+                        current = candidate
+                    else:
+                        if current:
+                            lines_to_print.append(current + "/")
+                            current = seg
+                        else:
+                            # Single segment longer than the budget — hard split.
+                            lines_to_print.append(seg[:budget])
+                            current = seg[budget:]
+                if current:
+                    lines_to_print.append(current)
+                for i, line_text in enumerate(lines_to_print):
+                    prefix = path_prefix if i == 0 else cont_prefix
+                    print(_pad_line(f"{prefix}{line_text}", width))
 
         print(_pad_line("│", width))
 

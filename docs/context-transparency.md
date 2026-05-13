@@ -166,6 +166,36 @@ See also:
 
 ---
 
+### 6. Permission Health
+**Location:** Analyzed from all three settings layers (see below)
+**Purpose:** Detect accumulated permission patterns that cause random prompts
+**Always loaded:** ✅ Yes, for Claude Code
+**Full docs:** [Permission Transparency](permission-transparency.md)
+
+**What it checks:**
+- Project-level patterns in `<project>/.claude/settings.local.json`
+- Global rules in `~/.claude/settings.json` and `~/.claude/settings.local.json`
+- Whether narrow patterns are redundant with global `Bash(*)`
+- Ask/deny gates that override allow rules
+
+**Why it matters:**
+Claude Code accumulates exact command strings as permission patterns each time you click "allow." Over time, the settings file grows to 100+ patterns that never match again, causing persistent prompts. AI Launcher detects this before launch and recommends the fix.
+
+**Example warning in the startup box:**
+```
+│   ⚠ 18 redundant patterns — global has Bash(*)
+│   💡 Set Bash(*) in .claude/settings.local.json
+```
+
+**CLI diagnostic:**
+```bash
+ai-launcher claude ~/projects --check-permissions
+```
+
+See [Permission Transparency](permission-transparency.md) for the full feature spec and [Permission Health Use Cases](use-cases/permission-health.md) for real-world scenarios.
+
+---
+
 ## AI Launcher Integration
 
 ### The Startup Report Feature

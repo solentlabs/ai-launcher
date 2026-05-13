@@ -603,6 +603,9 @@ class PreviewFormatter:
     def _format_session_config_section(self, config: "SessionConfig") -> str:
         """Format session configuration section.
 
+        Shows project-level and global-level permissions separately,
+        displays deny/ask rules, and highlights permission health warnings.
+
         Args:
             config: Session configuration data
 
@@ -612,23 +615,71 @@ class PreviewFormatter:
 
         lines = [f"{self.BOLD}⚙️ Session Configuration{self.RESET}"]
 
-        # Auto-approved permissions (expandable)
+        # Permission warnings (most important — show first)
+        if config.permission_warnings:
+            for warning in config.permission_warnings:
+                lines.append(f"  {self.YELLOW}⚠{self.RESET}  {warning}")
+            # Actionable fix recommendations
+            if config.permission_recommendations:
+                for rec in config.permission_recommendations:
+                    lines.append(f"  {self.GREEN}💡{self.RESET} {rec}")
+            lines.append("")
+
+        # Project-level permissions
         if config.permissions_count > 0:
+            if config.has_broad_bash and "Bash(*)" in config.permissions:
+                lines.append(f"  {self.GREEN}✓{self.RESET} Bash(*) (project)")
+            else:
+                lines.append(
+                    f"  {self.GREEN}✓{self.RESET} {config.permissions_count} auto-approved commands (project)"
+                )
+
+                # Show first 5 permissions as examples
+                max_show = 5
+                for perm in config.permissions[:max_show]:
+                    # Truncate long patterns
+                    display_perm = perm if len(perm) < 60 else perm[:57] + "..."
+                    lines.append(f"    {self.DIM}• {display_perm}{self.RESET}")
+
+                # Show count of remaining
+                if config.permissions_count > max_show:
+                    remaining = config.permissions_count - max_show
+                    lines.append(f"    {self.DIM}...and {remaining} more{self.RESET}")
+
+        # Global-level permissions
+        if config.global_permissions_count > 0:
+            if config.has_broad_bash and "Bash(*)" in config.global_permissions:
+                lines.append(
+                    f"  {self.GREEN}✓{self.RESET} Bash(*) + {config.global_permissions_count - 1} more (global)"
+                )
+            else:
+                lines.append(
+                    f"  {self.GREEN}✓{self.RESET} {config.global_permissions_count} auto-approved commands (global)"
+                )
+
+        # Ask rules (explain why user still gets prompted)
+        if config.global_ask:
+            ask_labels = []
+            for pattern in config.global_ask:
+                if pattern.startswith("Bash(") and pattern.endswith(")"):
+                    inner = pattern[5:-1]
+                    ask_labels.append(inner.split(":")[0])
+                else:
+                    ask_labels.append(pattern)
             lines.append(
-                f"  {self.GREEN}✓{self.RESET} {config.permissions_count} auto-approved commands"
+                f"  {self.YELLOW}🚫{self.RESET} Ask before: {', '.join(ask_labels)}"
             )
 
-            # Show first 5 permissions as examples
-            max_show = 5
-            for perm in config.permissions[:max_show]:
-                # Truncate long patterns
-                display_perm = perm if len(perm) < 60 else perm[:57] + "..."
-                lines.append(f"    {self.DIM}• {display_perm}{self.RESET}")
-
-            # Show count of remaining
-            if config.permissions_count > max_show:
-                remaining = config.permissions_count - max_show
-                lines.append(f"    {self.DIM}...and {remaining} more{self.RESET}")
+        # Deny rules
+        if config.global_deny:
+            deny_labels = []
+            for pattern in config.global_deny:
+                if pattern.startswith("Bash(") and pattern.endswith(")"):
+                    inner = pattern[5:-1]
+                    deny_labels.append(inner.split(":")[0])
+                else:
+                    deny_labels.append(pattern)
+            lines.append(f"  {self.RED}🚫{self.RESET} Denied: {', '.join(deny_labels)}")
 
         # MCP Servers
         if config.mcp_servers:
@@ -645,12 +696,9 @@ class PreviewFormatter:
         if config.model:
             lines.append(f"  {self.BLUE}🤖{self.RESET} Model: {config.model}")
 
-        # Config file location (transparency!)
+        # Config file locations (transparency!)
         if config.config_file_path:
-            # Show relative path if possible
             try:
-                from pathlib import Path
-
                 config_path = Path(config.config_file_path)
                 home = Path.home()
                 if is_relative_to(config_path, home):

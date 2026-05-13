@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from ai_launcher.utils.session import (
     count_sessions,
     encode_project_path,
@@ -84,27 +86,35 @@ def test_get_claude_session_dir_not_exists(tmp_path):
 
 
 # ============================================================================
-# count_sessions() tests
+# count_sessions() tests — parametrized
 # ============================================================================
 
 
-def test_count_sessions_with_files(tmp_path):
-    """Test counting session files."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-    (session_dir / "abc123.jsonl").write_text("{}")
-    (session_dir / "def456.jsonl").write_text("{}")
-    (session_dir / "ghi789.jsonl").write_text("{}")
-
-    assert count_sessions(session_dir) == 3
+@pytest.fixture
+def session_dir(tmp_path):
+    """Create a session directory and return it."""
+    d = tmp_path / "sessions"
+    d.mkdir()
+    return d
 
 
-def test_count_sessions_empty_dir(tmp_path):
-    """Test counting sessions in empty directory."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-
-    assert count_sessions(session_dir) == 0
+@pytest.mark.parametrize(
+    "files,expected",
+    [
+        # 3 jsonl files → 3
+        ({"abc.jsonl": "{}", "def.jsonl": "{}", "ghi.jsonl": "{}"}, 3),
+        # Empty directory → 0
+        ({}, 0),
+        # Mixed file types → only jsonl counted
+        ({"abc.jsonl": "{}", "readme.md": "notes", "config.json": "{}"}, 1),
+    ],
+    ids=["three_files", "empty_dir", "ignores_non_jsonl"],
+)
+def test_count_sessions(session_dir, files, expected):
+    """Test counting session .jsonl files in various scenarios."""
+    for name, content in files.items():
+        (session_dir / name).write_text(content)
+    assert count_sessions(session_dir) == expected
 
 
 def test_count_sessions_nonexistent_dir(tmp_path):
@@ -112,60 +122,39 @@ def test_count_sessions_nonexistent_dir(tmp_path):
     assert count_sessions(tmp_path / "nonexistent") == 0
 
 
-def test_count_sessions_ignores_non_jsonl(tmp_path):
-    """Test that non-.jsonl files are not counted."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-    (session_dir / "abc123.jsonl").write_text("{}")
-    (session_dir / "readme.md").write_text("notes")
-    (session_dir / "config.json").write_text("{}")
-
-    assert count_sessions(session_dir) == 1
-
-
-def test_count_sessions_ignores_subdirectories(tmp_path):
+def test_count_sessions_ignores_subdirectories(session_dir):
     """Test that .jsonl files in subdirectories are not counted."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
     (session_dir / "abc123.jsonl").write_text("{}")
     sub = session_dir / "memory"
     sub.mkdir()
     (sub / "nested.jsonl").write_text("{}")
-
     assert count_sessions(session_dir) == 1
 
 
-def test_count_sessions_permission_error(tmp_path):
+def test_count_sessions_permission_error(session_dir):
     """Test handling permission errors."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-
     with patch.object(Path, "glob", side_effect=PermissionError):
         assert count_sessions(session_dir) == 0
 
 
 # ============================================================================
-# get_session_size() tests
+# get_session_size() tests — parametrized
 # ============================================================================
 
 
-def test_get_session_size_with_files(tmp_path):
-    """Test calculating total session size."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-    (session_dir / "a.jsonl").write_text("x" * 100)
-    (session_dir / "b.jsonl").write_text("y" * 200)
-
-    result = get_session_size(session_dir)
-    assert result == 300
-
-
-def test_get_session_size_empty_dir(tmp_path):
-    """Test session size for empty directory."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-
-    assert get_session_size(session_dir) == 0
+@pytest.mark.parametrize(
+    "files,expected_size",
+    [
+        ({"a.jsonl": "x" * 100, "b.jsonl": "y" * 200}, 300),
+        ({}, 0),
+    ],
+    ids=["with_files", "empty_dir"],
+)
+def test_get_session_size(session_dir, files, expected_size):
+    """Test calculating total session size in various scenarios."""
+    for name, content in files.items():
+        (session_dir / name).write_text(content)
+    assert get_session_size(session_dir) == expected_size
 
 
 def test_get_session_size_nonexistent_dir(tmp_path):
@@ -173,50 +162,43 @@ def test_get_session_size_nonexistent_dir(tmp_path):
     assert get_session_size(tmp_path / "nonexistent") == 0
 
 
-def test_get_session_size_permission_error(tmp_path):
+def test_get_session_size_permission_error(session_dir):
     """Test handling permission errors."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-
     with patch.object(Path, "glob", side_effect=PermissionError):
         assert get_session_size(session_dir) == 0
 
 
 # ============================================================================
-# get_last_session_time() tests
+# get_last_session_time() tests — parametrized
 # ============================================================================
 
 
-def test_get_last_session_time_with_files(tmp_path):
+def test_get_last_session_time_with_files(session_dir):
     """Test getting last session modification time."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
     (session_dir / "old.jsonl").write_text("{}")
     (session_dir / "new.jsonl").write_text("{}")
-
     result = get_last_session_time(session_dir)
     assert result is not None
     assert isinstance(result, datetime)
 
 
-def test_get_last_session_time_empty_dir(tmp_path):
-    """Test last session time for empty directory."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
+@pytest.mark.parametrize(
+    "dir_exists",
+    [True, False],
+    ids=["empty_dir", "nonexistent_dir"],
+)
+def test_get_last_session_time_returns_none(tmp_path, dir_exists):
+    """Test last session time returns None for empty or missing directory."""
+    if dir_exists:
+        target = tmp_path / "sessions"
+        target.mkdir()
+    else:
+        target = tmp_path / "nonexistent"
+    assert get_last_session_time(target) is None
 
-    assert get_last_session_time(session_dir) is None
 
-
-def test_get_last_session_time_nonexistent_dir(tmp_path):
-    """Test last session time when directory doesn't exist."""
-    assert get_last_session_time(tmp_path / "nonexistent") is None
-
-
-def test_get_last_session_time_permission_error(tmp_path):
+def test_get_last_session_time_permission_error(session_dir):
     """Test handling permission errors."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-
     with patch.object(Path, "glob", side_effect=PermissionError):
         assert get_last_session_time(session_dir) is None
 

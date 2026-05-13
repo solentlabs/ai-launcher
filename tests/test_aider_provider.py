@@ -17,16 +17,6 @@ def provider():
     return AiderProvider()
 
 
-@pytest.fixture
-def cleanup_config():
-    return CleanupConfig(
-        enabled=True,
-        clean_provider_files=True,
-        clean_system_cache=False,
-        clean_npm_cache=False,
-    )
-
-
 class TestAiderMetadata:
     """Tests for Aider provider metadata."""
 

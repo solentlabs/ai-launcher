@@ -18,6 +18,7 @@ from ai_launcher.core.provider_data import (
     MarketplacePlugin,
     MemoryFile,
     ProviderPreviewData,
+    SessionConfig,
     SessionStats,
 )
 from ai_launcher.ui.formatter import PreviewFormatter
@@ -741,46 +742,125 @@ class TestPluginsSection:
 
 
 class TestSessionConfigFormatting:
-    """Tests for _format_session_config_section."""
+    """Tests for _format_session_config_section with permission transparency."""
 
     @pytest.fixture
     def formatter(self):
         return PreviewFormatter()
 
-    def test_permissions_shown(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
+    # --- Project permissions ---
 
+    def test_project_broad_bash_shown_compactly(self, formatter):
+        """When project has Bash(*), show compact label instead of count."""
+        config = SessionConfig(
+            permissions_count=1,
+            permissions=["Bash(*)"],
+            has_broad_bash=True,
+        )
+        result = formatter._format_session_config_section(config)
+        assert "Bash(*) (project)" in result
+        assert "1 auto-approved" not in result
+
+    def test_project_narrow_permissions_shown_with_count(self, formatter):
+        """Narrow project permissions show count and examples."""
         config = SessionConfig(
             permissions_count=3,
             permissions=["Bash(npm test)", "Bash(git status)", "Bash(make build)"],
         )
         result = formatter._format_session_config_section(config)
-        assert "3 auto-approved commands" in result
+        assert "3 auto-approved commands (project)" in result
         assert "npm test" in result
         assert "git status" in result
 
-    def test_permissions_truncated_over_5(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
+    def test_project_permissions_truncated_over_5(self, formatter):
+        """More than 5 project permissions shows '...and N more'."""
         perms = [f"Bash(cmd{i})" for i in range(8)]
         config = SessionConfig(permissions_count=8, permissions=perms)
         result = formatter._format_session_config_section(config)
-        assert "8 auto-approved commands" in result
+        assert "8 auto-approved commands (project)" in result
         assert "cmd0" in result
         assert "cmd4" in result
         assert "and 3 more" in result
 
     def test_long_permission_truncated(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
+        """Very long permission patterns are truncated with ellipsis."""
         long_perm = "Bash(" + "x" * 70 + ")"
         config = SessionConfig(permissions_count=1, permissions=[long_perm])
         result = formatter._format_session_config_section(config)
         assert "..." in result
 
-    def test_mcp_servers(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
+    # --- Global permissions ---
 
+    def test_global_broad_bash_shown(self, formatter):
+        """Global Bash(*) shows compact label with count of extras."""
+        config = SessionConfig(
+            global_permissions=["Bash(*)", "Read", "Edit", "Write"],
+            global_permissions_count=4,
+            has_broad_bash=True,
+        )
+        result = formatter._format_session_config_section(config)
+        assert "Bash(*) + 3 more (global)" in result
+
+    def test_global_narrow_permissions_shown(self, formatter):
+        """Global narrow permissions show count."""
+        config = SessionConfig(
+            global_permissions=["Read", "Edit", "Write"],
+            global_permissions_count=3,
+        )
+        result = formatter._format_session_config_section(config)
+        assert "3 auto-approved commands (global)" in result
+
+    # --- Ask/Deny rules ---
+
+    def test_ask_rules_shown(self, formatter):
+        """Ask rules display readable command names."""
+        config = SessionConfig(
+            global_ask=["Bash(git commit:*)", "Bash(git push:*)", "Bash(gh:*)"],
+        )
+        result = formatter._format_session_config_section(config)
+        assert "Ask before:" in result
+        assert "git commit" in result
+        assert "git push" in result
+        assert "gh" in result
+
+    def test_deny_rules_shown(self, formatter):
+        """Deny rules display readable command names."""
+        config = SessionConfig(
+            global_deny=["Bash(rm -rf:*)"],
+        )
+        result = formatter._format_session_config_section(config)
+        assert "Denied:" in result
+        assert "rm -rf" in result
+
+    # --- Warnings ---
+
+    def test_warnings_shown(self, formatter):
+        """Permission warnings are displayed prominently."""
+        config = SessionConfig(
+            permission_warnings=["15 accumulated Bash patterns — use Bash(*)"],
+        )
+        result = formatter._format_session_config_section(config)
+        assert "15 accumulated" in result
+
+    def test_recommendations_shown_with_warnings(self, formatter):
+        """Fix recommendations are displayed alongside warnings."""
+        config = SessionConfig(
+            permission_warnings=["10 accumulated patterns"],
+            permission_recommendations=["Set Bash(*) in .claude/settings.local.json"],
+        )
+        result = formatter._format_session_config_section(config)
+        assert "Bash(*)" in result
+        assert "Set" in result
+
+    def test_no_recommendations_without_warnings(self, formatter):
+        """No recommendations shown when there are no warnings."""
+        config = SessionConfig()
+        result = formatter._format_session_config_section(config)
+        assert "Fix:" not in result
+
+    # --- Other fields (unchanged behavior) ---
+
+    def test_mcp_servers(self, formatter):
         config = SessionConfig(mcp_servers=["github", "linear"])
         result = formatter._format_session_config_section(config)
         assert "MCP Servers" in result
@@ -788,29 +868,21 @@ class TestSessionConfigFormatting:
         assert "linear" in result
 
     def test_mcp_servers_truncated(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
         config = SessionConfig(mcp_servers=["s1", "s2", "s3", "s4", "s5"])
         result = formatter._format_session_config_section(config)
         assert "+2 more" in result
 
     def test_hooks_configured(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
         config = SessionConfig(hooks_configured=True)
         result = formatter._format_session_config_section(config)
         assert "Hooks: Configured" in result
 
     def test_model_shown(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
         config = SessionConfig(model="opus")
         result = formatter._format_session_config_section(config)
         assert "Model: opus" in result
 
     def test_config_file_path_relative_to_home(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
         home = Path.home()
         config = SessionConfig(config_file_path=str(home / ".claude" / "settings.json"))
         result = formatter._format_session_config_section(config)
@@ -818,18 +890,13 @@ class TestSessionConfigFormatting:
         assert "~/" in result
 
     def test_config_file_path_absolute(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
         config = SessionConfig(config_file_path="/etc/ai-launcher/config.json")
         result = formatter._format_session_config_section(config)
         assert "Source:" in result
-        # Path separator varies by platform
         assert "ai-launcher" in result
         assert "config.json" in result
 
     def test_empty_config(self, formatter):
-        from ai_launcher.core.provider_data import SessionConfig
-
         config = SessionConfig()
         result = formatter._format_session_config_section(config)
         assert "Session Configuration" in result

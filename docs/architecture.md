@@ -513,6 +513,73 @@ tests/
 
 ---
 
+## Permission Transparency Layer
+
+### Problem
+
+Claude Code's three-layer permission system accumulates narrow auto-approved patterns when users click "allow" on command prompts. These exact-match patterns (e.g., `Bash(python3 -m pytest tests/ -v)`) never match again with different arguments, causing persistent permission prompts. Users have no visibility into their effective permissions across layers.
+
+### Where It Sits in the Stack
+
+```
+┌─────────────────────────────────────────────────────┐
+│  CLI Layer (cli.py)                                 │
+│  --check-permissions flag → permissions_report.py   │
+├─────────────────────────────────────────────────────┤
+│  Presentation Layer (formatter.py, startup_report)  │
+│  Formats SessionConfig → warnings, counts, status   │
+├─────────────────────────────────────────────────────┤
+│  Data Transport (provider_data.py)                  │
+│  SessionConfig carries data + diagnostics           │
+├─────────────────────────────────────────────────────┤
+│  Analysis Layer (claude.py)                         │
+│  _analyze_permissions() → warnings, recommendations │
+├─────────────────────────────────────────────────────┤
+│  Settings Files (read-only)                         │
+│  <project>/.claude/settings.local.json              │
+│  ~/.claude/settings.json                            │
+│  ~/.claude/settings.local.json                      │
+└─────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+```
+Settings files → _get_claude_session_config() → _analyze_permissions()
+                                                       │
+                                                       ↓
+                                                 SessionConfig
+                                                (data + diagnostics)
+                                                 /     |     \
+                                                /      |      \
+                                               ↓       ↓       ↓
+                                          formatter  startup  permissions
+                                           (pane)    (box)    (--check)
+```
+
+### SessionConfig as Data + Diagnostics Carrier
+
+`SessionConfig` (in `provider_data.py`) carries both raw data and analyzed results:
+
+- **Raw data**: `permissions`, `global_permissions`, `global_deny`, `global_ask`, `mcp_servers`, `hooks_configured`, `model`
+- **Diagnostics**: `permission_warnings`, `permission_recommendations`, `has_broad_bash`
+- **Provenance**: `config_file_path`, `global_config_file_path`
+
+The analysis runs once in `_get_claude_session_config()`. Presentation layers read the pre-computed diagnostics — they never re-analyze.
+
+### Why the Analysis Lives in `claude.py`
+
+Permission accumulation is Claude Code-specific. Other providers don't have:
+- A three-layer settings hierarchy
+- Auto-approved pattern accumulation
+- Ask/deny override semantics
+
+Putting the analysis in `claude.py` (the provider module) keeps it co-located with the settings file reading logic and avoids polluting the core or presentation layers with Claude-specific knowledge. Non-Claude providers return `SessionConfig` with empty diagnostic fields.
+
+See [Permission Transparency](permission-transparency.md) for the full feature specification.
+
+---
+
 ## Future Architecture
 
 ### Multi-Tool Support
@@ -582,5 +649,5 @@ for plugin in plugins:
 
 ---
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-03-25
 **Status:** Living document, will evolve with project

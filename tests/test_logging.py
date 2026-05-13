@@ -2,6 +2,8 @@
 
 import logging
 
+import pytest
+
 from ai_launcher.utils.logging import get_logger, setup_logging
 
 
@@ -55,13 +57,16 @@ def test_get_logger():
     assert logger1.name == "ai_launcher"
 
 
-def test_logging_levels():
-    """Test different logging levels."""
-    # Test each level can be set
-    for level_name in ["DEBUG", "INFO", "WARNING", "ERROR"]:
-        logger = setup_logging(level=level_name)
-        expected_level = getattr(logging, level_name)
-        assert logger.level == expected_level
+@pytest.mark.parametrize(
+    "level_name",
+    ["DEBUG", "INFO", "WARNING", "ERROR"],
+    ids=["debug", "info", "warning", "error"],
+)
+def test_logging_levels(level_name):
+    """Test that each logging level can be set correctly."""
+    logger = setup_logging(level=level_name)
+    expected_level = getattr(logging, level_name)
+    assert logger.level == expected_level
 
 
 def test_invalid_log_level():

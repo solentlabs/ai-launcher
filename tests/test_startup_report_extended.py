@@ -244,7 +244,7 @@ class TestDisplayLaunchInfo:
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
         captured = capsys.readouterr()
-        assert "No pre-approved permissions" in captured.out
+        assert "No project permissions" in captured.out
         assert "No MCP servers" in captured.out
         assert "No hooks" in captured.out
         assert "default (sonnet)" in captured.out
@@ -254,7 +254,8 @@ class TestDisplayLaunchInfo:
         provider = self._make_provider(preview_data=data)
         display_launch_info(tmp_path, provider, verbose=True)
         captured = capsys.readouterr()
-        assert "No pre-approved permissions" in captured.out
+        assert "No permissions configured" in captured.out
+        assert "Bash(*)" in captured.out
 
     def test_verbose_memory_info(self, tmp_path, capsys):
         memory = MemoryInfo(
