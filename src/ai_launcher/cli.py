@@ -65,6 +65,7 @@ def _run_launcher(
     clean_npm: bool = False,
     global_files: Optional[str] = None,
     manual_paths: Optional[str] = None,
+    check_permissions: bool = False,
 ) -> None:
     """Internal function to run the launcher with specified provider."""
 
@@ -175,6 +176,13 @@ def _run_launcher(
     # Handle --list (no fzf needed)
     if list_projects:
         show_project_list(all_projects)
+        sys.exit(0)
+
+    # Handle --check-permissions (no fzf needed — reads settings files only)
+    if check_permissions:
+        from ai_launcher.ui.permissions_report import check_project_permissions
+
+        check_project_permissions(all_projects, provider_name)
         sys.exit(0)
 
     # All remaining code paths require fzf — ensure it's available
@@ -288,6 +296,11 @@ def claude(
         False, "--discover", "-d", help="Show discovery report"
     ),
     context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
+    check_permissions: bool = typer.Option(
+        False,
+        "--check-permissions",
+        help="Check permission health for all discovered projects",
+    ),
     # Configuration options
     cleanup: bool = typer.Option(
         False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
@@ -318,6 +331,7 @@ def claude(
         ai-launcher claude ~/projects/solentlabs
         ai-launcher claude ~/projects --global-files ~/.claude/RULES.md
         ai-launcher claude ~/projects --cleanup --clean-cache
+        ai-launcher claude ~/projects --check-permissions
     """
     # Just call main() with provider forced to claude-code
     _run_launcher(
@@ -334,6 +348,7 @@ def claude(
         clean_npm,
         global_files,
         manual_paths,
+        check_permissions,
     )
 
 

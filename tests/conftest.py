@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from ai_launcher.core.models import CleanupConfig
+
 
 @pytest.fixture
 def mock_home(tmp_path, monkeypatch):
@@ -35,3 +37,14 @@ def tmp_project_dir(tmp_path):
     (tmp_path / ".cache" / "stuff").mkdir(parents=True)
 
     return tmp_path
+
+
+@pytest.fixture
+def cleanup_config():
+    """Standard cleanup config for provider tests."""
+    return CleanupConfig(
+        enabled=True,
+        clean_provider_files=True,
+        clean_system_cache=False,
+        clean_npm_cache=False,
+    )

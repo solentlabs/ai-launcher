@@ -76,6 +76,21 @@ def test_discover(tmp_path):
     assert "Traceback" not in result.output
 
 
+def test_check_permissions_flag(tmp_path):
+    """--check-permissions runs the permission report and exits cleanly."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / ".git").mkdir()
+
+    result = runner.invoke(app, ["claude", str(tmp_path), "--check-permissions"])
+    assert result.exit_code in (0, 1)
+    assert "Traceback" not in result.output
+    # The permission report prints this header regardless of whether projects
+    # have settings — guards against regressing the wiring between the CLI
+    # flag and ui.permissions_report.check_project_permissions.
+    assert "Permission Health Check" in result.output
+
+
 def test_global_files_parsing(tmp_path):
     """Test --global-files are parsed and passed to config."""
     proj = tmp_path / "proj"

@@ -1,0 +1,30 @@
+{
+  "default": true,
+
+  // Line length — capped at 100 (Python ruff uses 88, prose wraps
+  // comfortably at 100). Tables are exempt structurally: a markdown table
+  // row must fit on one line, so a long cell can't be wrapped without
+  // breaking the table. Code blocks remain subject to the rule — long
+  // lines there are content debt and should be split (`\` continuation
+  // for shell, line breaks in Python, etc.).
+  "MD013": {
+    "line_length": 100,
+    "tables": false,
+    "code_blocks": true
+  },
+
+  // Duplicate headings — allowed when they are siblings of different parents.
+  // Required by Keep-a-Changelog format: every version section has its own
+  // "### Added" / "### Changed" / "### Fixed" subsections.
+  "MD024": {
+    "siblings_only": true
+  },
+
+  // Raw HTML — explicit allowlist of tags actually used in our docs.
+  // Adding here requires a real need; not preemptively widened.
+  //   img/p/br/em/div/a — README badges, screenshots, captions
+  //   details/summary/strong — README collapsible "What's it doing?" sections
+  "MD033": {
+    "allowed_elements": ["img", "p", "br", "em", "div", "a", "details", "summary", "strong"]
+  }
+}

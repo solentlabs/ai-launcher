@@ -245,13 +245,30 @@ class DirectoryListing:
 class SessionConfig:
     """Session configuration data.
 
+    NOTE: Currently Claude Code-specific. Other providers don't have a
+    permission system that accumulates patterns, so these fields stay
+    at their defaults (empty lists, False, None) for non-Claude providers.
+
+    The project/global split matters because Claude Code resolves permissions
+    from multiple files. A user might have Bash(*) globally but their project
+    file has 100+ narrow patterns from clicking "allow" on prompts. This
+    dataclass carries both layers so the UI can surface the mismatch.
+
     Attributes:
-        permissions: List of auto-approved command patterns
-        permissions_count: Number of auto-approved permissions
+        permissions: List of project-level auto-approved command patterns
+        permissions_count: Number of project-level auto-approved permissions
         mcp_servers: List of configured MCP server names
         hooks_configured: Whether hooks are configured
         model: Model selection from settings
-        config_file_path: Path to the config file (for transparency)
+        config_file_path: Path to the project config file (for transparency)
+        global_permissions: List of global-level auto-approved command patterns
+        global_permissions_count: Number of global-level auto-approved permissions
+        global_deny: List of globally denied command patterns
+        global_ask: List of commands requiring confirmation (override allow)
+        permission_warnings: Diagnostic warnings about permission health
+        permission_recommendations: Actionable fix commands for detected issues
+        has_broad_bash: Whether Bash(*) is in effective allow list
+        global_config_file_path: Path to the global config file read
     """
 
     permissions: List[str] = field(default_factory=list)
@@ -260,3 +277,11 @@ class SessionConfig:
     hooks_configured: bool = False
     model: Optional[str] = None
     config_file_path: Optional[str] = None
+    global_permissions: List[str] = field(default_factory=list)
+    global_permissions_count: int = 0
+    global_deny: List[str] = field(default_factory=list)
+    global_ask: List[str] = field(default_factory=list)
+    permission_warnings: List[str] = field(default_factory=list)
+    permission_recommendations: List[str] = field(default_factory=list)
+    has_broad_bash: bool = False
+    global_config_file_path: Optional[str] = None

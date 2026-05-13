@@ -92,6 +92,7 @@ py -m pip show ai-launcher
 ### No projects found
 
 **Causes:**
+
 1. No scan paths provided on the command line
 2. Paths don't contain git repositories
 3. Permissions issue
@@ -139,18 +140,22 @@ cp projects.db.backup.TIMESTAMP projects.db
 
 **Symptom:** Warnings about unreadable directories.
 
-**Fix:** These are automatically skipped. Directories like `node_modules`, `.cache`, and `venv` are pruned by default. No configuration needed.
+**Fix:** These are automatically skipped. Directories like `node_modules`, `.cache`, and `venv` are
+pruned by default. No configuration needed.
 
 ## Terminal Title Issues
 
-AI Launcher automatically sets the terminal window title (e.g., `my-app → Claude Code`) when launching a project. This works on most modern terminals including xterm, iTerm2, GNOME Terminal, Windows Terminal, tmux, and VS Code. Basic CMD.exe on Windows is not supported.
+AI Launcher automatically sets the terminal window title (e.g., `my-app → Claude Code`) when
+launching a project. This works on most modern terminals including xterm, iTerm2, GNOME Terminal,
+Windows Terminal, tmux, and VS Code. Basic CMD.exe on Windows is not supported.
 
 ### Terminal title not changing?
 
-1. **Check if your terminal supports title setting:**
-   Most modern terminals do, but some minimal terminals don't.
+1. **Check if your terminal supports title setting:** Most modern terminals do, but some minimal
+   terminals don't.
 
 2. **Try setting TERM environment variable:**
+
    ```bash
    export TERM=xterm-256color
    ai-launcher claude ~/projects
@@ -158,9 +163,11 @@ AI Launcher automatically sets the terminal window title (e.g., `my-app → Clau
 
 ### Terminal title persists after closing AI tool?
 
-This is normal. Most terminals keep the last set title until the window is closed or another program sets a new title.
+This is normal. Most terminals keep the last set title until the window is closed or another program
+sets a new title.
 
 To manually clear the title:
+
 ```bash
 echo -ne "\033]0;\007"
 ```
@@ -170,17 +177,20 @@ echo -ne "\033]0;\007"
 ### Profile doesn't launch
 
 1. **Verify WSL:**
+
    ```powershell
    wsl --list
    ```
 
 2. **Test command:**
+
    ```powershell
    wsl.exe -d Ubuntu bash -lic 'ai-launcher --version'
    ```
 
 3. **Check terminal settings path:**
-   ```
+
+   ```text
    %LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json
    ```
 
@@ -228,11 +238,13 @@ ls -lh ~/.local/share/ai-launcher/projects.db
 
 If issues persist:
 
-1. **Check GitHub Issues:** https://github.com/solentlabs/ai-launcher/issues
+1. **Check GitHub Issues:** <https://github.com/solentlabs/ai-launcher/issues>
 2. **Enable verbose logging:**
+
    ```bash
    ai-launcher claude --verbose ~/projects
    ```
+
 3. **Report bug with:**
    - OS and version
    - Python version (`python3 --version` or `py --version`)

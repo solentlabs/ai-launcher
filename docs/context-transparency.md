@@ -2,43 +2,51 @@
 
 ## Overview
 
-When Claude Code starts a session, it loads context from **multiple sources**. The AI Launcher's **Startup Report** feature makes this process transparent, helping users understand exactly what Claude knows about their project and how to optimize their experience.
+When Claude Code starts a session, it loads context from **multiple sources**. The AI Launcher's
+**Startup Report** feature makes this process transparent, helping users understand exactly what
+Claude knows about their project and how to optimize their experience.
 
 ## Context Sources
 
 ### 1. Project Instructions (CLAUDE.md)
-**Location:** `<project-root>/CLAUDE.md`
-**Purpose:** Project-specific rules, architecture, and development conventions
-**Always loaded:** ✅ Yes, if present
-**Official docs:** https://code.claude.com/docs/en/claude-md
+
+**Location:** `<project-root>/CLAUDE.md` **Purpose:** Project-specific rules, architecture, and
+development conventions **Always loaded:** ✅ Yes, if present **Official docs:**
+<https://code.claude.com/docs/en/claude-md>
 
 **What it is:**
+
 - Instructions **you write** for Claude
 - Project-specific rules and patterns
 - Architecture decisions and conventions
 - Links to other documentation
 
 **Best practices:**
+
 - Keep it concise (under 500 lines)
 - Move detailed docs to separate files
 - Use it for "rules" not "knowledge"
 - Link to other context files
 
 **Example:**
+
 ```markdown
 # My Project - Claude Guide
 
 ## Code Style
+
 - Use TypeScript strict mode
 - Prefer functional components (React)
 - Test coverage minimum: 80%
 
 ## Architecture
+
 - API: `/src/api` (Express)
 - Frontend: `/src/components` (React)
 - Database: PostgreSQL with Prisma ORM
 
 ## See also
+
 - [API Documentation](docs/API.md)
 - [Database Schema](docs/SCHEMA.md)
 ```
@@ -46,12 +54,13 @@ When Claude Code starts a session, it loads context from **multiple sources**. T
 ---
 
 ### 2. Auto Memory (MEMORY.md)
-**Location:** `~/.claude/projects/<encoded-project-path>/memory/MEMORY.md`
-**Purpose:** Claude's persistent learnings across sessions
-**Always loaded:** ✅ Yes (first 200 lines only)
-**Official docs:** https://code.claude.com/docs/en/memory
+
+**Location:** `~/.claude/projects/<encoded-project-path>/memory/MEMORY.md` **Purpose:** Claude's
+persistent learnings across sessions **Always loaded:** ✅ Yes (first 200 lines only) **Official
+docs:** <https://code.claude.com/docs/en/memory>
 
 **What it is:**
+
 - Notes **Claude writes** for itself
 - Bugs encountered and fixes applied
 - Project patterns discovered
@@ -59,12 +68,14 @@ When Claude Code starts a session, it loads context from **multiple sources**. T
 - Commands that work
 
 **Path encoding:**
+
 - `/home/user/my_project` → `-home-user-my-project`
 - Both `/` and `_` convert to `-`
 - Example: `/home/kwschulz/projects/solentlabs/network-monitoring/cable_modem_monitor`
   - Becomes: `-home-kwschulz-projects-solentlabs-network-monitoring-cable-modem-monitor`
 
 **The 200-line limit:**
+
 - Only first 200 lines load into Claude's context
 - Keep MEMORY.md as an **index**
 - Move detailed notes to topic files:
@@ -73,32 +84,39 @@ When Claude Code starts a session, it loads context from **multiple sources**. T
   - `gotchas.md` - common mistakes
 
 **Best practices:**
+
 - Let Claude manage it automatically
-- Tell Claude to remember things: *"Remember we use pytest for testing"*
+- Tell Claude to remember things: _"Remember we use pytest for testing"_
 - Review periodically and remove outdated info
 - Create topic files when approaching 200 lines
 
 **Example MEMORY.md:**
+
 ```markdown
 # My Project - Auto Memory
 
 ## Bug #42: Race condition in API endpoint (2026-02-01)
+
 Fixed by adding mutex lock. See `patterns.md#concurrency` for details.
 
 ## Testing
+
 - Always run `npm test` before pushing
 - Integration tests require Docker running
 - Coverage minimum: 80%
 
 ## Database
+
 - Use migrations for schema changes: `npm run migrate`
 - Never edit schema.prisma directly in production
 
 ## Deployment
+
 - Staging: `npm run deploy:staging`
 - Production requires manual approval
 
 See also:
+
 - [Debugging Guide](debugging.md)
 - [Common Patterns](patterns.md)
 ```
@@ -106,17 +124,18 @@ See also:
 ---
 
 ### 3. Global Settings
-**Location:** `~/.claude/settings.json`
-**Purpose:** Global Claude preferences (model selection, features)
-**Always loaded:** ✅ Yes
-**Official docs:** https://code.claude.com/docs/en/settings
+
+**Location:** `~/.claude/settings.json` **Purpose:** Global Claude preferences (model selection,
+features) **Always loaded:** ✅ Yes **Official docs:** <https://code.claude.com/docs/en/settings>
 
 **What it is:**
+
 - Your global Claude Code preferences
 - Model selection (sonnet/opus/haiku)
 - Feature flags
 
 **Example:**
+
 ```json
 {
   "model": "sonnet",
@@ -127,17 +146,19 @@ See also:
 ---
 
 ### 4. Project Settings Override
-**Location:** `<project-root>/.claude/settings.local.json`
-**Purpose:** Override global settings for specific projects
-**Always loaded:** ✅ Yes, if present
-**Official docs:** https://code.claude.com/docs/en/settings
+
+**Location:** `<project-root>/.claude/settings.local.json` **Purpose:** Override global settings for
+specific projects **Always loaded:** ✅ Yes, if present **Official docs:**
+<https://code.claude.com/docs/en/settings>
 
 **What it is:**
+
 - Project-specific setting overrides
 - Can override model, features, etc.
 - Takes precedence over global settings
 
 **Example:**
+
 ```json
 {
   "model": "opus",
@@ -146,6 +167,7 @@ See also:
 ```
 
 **When to use:**
+
 - Large codebases (use Opus)
 - Simple projects (use Haiku for speed)
 - Projects with specific requirements
@@ -153,12 +175,12 @@ See also:
 ---
 
 ### 5. Git Context
-**Location:** `<project-root>/.git/`
-**Purpose:** Branch name, git status, recent commits
-**Always loaded:** ✅ Yes, if git repo
-**Official docs:** https://git-scm.com/doc
+
+**Location:** `<project-root>/.git/` **Purpose:** Branch name, git status, recent commits **Always
+loaded:** ✅ Yes, if git repo **Official docs:** <https://git-scm.com/doc>
 
 **What Claude sees:**
+
 - Current branch name
 - Modified/staged files
 - Recent commit messages
@@ -166,18 +188,56 @@ See also:
 
 ---
 
+### 6. Permission Health
+
+**Location:** Analyzed from all three settings layers (see below) **Purpose:** Detect accumulated
+permission patterns that cause random prompts **Always loaded:** ✅ Yes, for Claude Code **Full
+docs:** [Permission Transparency](permission-transparency.md)
+
+**What it checks:**
+
+- Project-level patterns in `<project>/.claude/settings.local.json`
+- Global rules in `~/.claude/settings.json` and `~/.claude/settings.local.json`
+- Whether narrow patterns are redundant with global `Bash(*)`
+- Ask/deny gates that override allow rules
+
+**Why it matters:** Claude Code accumulates exact command strings as permission patterns each time
+you click "allow." Over time, the settings file grows to 100+ patterns that never match again,
+causing persistent prompts. AI Launcher detects this before launch and recommends the fix.
+
+**Example warning in the startup box:**
+
+```text
+│   ⚠ 18 redundant patterns — global has Bash(*)
+│   💡 Set Bash(*) in .claude/settings.local.json
+```
+
+**CLI diagnostic:**
+
+```bash
+ai-launcher claude ~/projects --check-permissions
+```
+
+See [Permission Transparency](permission-transparency.md) for the full feature spec and
+[Permission Health Use Cases](use-cases/permission-health.md) for real-world scenarios.
+
+---
+
 ## AI Launcher Integration
 
 ### The Startup Report Feature
 
-The AI Launcher provides transparency into what context is loaded when you start a Claude Code session.
+The AI Launcher provides transparency into what context is loaded when you start a Claude Code
+session.
 
 #### Startup Report
 
-When you select a project, AI Launcher automatically displays a context summary before launching Claude Code.
+When you select a project, AI Launcher automatically displays a context summary before launching
+Claude Code.
 
 **Example output:**
-```
+
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │  Claude Code Startup Context Report                            │
 │  Transparency: What Context is Claude Loading?                 │
@@ -245,7 +305,7 @@ When you select a project, AI Launcher automatically displays a context summary 
 
 A compact summary is also shown at launch:
 
-```
+```text
 ═══════════════════════════════════════════════════════════════
   CONTEXT LOADED FOR THIS SESSION
 ═══════════════════════════════════════════════════════════════
@@ -263,7 +323,9 @@ A compact summary is also shown at launch:
 ## Tips for Maximizing Your Experience
 
 ### 1. Start with CLAUDE.md
+
 Create a basic project guide:
+
 ```bash
 # In your project root
 cat > CLAUDE.md << 'EOF'
@@ -290,16 +352,19 @@ EOF
 ```
 
 ### 2. Let Auto Memory Grow Naturally
+
 Don't manually edit MEMORY.md. Instead, tell Claude to remember things:
 
 **During a session:**
-```
+
+```text
 You: "Remember that we always run 'npm test' before pushing"
 Claude: "I'll remember that..."
 # Claude adds it to MEMORY.md automatically
 ```
 
 ### 3. Use Project Settings for Special Cases
+
 Override model for specific projects:
 
 ```bash
@@ -322,7 +387,9 @@ EOF
 ```
 
 ### 4. Review Auto Memory Periodically
+
 Check what Claude has learned:
+
 ```bash
 # View your auto memory
 cat ~/.claude/projects/-home-user-my-app/memory/MEMORY.md
@@ -333,7 +400,9 @@ cat ~/.claude/projects/-home-user-my-app/memory/MEMORY.md
 
 ### 5. Review Context Before Important Work
 
-Launch AI Launcher and review the startup report to verify context is loaded correctly before starting critical work:
+Launch AI Launcher and review the startup report to verify context is loaded correctly before
+starting critical work:
+
 ```bash
 ai-launcher claude ~/projects
 ```
@@ -343,23 +412,30 @@ ai-launcher claude ~/projects
 ## Official Documentation Links
 
 ### Claude Code Documentation
-- **Main docs:** https://code.claude.com/docs
-- **CLAUDE.md guide:** https://code.claude.com/docs/en/claude-md
-- **Auto memory:** https://code.claude.com/docs/en/memory
-- **Settings:** https://code.claude.com/docs/en/settings
-- **Setup guide:** https://code.claude.com/docs/en/setup
+
+- **Main docs:** <https://code.claude.com/docs>
+- **CLAUDE.md guide:** <https://code.claude.com/docs/en/claude-md>
+- **Auto memory:** <https://code.claude.com/docs/en/memory>
+- **Settings:** <https://code.claude.com/docs/en/settings>
+- **Setup guide:** <https://code.claude.com/docs/en/setup>
 
 ### Community Resources
-- **Persistent Memory Guide:** https://agentnativedev.medium.com/persistent-memory-for-claude-code-never-lose-context-setup-guide-2cb6c7f92c58
-- **Memory Deep Dive:** https://therealjasoncoleman.com/2026/02/05/giving-claude-code-a-memory-and-a-soul-with-automem/
-- **Claude API Memory Tool:** https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool
+
+- **Persistent Memory Guide:**
+  <https://agentnativedev.medium.com/persistent-memory-for-claude-code-never-lose-context-setup-guide-2cb6c7f92c58>
+- **Memory Deep Dive:**
+  <https://therealjasoncoleman.com/2026/02/05/giving-claude-code-a-memory-and-a-soul-with-automem/>
+- **Claude API Memory Tool:**
+  <https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool>
 
 ---
 
 ## FAQ
 
 ### Q: Why doesn't Claude remember things from previous sessions?
+
 **A:** Check if auto memory is enabled:
+
 ```bash
 # Enable auto memory
 export CLAUDE_CODE_DISABLE_AUTO_MEMORY=0
@@ -369,32 +445,43 @@ ls -la ~/.claude/projects/-*/memory/MEMORY.md
 ```
 
 ### Q: My MEMORY.md is over 200 lines. What now?
+
 **A:** Only the first 200 lines load automatically. Options:
+
 1. Keep MEMORY.md as an index with links to topic files
-2. Ask Claude to reorganize: *"Move detailed notes to topic files"*
+2. Ask Claude to reorganize: _"Move detailed notes to topic files"_
 3. Review and remove outdated entries
 
 ### Q: Should I manually edit MEMORY.md?
+
 **A:** You can, but it's better to let Claude manage it. Tell Claude what to remember:
-- *"Remember that tests require Docker running"*
-- *"Save to memory: API key is in .env.local"*
+
+- _"Remember that tests require Docker running"_
+- _"Save to memory: API key is in .env.local"_
 
 ### Q: Can I have different CLAUDE.md files for different branches?
-**A:** No, CLAUDE.md is checked into git and shared across branches. Use comments for branch-specific info:
+
+**A:** No, CLAUDE.md is checked into git and shared across branches. Use comments for
+branch-specific info:
+
 ```markdown
 ## Branch-Specific Notes
+
 - `main` branch: Production-ready code
 - `develop` branch: Integration testing
 - `feature/*` branches: Experimental features
 ```
 
 ### Q: How do I share auto memory across my team?
+
 **A:** Auto memory is **local-only** by design (privacy-first). To share knowledge:
+
 1. Use CLAUDE.md (checked into git)
 2. Convert important memories to documentation
 3. Use shared context (see Layered Context Architecture in CLAUDE.md)
 
 ### Q: What's the difference between CLAUDE.md and MEMORY.md?
+
 - **CLAUDE.md:** Instructions **you write** for Claude (project rules)
 - **MEMORY.md:** Notes **Claude writes** for itself (lessons learned)
 
@@ -412,4 +499,5 @@ Think of CLAUDE.md as "the manual" and MEMORY.md as "the journal".
 
 ---
 
-**Made by Solent Labs™** - Building tools for developers who value transparency and local-first software.
+**Made by Solent Labs™** - Building tools for developers who value transparency and local-first
+software.

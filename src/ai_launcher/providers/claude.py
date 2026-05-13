@@ -721,11 +721,123 @@ def _discover_claude_context_files() -> Optional["GlobalFiles"]:
     )
 
 
+def _analyze_permissions(
+    project_permissions: List[str],
+    global_permissions: List[str],
+) -> tuple:
+    """Analyze permissions and generate diagnostic warnings + fix recommendations.
+
+    Claude Code's permission system has a pattern-accumulation problem:
+    each time a user approves a command prompt, an individual pattern like
+    ``Bash(python3 -m pytest tests/ -v --tb=short)`` is appended to the
+    project's ``.claude/settings.local.json``. Over time, this file can
+    grow to 100+ narrow patterns. Any command that doesn't exactly match
+    one of those patterns will still trigger a prompt — making the user
+    think permissions are broken when the real issue is that the file
+    never had ``Bash(*)`` in the first place.
+
+    This function inspects both project-level and global-level permission
+    lists and surfaces actionable warnings so users can fix their config
+    *before* launching a session.
+
+    Detected issues:
+    - Accumulated narrow patterns (>10 individual Bash rules without Bash(*))
+    - Redundant project permissions when global already has Bash(*)
+    - Very long patterns (>120 chars) that suggest accidental approvals
+      of full commands rather than intentional wildcard rules
+
+    Note on deny/ask rules: the caller carries these on ``SessionConfig``
+    and the formatter renders them in the launch box. This function does
+    not inspect them — deny rules are enforced by Claude Code itself, and
+    ask rules are intentional safety gates rather than diagnostic targets.
+
+    Args:
+        project_permissions: Allow list from project settings.local.json
+        global_permissions: Merged allow list from global settings
+
+    Returns:
+        Tuple of (warnings list, recommendations list, has_broad_bash boolean)
+    """
+    warnings: List[str] = []
+    recommendations: List[str] = []
+
+    # Bash(*) at either level grants broad shell access — the recommended
+    # setting for experienced users who control git discipline via CLAUDE.md.
+    project_has_broad = "Bash(*)" in project_permissions
+    global_has_broad = "Bash(*)" in global_permissions
+    has_broad_bash = project_has_broad or global_has_broad
+
+    # Narrow patterns = individual Bash(...) rules that are NOT the wildcard.
+    # These accumulate one-per-approval when users click "allow" on prompts.
+    project_bash_patterns = [
+        p for p in project_permissions if p.startswith("Bash(") and p != "Bash(*)"
+    ]
+    narrow_count = len(project_bash_patterns)
+
+    # Also detect accumulated narrow WebFetch(domain:...) patterns — same
+    # accumulation problem, different tool. Global WebFetch(*) covers all.
+    project_webfetch_patterns = [
+        p
+        for p in project_permissions
+        if p.startswith("WebFetch(domain:") and p != "WebFetch(*)"
+    ]
+    webfetch_narrow_count = len(project_webfetch_patterns)
+
+    # Build the fix command that applies to all accumulation issues.
+    # Always reference the project-relative path — the project root is already
+    # shown in the launch box header, so the absolute prefix is redundant.
+    fix_path = ".claude/settings.local.json"
+
+    # Count all accumulated patterns (Bash + WebFetch + others)
+    total_narrow = narrow_count + webfetch_narrow_count
+    long_patterns = [p for p in project_bash_patterns if len(p) > 120]
+
+    # Consolidate into one warning — these are all symptoms of the same
+    # problem: the project settings file has accumulated auto-approved
+    # patterns instead of using wildcards.
+    if total_narrow > 0 and global_has_broad and not project_has_broad:
+        # Global already covers everything — project patterns are dead weight.
+        # This is the most common case after a user sets up global Bash(*).
+        warnings.append(f"{total_narrow} redundant patterns — global has Bash(*)")
+        recommendations.append(f"Set Bash(*) in {fix_path}")
+    elif total_narrow > 10 and not project_has_broad:
+        warnings.append(f"{total_narrow} accumulated patterns — use Bash(*)")
+        recommendations.append(f"Set Bash(*) in {fix_path}")
+    elif total_narrow > 5 and not project_has_broad:
+        warnings.append(f"{total_narrow} patterns — may cause prompts")
+        recommendations.append(f"Set Bash(*) in {fix_path}")
+    elif long_patterns:
+        # Only long-pattern issue, no general accumulation
+        warnings.append(f"{len(long_patterns)} long pattern(s) — likely accidental")
+        recommendations.append(f"Set Bash(*) in {fix_path}")
+
+    # Note: ask gates are NOT shown here — they're already displayed by the
+    # formatter as "🚫 Ask before: ..." in the session config section.
+    # Showing them as warnings implies they're a problem, but they're
+    # intentional safety gates.
+
+    return warnings, recommendations, has_broad_bash
+
+
 def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     """Get Claude Code session configuration.
 
-    Reads project-level and global settings to determine permissions,
-    MCP servers, hooks, and model configuration.
+    Claude Code resolves permissions from three layers (highest priority first):
+
+    1. **Project-level**: ``<project>/.claude/settings.local.json``
+       - Accumulated auto-approved patterns live here
+       - This is the file that grows uncontrollably (the core problem)
+
+    2. **Global user**: ``~/.claude/settings.json``
+       - Shared allow/deny/ask lists set by the user
+       - "ask" rules here override "allow" at any level
+
+    3. **Global local**: ``~/.claude/settings.local.json``
+       - Additional user permissions (often set via Claude Code's UI)
+       - Merged with settings.json (union, not override)
+
+    We read all three to give users a complete picture of their effective
+    permissions before launching a session.
 
     Args:
         project_path: Path to the project
@@ -737,7 +849,7 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
 
     config = SessionConfig()
 
-    # Check project permissions
+    # Layer 1: Project-level permissions (the ones that accumulate)
     project_settings = project_path / ".claude" / "settings.local.json"
     if project_settings.exists():
         config.config_file_path = str(project_settings)
@@ -761,14 +873,62 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
         except (json.JSONDecodeError, KeyError):
             pass
 
-    # Check global settings for model
+    # Layer 2: Global settings.json — shared allow/deny/ask + model
     global_settings = Path.home() / ".claude" / "settings.json"
+    global_allow: List[str] = []
+    global_deny: List[str] = []
+    global_ask: List[str] = []
     if global_settings.exists():
         try:
             settings = json.loads(global_settings.read_text())
             config.model = settings.get("model")
+
+            # Global permissions
+            if "permissions" in settings:
+                perms = settings["permissions"]
+                global_allow.extend(perms.get("allow", []))
+                global_deny.extend(perms.get("deny", []))
+                global_ask.extend(perms.get("ask", []))
         except json.JSONDecodeError:
             pass
+
+    # Layer 3: Global settings.local.json — merged with settings.json (union)
+    global_local_settings = Path.home() / ".claude" / "settings.local.json"
+    if global_local_settings.exists():
+        config.global_config_file_path = str(global_local_settings)
+        try:
+            settings = json.loads(global_local_settings.read_text())
+            if "permissions" in settings:
+                perms = settings["permissions"]
+                for perm in perms.get("allow", []):
+                    if perm not in global_allow:
+                        global_allow.append(perm)
+                for perm in perms.get("deny", []):
+                    if perm not in global_deny:
+                        global_deny.append(perm)
+                for perm in perms.get("ask", []):
+                    if perm not in global_ask:
+                        global_ask.append(perm)
+        except json.JSONDecodeError:
+            pass
+    elif global_settings.exists():
+        config.global_config_file_path = str(global_settings)
+
+    # Store global permission data
+    config.global_permissions = global_allow
+    config.global_permissions_count = len(global_allow)
+    config.global_deny = global_deny
+    config.global_ask = global_ask
+
+    # Analyze permission health
+    (
+        config.permission_warnings,
+        config.permission_recommendations,
+        config.has_broad_bash,
+    ) = _analyze_permissions(
+        config.permissions,
+        global_allow,
+    )
 
     # Check global MCP servers
     mcp_config = Path.home() / ".claude" / "mcp.json"
@@ -792,6 +952,7 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     # Only return if we found some config
     if (
         config.permissions_count > 0
+        or config.global_permissions_count > 0
         or config.mcp_servers
         or config.hooks_configured
         or config.model

@@ -2,30 +2,86 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
+adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.0] - 2026-05-13
+
+### Added
+
+- **Permission transparency report** — new `ai-launcher permissions` command and launch-box section
+  that audits Claude Code's effective permissions, flags accumulated narrow `Bash()` patterns,
+  detects redundancy against global `Bash(*)`, and emits actionable fix recommendations. See
+  `docs/permission-transparency.md`.
+- **`.vscode/extensions.json` and `.vscode/settings.json`** — shared workspace config so every
+  contributor sees the same ruff/mypy warnings as CI.
+- **`CONTRIBUTING.md`** — development setup, code style, testing, and local hook installation.
+- **`docs/releasing.md`** — full release procedure including pre-release wheel test, dry-run, and
+  failure recovery.
+- **`Makefile`** — wraps the common dev commands (`test`, `lint`, `validate-ci`, `install-hooks`);
+  `validate-ci` delegates to `scripts/ci-local.sh` for single-source truth with the pre-push hook.
+- **`.github/workflows/commit-lint.yml`** — PR-title gate enforcing Conventional Commits so
+  squash-merge commits on `main` stay parseable.
+- **Markdown linting via `.markdownlint.jsonc`** with prettier + markdownlint-cli2 pre-commit hooks.
+  Prettier hard-wraps prose to 100 chars and aligns tables; markdownlint catches the rest. Every
+  linter exception in the config carries an inline `// why` comment.
+
+### Fixed
+
+- **Launch box overflow on long paths and file lists** — the 85-column box no longer breaks when
+  paths or memory file lists exceed its width. Memory display lists files when ≤5 or shows count +
+  wrapped directory path otherwise; recommendation lines use project-relative paths instead of
+  absolute.
+- **Three unused-argument and one unused-variable lint issues** in `_analyze_permissions` and the
+  memory-list wrapper.
+- **Dead parameters removed from `_analyze_permissions`** — `global_deny`, `global_ask`, and
+  `config_file_path` were accepted but never read. Caller and tests updated. Docstring documents why
+  deny/ask are tracked elsewhere.
+
+### Changed
+
+- **CLAUDE.md rewrite** (322 → 57 lines) — restructured from a project overview into a behavior
+  contract with numbered Core Principles (Process, Project Invariants, Secrets), a Where Things Live
+  table, and Verification / Shell & Commits sections. Dev workflow content moved to
+  `CONTRIBUTING.md`; release content moved to `docs/releasing.md`.
+- **`.gitignore`** — removed the overly defensive `.vscode/*` exclusion. `.vscode/` is shared
+  workspace config and now tracks all files.
 
 ## [0.3.1] - 2026-03-11
 
 ### Changed
-- **Rename "Boundary Protection" to "Sibling Projects"** — the old name implied enforcement that doesn't exist. The feature only shows nearby projects for awareness, so the labeling now reflects that honestly. "Forbidden"/"Allowed" replaced with "Other"/"Selected".
+
+- **Rename "Boundary Protection" to "Sibling Projects"** — the old name implied enforcement that
+  doesn't exist. The feature only shows nearby projects for awareness, so the labeling now reflects
+  that honestly. "Forbidden"/"Allowed" replaced with "Other"/"Selected".
 
 ## [0.3.0] - 2026-03-05
 
 ### Removed
-- **Dead code cleanup** — removed `ConfigManager` (`core/config.py`), `settings.py`, and `shared_context.py` which were never called by the CLI
+
+- **Dead code cleanup** — removed `ConfigManager` (`core/config.py`), `settings.py`, and
+  `shared_context.py` which were never called by the CLI
 - Removed `HistoryConfig` dataclass from `core/models.py` (only used by deleted ConfigManager)
 - Removed `docs/terminal-title.md` — folded troubleshooting content into `docs/troubleshooting.md`
-- Removed `docs/CONTEXT_TRANSPARENCY_IMPLEMENTATION.md` and `docs/REFACTORING_2026_02.md` (completed checklists, archived to journal)
-- Removed tests for deleted code (`test_config.py`, `test_integration.py`, `test_settings_menu.py`, `test_shared_context.py`)
+- Removed `docs/CONTEXT_TRANSPARENCY_IMPLEMENTATION.md` and `docs/REFACTORING_2026_02.md` (completed
+  checklists, archived to journal)
+- Removed tests for deleted code (`test_config.py`, `test_integration.py`, `test_settings_menu.py`,
+  `test_shared_context.py`)
 
 ### Changed
-- **CLAUDE.md rewrite** — trimmed from 698 to ~320 lines by removing duplication and linking to canonical docs
-- **Documentation accuracy pass** — fixed all CLI syntax (`ai-launcher ~/projects` → `ai-launcher claude ~/projects`), removed references to non-existent flags (`--providers`, `--startup-report`, `--context-health`)
-- **README.md** — converted relative doc links to full GitHub URLs for PyPI compatibility, added PyPI downloads badge
+
+- **CLAUDE.md rewrite** — trimmed from 698 to ~320 lines by removing duplication and linking to
+  canonical docs
+- **Documentation accuracy pass** — fixed all CLI syntax (`ai-launcher ~/projects` →
+  `ai-launcher claude ~/projects`), removed references to non-existent flags (`--providers`,
+  `--startup-report`, `--context-health`)
+- **README.md** — converted relative doc links to full GitHub URLs for PyPI compatibility, added
+  PyPI downloads badge
 - **docs/configuration.md** — complete rewrite from config.toml reference to CLI flags reference
-- **docs/troubleshooting.md** — removed stale config.toml references, added terminal title troubleshooting section
-- **docs/adding-providers.md** — updated provider status table, replaced manual registration with auto-discovery
+- **docs/troubleshooting.md** — removed stale config.toml references, added terminal title
+  troubleshooting section
+- **docs/adding-providers.md** — updated provider status table, replaced manual registration with
+  auto-discovery
 - **docs/context-transparency.md** — removed proposed/unimplemented CLI commands
 - Renamed docs to lowercase kebab-case for consistency (`ARCHITECTURE.md` → `architecture.md`, etc.)
 - Added `docs/README.md` index for documentation navigation
@@ -33,22 +89,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.1] - 2026-03-04
 
 ### Fixed
-- Quote `sys.executable` and helper script paths in all fzf `--preview` commands — fixes `'C:\Program' is not recognized` errors on Windows when Python is installed under `C:\Program Files\...`
+
+- Quote `sys.executable` and helper script paths in all fzf `--preview` commands — fixes
+  `'C:\Program' is not recognized` errors on Windows when Python is installed under
+  `C:\Program Files\...`
 
 ### Changed
-- Added `quote_for_fzf` and `fzf_preview_cmd` helpers to `utils/paths.py` to centralise fzf command quoting
+
+- Added `quote_for_fzf` and `fzf_preview_cmd` helpers to `utils/paths.py` to centralise fzf command
+  quoting
 - Removed redundant `import sys` from UI modules that no longer reference it directly
 
 ## [0.2.0] - 2026-03-03
 
 ### Added
+
 - Auto-download fzf when missing — prompts user and fetches from GitHub releases
 - Cross-platform Python helpers for fzf preview commands (`_browser_preview.py`, `_file_preview.py`)
 
 ### Fixed
-- Cross-platform encoding: all fzf subprocess calls use binary mode with explicit UTF-8 encode/decode, fixing Windows cp1252 mangling
-- Delimiter escaping: consistent `\\t\\t` in all fzf `--delimiter` args (raw tab chars were mangled by Windows command-line processing)
-- Project discovery on native Windows — follow NTFS junctions and symlinks (Python 3.12+ treats junctions as symlinks, causing `os.walk` to silently skip them)
+
+- Cross-platform encoding: all fzf subprocess calls use binary mode with explicit UTF-8
+  encode/decode, fixing Windows cp1252 mangling
+- Delimiter escaping: consistent `\\t\\t` in all fzf `--delimiter` args (raw tab chars were mangled
+  by Windows command-line processing)
+- Project discovery on native Windows — follow NTFS junctions and symlinks (Python 3.12+ treats
+  junctions as symlinks, causing `os.walk` to silently skip them)
 - Circular symlink protection during project scanning via real-path cycle detection
 - Detect `.git` files (Git submodules) in addition to `.git` directories
 - Replace hardcoded `:` path separators with `os.pathsep` for Windows
@@ -58,17 +124,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Codecov integration (tokenless org-level auth)
 
 ### Changed
-- All fzf callers (settings, shared context, browser, context viewer) use consistent binary-mode pattern
-- Release script (`scripts/release.py`) extended with full lifecycle automation: PR merge, CI wait, tag, and GitHub release creation
+
+- All fzf callers (settings, shared context, browser, context viewer) use consistent binary-mode
+  pattern
+- Release script (`scripts/release.py`) extended with full lifecycle automation: PR merge, CI wait,
+  tag, and GitHub release creation
 - Tag protection and publish workflows hardened for CI reliability
 
-> **Note:** Versions 0.1.1–0.1.3 were incremental debugging releases and have been yanked from PyPI. All their fixes are included in 0.2.0.
+> **Note:** Versions 0.1.1–0.1.3 were incremental debugging releases and have been yanked from PyPI.
+> All their fixes are included in 0.2.0.
 
 ## [0.1.0] - 2026-03-03
 
 ### Added
 
 #### Multi-Provider Support (NEW)
+
 - **Provider abstraction layer** - Extensible system for multiple AI tools
 - **ClaudeProvider** - Full Claude Code integration
 - **GeminiProvider** - Google Gemini CLI support
@@ -84,6 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Provider metadata** - Version detection, installation status, context stats
 
 #### Enhanced Startup Report - Complete Context Transparency
+
 - **Session Configuration** - Shows all session-affecting settings
   - Auto-approved commands count (from `.claude/settings.local.json`)
   - MCP servers status (from `~/.claude/mcp.json`)
@@ -103,10 +175,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Available in both Python and bash implementations
 
 #### Terminal Window Title
+
 - **Automatic title setting** - Terminal title shows project and provider
 - **Customizable format** - Configure via `terminal_title_format` in config
 - **Format variables** - `{project}`, `{provider}`, `{path}`, `{parent}`
-- **Smart terminal detection** - Works with xterm, iTerm2, GNOME Terminal, Windows Terminal, tmux, etc.
+- **Smart terminal detection** - Works with xterm, iTerm2, GNOME Terminal, Windows Terminal, tmux,
+  etc.
 - **tmux support** - Special handling for tmux sessions
 - **Enable/disable** - Control via `set_terminal_title` config option
 - **Example formats:**
@@ -115,6 +189,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `"{parent}/{project}"` → "projects/my-app"
 
 #### Project Management
+
 - Interactive project selector with tree-structured navigation
 - fzf-powered fuzzy search interface
 - Automatic git repository discovery with configurable scan paths
@@ -130,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Action menu (Rescan, Add path, Remove path)
 
 #### Infrastructure
+
 - Cross-platform support (Linux, macOS, Windows/WSL)
 - Pre-commit hooks for code quality
 - Comprehensive test suite with pytest
@@ -139,6 +215,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic config directory creation
 
 ### Changed
+
 - **Complete rebranding** from claude-launcher to ai-launcher (23 files)
 - **Replaced hardcoded Claude logic** with provider abstraction system
 - `launch_claude()` → `launch_ai()` with provider parameter
@@ -152,12 +229,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI help text updated to reflect multi-provider support
 
 ### Fixed
+
 - Config directory creation errors (mkdir -p before writes)
 - Preview pane folders-first sorting logic
 - Text truncation in fzf headers
 - Manual path directory creation bug
 
 ### Technical Details
+
 - Python 3.8+ compatibility
 - SQLite storage for manual paths and history
 - Platform-specific config and data directories (`~/.config/ai-launcher/`)

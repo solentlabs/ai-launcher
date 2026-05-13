@@ -74,6 +74,27 @@ repos:
       - id: commitizen
         stages: [commit-msg]
 
+  # Markdown formatting — prettier hard-wraps prose to 100 chars and
+  # aligns table columns. Runs BEFORE markdownlint so wrap-related
+  # lint errors are auto-resolved instead of becoming manual chores.
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [markdown]
+        args: ["--prose-wrap=always", "--print-width=100"]
+        exclude: ^(venv|build|dist|htmlcov|\.venv|node_modules)/
+
+  # Markdown linting — same rules as the VSCode markdownlint extension
+  # so what contributors see while editing matches what gets enforced.
+  # Config lives in .markdownlint.jsonc at repo root.
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.13.0
+    hooks:
+      - id: markdownlint-cli2
+        args: ["--fix"]
+        exclude: ^(venv|build|dist|htmlcov|\.venv|node_modules)/
+
   # Pre-push hooks
   - repo: local
     hooks:
