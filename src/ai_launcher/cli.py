@@ -178,6 +178,13 @@ def _run_launcher(
         show_project_list(all_projects)
         sys.exit(0)
 
+    # Handle --check-permissions (no fzf needed — reads settings files only)
+    if check_permissions:
+        from ai_launcher.ui.permissions_report import check_project_permissions
+
+        check_project_permissions(all_projects, provider_name)
+        sys.exit(0)
+
     # All remaining code paths require fzf — ensure it's available
     from ai_launcher.utils.fzf import ensure_fzf
 
@@ -193,13 +200,6 @@ def _run_launcher(
         provider_infos = discovery.detect_all()
 
         show_context_viewer(provider_infos, all_projects)
-        sys.exit(0)
-
-    # Handle --check-permissions
-    if check_permissions:
-        from ai_launcher.ui.permissions_report import check_project_permissions
-
-        check_project_permissions(all_projects, provider_name)
         sys.exit(0)
 
     # Parse manual paths for display (convert to list of path strings)
