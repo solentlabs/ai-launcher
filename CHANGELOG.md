@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - TBD
+
+### Fixed
+
+- **Release script: PR title now follows Conventional Commits** — was `"Release v{version}"`
+  (rejected by the PR title gate); changed to `"chore(release): v{version}"`.
+- **Release script: `poll_pr_checks` no longer times out on running checks** — `gh pr checks` exits
+  non-zero for both pending and failed states, but stdout still contains the check list. The poller
+  previously treated any non-zero exit as "no checks yet" and burned the full 1200s timeout. Fixed
+  to only wait when stdout is actually empty.
+- **Release script: phase 4 is now idempotent** — re-running after a timeout no longer fatals with
+  "Could not find version string" when the version file is already at the target version.
+
+### Changed
+
+- **Changelog gate added** — new `changelog-check.yml` CI workflow fails PRs that change Python
+  source or scripts without updating `CHANGELOG.md`. Soft pre-commit warning added via
+  `scripts/check-changelog.sh`.
+
 ## [0.4.1] - 2026-05-29
 
 ### Fixed

@@ -95,6 +95,17 @@ repos:
         args: ["--fix"]
         exclude: ^(venv|build|dist|htmlcov|\.venv|node_modules)/
 
+  # Pre-commit hooks (local)
+  - repo: local
+    hooks:
+      - id: check-changelog
+        name: Check CHANGELOG.md updated
+        entry: bash scripts/check-changelog.sh
+        language: system
+        stages: [pre-commit]
+        always_run: true
+        pass_filenames: false
+
   # Pre-push hooks
   - repo: local
     hooks:
