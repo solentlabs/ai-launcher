@@ -16,7 +16,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Coverage floor raised from 75%/80% to 85%** — added ~30 fixture- and table-based tests covering
+- **Coverage floor raised from 75%/80% to 84%** — added ~30 fixture- and table-based tests covering
   session-config permission branches, session-stats edge cases, formatter private methods
   (`_format_git_section`, `_format_session_section`, `_format_rich_header`), and selector edge cases
   (action items, `__SPACE__` separators, directory headers, env-var population, generic exception

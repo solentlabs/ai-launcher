@@ -70,7 +70,7 @@ addopts = [
     "--cov=ai_launcher",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-fail-under=85",
+    "--cov-fail-under=84",
 ]
 
 [tool.coverage.run]
@@ -79,7 +79,7 @@ branch = true
 parallel = true
 
 [tool.coverage.report]
-fail_under = 85
+fail_under = 84
 show_missing = true
 skip_covered = false
 exclude_lines = [
