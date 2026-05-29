@@ -900,3 +900,140 @@ class TestSessionConfigFormatting:
         config = SessionConfig()
         result = formatter._format_session_config_section(config)
         assert "Session Configuration" in result
+
+    def test_global_ask_non_bash_pattern(self, formatter):
+        """Non-Bash ask pattern (no 'Bash(' prefix) is appended verbatim."""
+        config = SessionConfig(global_ask=["custom_tool", "Bash(git push:*)"])
+        result = formatter._format_session_config_section(config)
+        assert "custom_tool" in result
+        assert "Ask before:" in result
+
+    def test_global_deny_non_bash_pattern(self, formatter):
+        """Non-Bash deny pattern is appended verbatim."""
+        config = SessionConfig(global_deny=["custom_deny_rule"])
+        result = formatter._format_session_config_section(config)
+        assert "custom_deny_rule" in result
+        assert "Denied:" in result
+
+    def test_config_file_path_exception_fallback(self, formatter):
+        """When Path.home() raises, config_file_path is displayed as-is."""
+        from unittest.mock import patch
+
+        config = SessionConfig(config_file_path="/some/path/settings.json")
+        with patch(
+            "ai_launcher.ui.formatter.Path.home", side_effect=RuntimeError("no home")
+        ):
+            result = formatter._format_session_config_section(config)
+        assert "Source:" in result
+        assert "settings.json" in result
+
+
+class TestRichHeader:
+    """Coverage for _format_rich_header (lines 363-364)."""
+
+    def test_rich_header_contains_provider_name(self):
+        formatter = PreviewFormatter()
+        result = formatter._format_rich_header("Claude Code")
+        assert "Claude Code" in result
+        assert "━" in result
+
+
+class TestFormatPreviewPrivateMethods:
+    """Drive format_preview() to cover private formatting helpers."""
+
+    @pytest.fixture
+    def formatter(self):
+        return PreviewFormatter()
+
+    def test_no_provider_name_skips_header(self, formatter):
+        """format_preview with empty provider_name skips the header section."""
+        data = ProviderPreviewData(provider_name="")
+        result = formatter.format_complete_preview(Path("/tmp"), data)
+        assert "━" not in result
+
+    def test_git_section_no_branch(self, formatter):
+        """Git section omits Branch line when branch is None."""
+        data = ProviderPreviewData(provider_name="Test")
+        status = GitStatus(is_repo=True, is_clean=True, branch=None)
+        result = formatter.format_complete_preview(
+            Path("/tmp"), data, git_status=status
+        )
+        assert "Git Status" in result
+        assert "Branch:" not in result
+
+    def test_git_section_dirty_with_files(self, formatter):
+        """Git section lists changed files when repo is dirty."""
+        data = ProviderPreviewData(provider_name="Test")
+        status = GitStatus(
+            is_repo=True,
+            is_clean=False,
+            branch="main",
+            changed_files=["a.py", "b.py"],
+        )
+        result = formatter.format_complete_preview(
+            Path("/tmp"), data, git_status=status
+        )
+        assert "a.py" in result
+        assert "b.py" in result
+        assert "files changed" in result
+
+    def test_session_section_with_many_memory_files(self, formatter):
+        """Session section shows '...and N more' when >3 memory files."""
+        files = [
+            MemoryFile(
+                path=Path(f"/tmp/mem{i}.md"),
+                name=f"mem{i}.md",
+                size_bytes=100,
+                last_modified=datetime.now(),
+            )
+            for i in range(5)
+        ]
+        stats = SessionStats(
+            session_count=1,
+            total_size_bytes=500,
+            last_session_time=datetime.now(),
+            memory_files=files,
+        )
+        data = ProviderPreviewData(provider_name="Test", session_stats=stats)
+        result = formatter.format_complete_preview(Path("/tmp"), data)
+        assert "and 2 more" in result
+
+    def test_session_section_with_last_session_time(self, formatter):
+        """Session section shows last-used time when last_session_time is set."""
+        stats = SessionStats(
+            session_count=2,
+            total_size_bytes=200,
+            last_session_time=datetime.now() - timedelta(hours=1),
+            memory_files=[],
+        )
+        data = ProviderPreviewData(provider_name="Test", session_stats=stats)
+        result = formatter.format_complete_preview(Path("/tmp"), data)
+        assert "Last used:" in result
+
+    @pytest.mark.parametrize(
+        "preview_content,must_contain,must_not_contain",
+        [
+            # blank lines in preview are silently skipped
+            ("line1\n\nline2", "line1", None),
+            # only non-blank lines appear
+            ("\n\nonly_visible", "only_visible", None),
+        ],
+        ids=["blank_lines_skipped", "leading_blanks"],
+    )
+    def test_context_file_blank_lines_in_preview(
+        self, formatter, preview_content, must_contain, must_not_contain
+    ):
+        """Blank lines in content_preview are skipped (line.strip() falsy branch)."""
+        ctx = ContextFile(
+            path=Path("/tmp/TEST.md"),
+            label="TEST.md",
+            exists=True,
+            size_bytes=100,
+            line_count=3,
+            file_type="project",
+            content_preview=preview_content,
+        )
+        result = formatter.format_context_files([ctx])
+        assert must_contain in result
+        if must_not_contain:
+            assert must_not_contain not in result

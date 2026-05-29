@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-05-29
+
+### Fixed
+
+- **Startup box formatting consistency** — unified checkmarks (`✅` → `✓`), indented `💡`
+  recommendations as sub-items under `⚠` warnings, broke sibling project names and skill names onto
+  individual `•` bullet lines matching the Global Context section style, added `○` marker to the
+  `/plugin to browse` line, and corrected a 4→3 space indent on that line.
+
+### Changed
+
+- **Coverage floor raised from 75%/80% to 84%** — added ~30 fixture- and table-based tests covering
+  session-config permission branches, session-stats edge cases, formatter private methods
+  (`_format_git_section`, `_format_session_section`, `_format_rich_header`), and selector edge cases
+  (action items, `__SPACE__` separators, directory headers, env-var population, generic exception
+  handler). `selector.py` 75% → 95%, `startup_report.py` 91% → 97%, `formatter.py` 85% → 90%.
+
 ## [0.4.0] - 2026-05-13
 
 ### Added

@@ -726,3 +726,247 @@ class TestAnalyzeWithProviderEdgeCases:
         captured = capsys.readouterr()
         assert "TEST.md" in captured.out
         assert "local project instructions" in captured.out
+
+
+class TestSessionConfigPermissionBranches:
+    """Parametrized coverage for the session-config permission display branches."""
+
+    def _make_provider(self, session):
+        from unittest.mock import MagicMock, PropertyMock
+
+        provider = MagicMock()
+        metadata = ProviderMetadata(
+            name="test",
+            display_name="Test",
+            command="test",
+            description="desc",
+            config_files=["TEST.md"],
+        )
+        type(provider).metadata = PropertyMock(return_value=metadata)
+        data = ProviderPreviewData(provider_name="Test", session_config=session)
+        provider.collect_preview_data.return_value = data
+        del provider.get_version
+        return provider
+
+    @pytest.mark.parametrize(
+        "session_kwargs,expected,forbidden",
+        [
+            # warnings + indented recommendations
+            (
+                {
+                    "permission_warnings": ["12 patterns — likely accidental"],
+                    "permission_recommendations": [
+                        "Set Bash(*) in settings.local.json"
+                    ],
+                },
+                ["12 patterns", "Set Bash(*)"],
+                [],
+            ),
+            # project-level Bash(*) → compact label
+            (
+                {
+                    "permissions_count": 1,
+                    "permissions": ["Bash(*)"],
+                    "has_broad_bash": True,
+                },
+                ["Bash(*) (project)"],
+                ["1 auto-approved"],
+            ),
+            # global Bash(*) → "Bash(*) + N more (global)"
+            (
+                {
+                    "global_permissions": ["Bash(*)", "Read"],
+                    "global_permissions_count": 2,
+                    "has_broad_bash": True,
+                },
+                ["Bash(*) + 1 more (global)"],
+                [],
+            ),
+            # global narrow permissions → count label
+            (
+                {
+                    "global_permissions": ["Read", "Edit"],
+                    "global_permissions_count": 2,
+                },
+                ["2 auto-approved commands (global)"],
+                [],
+            ),
+            # global_ask → "Ask before:" line
+            (
+                {"global_ask": ["Bash(git commit:*)", "Bash(git push:*)"]},
+                ["Ask before:", "git commit", "git push"],
+                [],
+            ),
+            # no warnings + has_broad_bash → permission health clean
+            (
+                {"has_broad_bash": True, "permission_warnings": []},
+                ["Permission health: clean"],
+                [],
+            ),
+        ],
+        ids=[
+            "warnings_and_recs",
+            "project_broad_bash",
+            "global_broad_bash",
+            "global_narrow",
+            "global_ask",
+            "clean_health",
+        ],
+    )
+    def test_session_config_branch(
+        self, tmp_path, capsys, session_kwargs, expected, forbidden
+    ):
+        session = SessionConfig(**session_kwargs)
+        provider = self._make_provider(session)
+        display_launch_info(tmp_path, provider, verbose=True)
+        out = capsys.readouterr().out
+        for s in expected:
+            assert s in out, f"missing {s!r}"
+        for s in forbidden:
+            assert s not in out, f"unexpected {s!r}"
+
+
+class TestSessionStatsBranches:
+    """Parametrized coverage for session-stats display branches."""
+
+    def _make_provider_with_stats(self, stats):
+        from unittest.mock import MagicMock, PropertyMock
+
+        provider = MagicMock()
+        metadata = ProviderMetadata(
+            name="test",
+            display_name="Test",
+            command="test",
+            description="desc",
+            config_files=[],
+        )
+        type(provider).metadata = PropertyMock(return_value=metadata)
+        data = ProviderPreviewData(provider_name="Test", session_stats=stats)
+        provider.collect_preview_data.return_value = data
+        del provider.get_version
+        return provider
+
+    @pytest.mark.parametrize(
+        "stats_kwargs,expected,forbidden",
+        [
+            # last_session_time=None → no "Last used" line
+            (
+                {
+                    "session_count": 5,
+                    "total_size_bytes": 1024,
+                    "last_session_time": None,
+                    "memory_files": [],
+                },
+                ["5 sessions"],
+                ["Last used"],
+            ),
+            # empty memory_files → no "│   Memory:" stats summary line
+            (
+                {
+                    "session_count": 3,
+                    "total_size_bytes": 512,
+                    "last_session_time": None,
+                    "memory_files": [],
+                },
+                ["3 sessions"],
+                ["│   Memory:"],
+            ),
+        ],
+        ids=["no_last_session_time", "empty_memory_files"],
+    )
+    def test_session_stats_branch(
+        self, tmp_path, capsys, stats_kwargs, expected, forbidden
+    ):
+        stats = SessionStats(**stats_kwargs)
+        provider = self._make_provider_with_stats(stats)
+        display_launch_info(tmp_path, provider, verbose=True)
+        out = capsys.readouterr().out
+        for s in expected:
+            assert s in out, f"missing {s!r}"
+        for s in forbidden:
+            assert s not in out, f"unexpected {s!r}"
+
+
+class TestDisplayLaunchInfoMiscBranches:
+    """Covers remaining small display_launch_info branches."""
+
+    def _make_provider(self, preview_data=None):
+        from unittest.mock import MagicMock, PropertyMock
+
+        provider = MagicMock()
+        metadata = ProviderMetadata(
+            name="test",
+            display_name="Test",
+            command="test",
+            description="desc",
+            config_files=["TEST.md"],
+        )
+        type(provider).metadata = PropertyMock(return_value=metadata)
+        if preview_data is None:
+            preview_data = ProviderPreviewData(provider_name="Test")
+        provider.collect_preview_data.return_value = preview_data
+        del provider.get_version
+        return provider
+
+    def test_marketplace_more_than_3_plugins(self, tmp_path, capsys):
+        """Marketplace section shows '+N more' when >3 plugins installed."""
+        plugins = MarketplaceInfo(
+            name="marketplace",
+            plugins=[
+                MarketplacePlugin(name=f"plugin{i}", description="d") for i in range(5)
+            ],
+        )
+        data = ProviderPreviewData(provider_name="Test", marketplace_plugins=plugins)
+        provider = self._make_provider(preview_data=data)
+        display_launch_info(tmp_path, provider, verbose=True)
+        out = capsys.readouterr().out
+        assert "+ 2 more" in out
+
+    def test_context_file_no_line_count(self, tmp_path, capsys):
+        """Context file with line_count=0 shows type label only (no line count)."""
+        ctx = ContextFile(
+            path=tmp_path / "CLAUDE.md",
+            label="CLAUDE.md",
+            exists=True,
+            size_bytes=100,
+            line_count=0,
+            file_type="project",
+        )
+        data = ProviderPreviewData(provider_name="Test", context_files=[ctx])
+        provider = self._make_provider(preview_data=data)
+        display_launch_info(tmp_path, provider, verbose=True)
+        out = capsys.readouterr().out
+        assert "CLAUDE.md" in out
+        assert "lines" not in out.split("CLAUDE.md")[1].split("\n")[0]
+
+    def test_provider_context_long_filename_truncated(self, tmp_path, capsys):
+        """Provider context line exceeding box width is truncated with ellipsis."""
+        from unittest.mock import MagicMock, PropertyMock
+
+        long_name = "A" * 55 + ".md"
+        (tmp_path / long_name).write_text("content")
+        provider = MagicMock()
+        metadata = ProviderMetadata(
+            name="test",
+            display_name="Test",
+            command="test",
+            description="desc",
+            config_files=[long_name],
+        )
+        type(provider).metadata = PropertyMock(return_value=metadata)
+        data = ProviderPreviewData(provider_name="Test")
+        provider.collect_preview_data.return_value = data
+        del provider.get_version
+        display_launch_info(tmp_path, provider, verbose=True)
+        out = capsys.readouterr().out
+        assert "..." in out
+
+
+class TestCheckSiblingProjectsNonexistentParent:
+    """Coverage for the parent.exists() == False branch."""
+
+    def test_nonexistent_parent_returns_zero_siblings(self):
+        result = _check_sibling_projects(Path("/definitely/nonexistent/project"))
+        assert result["sibling_count"] == 0
+        assert result["sibling_names"] == []
+        assert result["selected_project"] == "project"

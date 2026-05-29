@@ -63,3 +63,6 @@ Thumbs.db
 
 # Archive of planning documents
 archive/
+
+# Claude Code runtime files
+.claude/scheduled_tasks.lock

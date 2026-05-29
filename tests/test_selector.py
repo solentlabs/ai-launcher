@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from ai_launcher.core.models import Project
+from ai_launcher.core.models import ConfigData, ContextConfig, Project
 from ai_launcher.ui.selector import show_project_list
 
 
@@ -143,3 +143,182 @@ def test_select_project_fzf_not_found(
     assert result is None
     captured = capsys.readouterr()
     assert "fzf" in captured.out.lower()
+
+
+def _make_popen_mock(output_bytes, returncode=0):
+    proc = MagicMock()
+    proc.returncode = returncode
+    proc.communicate.return_value = (output_bytes, b"")
+    return proc
+
+
+@patch("subprocess.Popen")
+@patch("ai_launcher.ui.selector.build_tree_view")
+@patch("ai_launcher.ui.selector.clear_screen")
+def test_select_project_generic_exception(
+    mock_clear, mock_tree, mock_popen, tmp_path, capsys
+):
+    """Generic exception during Popen returns None and prints error."""
+    from ai_launcher.ui.selector import select_project
+
+    project = Project.from_path(tmp_path / "p", is_manual=False)
+    choice_str = f"{tmp_path / 'p'}\t\tp"
+    mock_tree.return_value = ([choice_str], {choice_str: project})
+    mock_popen.side_effect = RuntimeError("unexpected")
+
+    result = select_project([project])
+
+    assert result is None
+    assert "Error" in capsys.readouterr().out
+
+
+@patch("subprocess.Popen")
+@patch("ai_launcher.ui.selector.build_tree_view")
+@patch("ai_launcher.ui.selector.clear_screen")
+def test_select_project_configuration_action_then_select(
+    mock_clear, mock_tree, mock_popen, tmp_path
+):
+    """Selecting the Configuration action item loops back; next selection succeeds."""
+    from ai_launcher.ui.selector import select_project
+
+    project_path = tmp_path / "my-proj"
+    project_path.mkdir()
+    project = Project.from_path(project_path, is_manual=False)
+    choice_str = f"{project_path}\t\tmy-proj"
+    mock_tree.return_value = ([choice_str], {choice_str: project})
+
+    action_bytes = "__ACTION__\t\t⚙️ Configuration".encode()
+    mock_popen.side_effect = [
+        _make_popen_mock(action_bytes + b"\n"),
+        _make_popen_mock(f"{choice_str}\n".encode()),
+    ]
+
+    result = select_project([project])
+    assert result == project
+
+
+@patch("subprocess.Popen")
+@patch("ai_launcher.ui.selector.build_tree_view")
+@patch("ai_launcher.ui.selector.clear_screen")
+def test_select_project_space_action_then_select(
+    mock_clear, mock_tree, mock_popen, tmp_path
+):
+    """Selecting a __SPACE__ separator loops back; next selection succeeds."""
+    from ai_launcher.ui.selector import select_project
+
+    project_path = tmp_path / "my-proj"
+    project_path.mkdir()
+    project = Project.from_path(project_path, is_manual=False)
+    choice_str = f"{project_path}\t\tmy-proj"
+    mock_tree.return_value = ([choice_str], {choice_str: project})
+
+    space_bytes = b"__SPACE__\t\t\n"
+    mock_popen.side_effect = [
+        _make_popen_mock(space_bytes),
+        _make_popen_mock(f"{choice_str}\n".encode()),
+    ]
+
+    result = select_project([project])
+    assert result == project
+
+
+@patch("subprocess.Popen")
+@patch("ai_launcher.ui.selector.build_tree_view")
+@patch("ai_launcher.ui.selector.clear_screen")
+def test_select_project_directory_header_loops_back(
+    mock_clear, mock_tree, mock_popen, tmp_path
+):
+    """Selecting a directory header (path is a dir with no .git) loops back."""
+    from ai_launcher.ui.selector import select_project
+
+    project_path = tmp_path / "my-proj"
+    project_path.mkdir()
+    dir_header = tmp_path / "parent-dir"
+    dir_header.mkdir()
+    project = Project.from_path(project_path, is_manual=False)
+
+    choice_str = f"{project_path}\t\tmy-proj"
+    mock_tree.return_value = ([choice_str], {choice_str: project})
+
+    header_str = f"{dir_header}\t\tparent-dir/"
+    mock_popen.side_effect = [
+        _make_popen_mock(f"{header_str}\n".encode()),
+        _make_popen_mock(f"{choice_str}\n".encode()),
+    ]
+
+    result = select_project([project])
+    assert result == project
+
+
+@patch("subprocess.Popen")
+@patch("ai_launcher.ui.selector.build_tree_view")
+@patch("ai_launcher.ui.selector.clear_screen")
+def test_select_project_multiple_scan_paths_common_base(
+    mock_clear, mock_tree, mock_popen, tmp_path
+):
+    """Multiple scan_paths triggers common-base calculation (lines 66-67)."""
+    from ai_launcher.ui.selector import select_project
+
+    path_a = tmp_path / "workspace" / "proj-a"
+    path_b = tmp_path / "workspace" / "proj-b"
+    path_a.mkdir(parents=True)
+    path_b.mkdir(parents=True)
+
+    proj_a = Project.from_path(path_a, is_manual=False)
+    choice_str = f"{path_a}\t\tproj-a"
+    mock_tree.return_value = ([choice_str], {choice_str: proj_a})
+    mock_popen.return_value = _make_popen_mock(f"{choice_str}\n".encode())
+
+    result = select_project(
+        [proj_a],
+        scan_paths=[
+            tmp_path / "workspace" / "proj-a",
+            tmp_path / "workspace" / "proj-b",
+        ],
+    )
+    assert result == proj_a
+
+
+@patch("subprocess.Popen")
+@patch("ai_launcher.ui.selector.build_tree_view")
+@patch("ai_launcher.ui.selector.clear_screen")
+def test_select_project_env_vars_global_files_and_manual_paths(
+    mock_clear, mock_tree, mock_popen, tmp_path
+):
+    """config.context.global_files and manual_paths populate env vars (lines 109, 111)."""
+    from ai_launcher.ui.selector import select_project
+
+    project_path = tmp_path / "proj"
+    project_path.mkdir()
+    project = Project.from_path(project_path, is_manual=False)
+    choice_str = f"{project_path}\t\tproj"
+    mock_tree.return_value = ([choice_str], {choice_str: project})
+    mock_popen.return_value = _make_popen_mock(f"{choice_str}\n".encode())
+
+    config = ConfigData(context=ContextConfig(global_files=["~/notes.md"]))
+
+    select_project([project], config=config, manual_paths=["/extra/path"])
+
+    env = mock_popen.call_args[1]["env"]
+    assert "AI_LAUNCHER_GLOBAL_FILES" in env
+    assert "~/notes.md" in env["AI_LAUNCHER_GLOBAL_FILES"]
+    assert "AI_LAUNCHER_MANUAL_PATHS" in env
+    assert "/extra/path" in env["AI_LAUNCHER_MANUAL_PATHS"]
+
+
+@patch("subprocess.Popen")
+@patch("ai_launcher.ui.selector.build_tree_view")
+@patch("ai_launcher.ui.selector.clear_screen")
+def test_select_project_empty_stdout_returns_none(
+    mock_clear, mock_tree, mock_popen, tmp_path
+):
+    """Empty stdout after fzf exits normally returns None (line 162)."""
+    from ai_launcher.ui.selector import select_project
+
+    project = Project.from_path(tmp_path / "proj", is_manual=False)
+    choice_str = f"{tmp_path / 'proj'}\t\tproj"
+    mock_tree.return_value = ([choice_str], {choice_str: project})
+    mock_popen.return_value = _make_popen_mock(b"")
+
+    result = select_project([project])
+    assert result is None

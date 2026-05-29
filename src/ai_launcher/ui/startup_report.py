@@ -631,7 +631,7 @@ def display_launch_info(
                 status_text = f"{ctx_file.line_count} lines ({type_label})"
             else:
                 status_text = type_label
-            line = f"│   ✅ {ctx_file.label}: {status_text}"
+            line = f"│   ✓ {ctx_file.label}: {status_text}"
             print(_pad_line(line, width))
     else:
         print(_pad_line("│   (no context loaded)", width))
@@ -647,10 +647,9 @@ def display_launch_info(
         if session_config.permission_warnings:
             for warning in session_config.permission_warnings:
                 print(_pad_line(f"│   ⚠ {warning}", width))
-            # Actionable fix recommendations
             if session_config.permission_recommendations:
                 for rec in session_config.permission_recommendations:
-                    print(_pad_line(f"│   💡 {rec}", width))
+                    print(_pad_line(f"│     💡 {rec}", width))
 
         # Project-level permissions
         if session_config.permissions_count > 0:
@@ -727,7 +726,7 @@ def display_launch_info(
                 "│   ⚠ No permissions configured — all commands will prompt", width
             )
         )
-        print(_pad_line("│   💡 Set Bash(*) in .claude/settings.local.json", width))
+        print(_pad_line("│     💡 Set Bash(*) in .claude/settings.local.json", width))
         print(_pad_line("│   ○ No MCP servers configured", width))
         print(_pad_line("│   ○ No hooks configured", width))
         print(_pad_line("│   ○ Model: default (sonnet)", width))
@@ -765,10 +764,11 @@ def display_launch_info(
 
     if skills:
         skill_names = [s.name for s in skills]
-        skill_list = ", ".join(skill_names[:3])
+        print(_pad_line(f"│   ✓ {len(skill_names)} available", width))
+        for name in skill_names[:3]:
+            print(_pad_line(f"│     • {name}", width))
         if len(skill_names) > 3:
-            skill_list += f", +{len(skill_names) - 3} more"
-        print(_pad_line(f"│   ✓ {len(skill_names)} available: {skill_list}", width))
+            print(_pad_line(f"│     • +{len(skill_names) - 3} more", width))
     else:
         print(_pad_line("│   ○ No skills installed", width))
 
@@ -787,7 +787,7 @@ def display_launch_info(
         print(_pad_line(f"│ 🔌 Plugins: {names_str}", width))
         print(
             _pad_line(
-                "│    /plugin to browse · https://code.claude.com/docs/en/discover-plugins",
+                "│   ○ /plugin to browse · https://code.claude.com/docs/en/discover-plugins",
                 width,
             )
         )
@@ -818,10 +818,12 @@ def display_launch_info(
             )
         )
 
-        other_list = ", ".join(siblings["sibling_names"][:3])
+        for name in siblings["sibling_names"][:3]:
+            print(_pad_line(f"│     • {name}", width))
         if siblings["sibling_count"] > 3:
-            other_list += f", ... +{siblings['sibling_count'] - 3} more"
-        print(_pad_line(f"│   ○ Other: {other_list}", width))
+            print(
+                _pad_line(f"│     • ... +{siblings['sibling_count'] - 3} more", width)
+            )
         print(_pad_line(f"│   ✓ Selected: {siblings['selected_project']}", width))
         print(_pad_line("│", width))
 
