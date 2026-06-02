@@ -693,7 +693,9 @@ def display_launch_info(
                     ask_labels.append(inner.split(":")[0])
                 else:
                     ask_labels.append(pattern)
-            print(_pad_line(f"│   🚫 Ask before: {', '.join(ask_labels)}", width))
+            print(_pad_line("│   🚫 Ask before:", width))
+            for label in ask_labels:
+                print(_pad_line(f"│     • {label}", width))
 
         # Permission health summary (always shown)
         if not session_config.permission_warnings and session_config.has_broad_bash:
