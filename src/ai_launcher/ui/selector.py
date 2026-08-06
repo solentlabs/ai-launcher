@@ -74,7 +74,7 @@ def select_project(
 
         # Add action menu items at the bottom
         choices.append("__ACTION__\t\t")
-        choices.append("__ACTION__\t\t⚙️ Configuration")
+        choices.append("__ACTION__\t\t🔧 Configuration")
 
         # Build header with project info
         project_count = len(current_projects)
@@ -162,7 +162,7 @@ Type to filter • Arrows to navigate
                 return None
 
             # Handle action menu items
-            if selected == "__ACTION__\t\t⚙️ Configuration":
+            if selected == "__ACTION__\t\t🔧 Configuration":
                 # Configuration preview is shown in right pane, just loop back
                 continue
 

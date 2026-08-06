@@ -307,7 +307,7 @@ def generate_provider_preview(
     provider = registry.get(provider_name)
 
     if not provider:
-        return f"⚠️  Provider '{provider_name}' not found"
+        return f"❗ Provider '{provider_name}' not found"
 
     # 1. Collect GENERIC project data (same for all providers)
     git_status = _get_git_status(project_path)
@@ -317,7 +317,7 @@ def generate_provider_preview(
     try:
         provider_data = provider.collect_preview_data(project_path)
     except Exception as e:
-        return f"⚠️  Error collecting preview data: {e}"
+        return f"❗ Error collecting preview data: {e}"
 
     # 3. Format ALL data (generic + provider-specific) for display
     formatter = PreviewFormatter()
@@ -331,4 +331,4 @@ def generate_provider_preview(
             session_config=provider_data.session_config,
         )
     except Exception as e:
-        return f"⚠️  Error formatting preview: {e}"
+        return f"❗ Error formatting preview: {e}"

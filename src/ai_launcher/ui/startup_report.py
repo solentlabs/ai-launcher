@@ -65,7 +65,7 @@ class StartupReport:
                 hints = []
                 if ctx_file.line_count and ctx_file.line_count > 500:
                     hints.append(
-                        "⚠️  File is large - consider splitting into multiple context files"
+                        "❗ File is large - consider splitting into multiple context files"
                     )
                 if ctx_file.size_bytes and ctx_file.size_bytes > 50000:
                     hints.append(
@@ -107,7 +107,7 @@ class StartupReport:
                 hints = []
                 if mem.project_lines > 200:
                     hints.append(
-                        "⚠️  Only first 200 lines are loaded - move details to topic files"
+                        "❗ Only first 200 lines are loaded - move details to topic files"
                     )
                 elif mem.project_lines > 150:
                     hints.append(
@@ -200,7 +200,7 @@ class StartupReport:
 
             if lines > 500:
                 hints.append(
-                    "⚠️  File is large - consider splitting into multiple context files"
+                    "❗ File is large - consider splitting into multiple context files"
                 )
             if size > 50000:
                 hints.append(
@@ -247,7 +247,7 @@ class StartupReport:
 
             if lines > 200:
                 hints.append(
-                    "⚠️  Only first 200 lines are loaded - move details to topic files"
+                    "❗ Only first 200 lines are loaded - move details to topic files"
                 )
             if lines > 150:
                 hints.append(

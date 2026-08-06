@@ -5,10 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.2] - TBD
+## [0.4.2] - 2026-08-06
 
 ### Fixed
 
+- **Preview pane no longer eats the last character of a row** — `⚙️`, `⚠️` and `🏗️` are an East
+  Asian _Neutral_ base plus a U+FE0F variation selector. fzf's `go-runewidth` scores that as one
+  column; terminals honour the selector and draw two. fzf therefore admitted one character too many
+  onto any row carrying one, the overflow wrapped past the pane, and fzf's next redraw painted over
+  the remainder — `Session Configuration` rendered as `Session Configuratio`. Replaced with glyphs
+  whose base is already East Asian Wide, so no variation selector is needed and both agree: `⚙️` →
+  `🔧` (session config header, matching the launch box), `⚙️` → `🔩` (Config category, since `🔧`
+  already marks Skill), `🏗️` → `📐` (Arch category), `⚠️` → `❗` (warnings). Added
+  `tests/test_terminal_width_safety.py`, which fails on any width-mismatched glyph reaching a
+  shipped source file.
 - **Release script: PR title now follows Conventional Commits** — was `"Release v{version}"`
   (rejected by the PR title gate); changed to `"chore(release): v{version}"`.
 - **Release script: `poll_pr_checks` no longer times out on running checks** — `gh pr checks` exits
