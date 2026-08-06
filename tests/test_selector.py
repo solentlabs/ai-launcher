@@ -187,7 +187,7 @@ def test_select_project_configuration_action_then_select(
     choice_str = f"{project_path}\t\tmy-proj"
     mock_tree.return_value = ([choice_str], {choice_str: project})
 
-    action_bytes = "__ACTION__\t\t⚙️ Configuration".encode()
+    action_bytes = "__ACTION__\t\t🔧 Configuration".encode()
     mock_popen.side_effect = [
         _make_popen_mock(action_bytes + b"\n"),
         _make_popen_mock(f"{choice_str}\n".encode()),

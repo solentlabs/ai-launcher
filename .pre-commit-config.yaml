@@ -40,10 +40,13 @@ repos:
         args: [--pytest-test-first]
 
   # Ruff linter (replaces flake8, isort, bandit)
+  # Keep this rev in lockstep with the ruff pin in pyproject.toml [dev] --
+  # CI installs that pin and runs the same two commands. A mismatch means the
+  # hook and CI disagree about the same source, which is only discovered on push.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.0
+    rev: v0.15.9
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
@@ -94,6 +97,17 @@ repos:
       - id: markdownlint-cli2
         args: ["--fix"]
         exclude: ^(venv|build|dist|htmlcov|\.venv|node_modules)/
+
+  # Pre-commit hooks (local)
+  - repo: local
+    hooks:
+      - id: check-changelog
+        name: Check CHANGELOG.md updated
+        entry: bash scripts/check-changelog.sh
+        language: system
+        stages: [pre-commit]
+        always_run: true
+        pass_filenames: false
 
   # Pre-push hooks
   - repo: local

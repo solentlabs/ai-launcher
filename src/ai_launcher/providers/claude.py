@@ -581,7 +581,7 @@ def _categorize_global_file(file_path: Path) -> str:
 
     # Architecture
     if any(word in name for word in ["ARCH", "DESIGN", "STRUCTURE"]):
-        return "🏗️  Arch: Architecture and design decisions"
+        return "📐 Arch: Architecture and design decisions"
 
     # Project root instructions
     if name in ["CLAUDE", "INSTRUCTIONS", "CONTEXT", "PROMPT"]:
@@ -589,7 +589,7 @@ def _categorize_global_file(file_path: Path) -> str:
 
     # Configuration files
     if "config" in name_lower or "settings" in name_lower:
-        return "⚙️  Config: CLI configuration file"
+        return "🔩 Config: CLI configuration file"
 
     # Configuration directories
     if ".config" in str(file_path) or ".claude" in str(file_path):

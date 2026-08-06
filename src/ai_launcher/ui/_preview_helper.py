@@ -131,7 +131,7 @@ def show_configuration_preview() -> None:
 
     # Available Options
     print(
-        "\033[1m⚙️ Available Options\033[0m \033[2m(All options work independently)\033[0m"
+        "\033[1m🔧 Available Options\033[0m \033[2m(All options work independently)\033[0m"
     )
     print()
     print("   \033[1mContext:\033[0m")
@@ -373,7 +373,7 @@ def main() -> None:
                                 print("─" * 80)
                                 print()
                     except Exception as e:
-                        print(f"\n⚠️  Error loading provider context: {e}")
+                        print(f"\n❗ Error loading provider context: {e}")
                         import traceback
 
                         traceback.print_exc()

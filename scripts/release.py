@@ -217,7 +217,10 @@ def poll_pr_checks(pr_number: int) -> bool:
             ["pr", "checks", str(pr_number)],
             check=False,
         )
-        if result.returncode != 0 or not result.stdout.strip():
+        # gh pr checks exits non-zero when checks are pending OR failed, but
+        # stdout still contains the check list. Only treat truly empty output
+        # as "checks haven't appeared yet".
+        if not result.stdout.strip():
             info(f"Waiting for checks to appear... ({elapsed}s)")
             time.sleep(POLL_INTERVAL)
             elapsed += POLL_INTERVAL
@@ -430,6 +433,9 @@ def check_changelog(version: str) -> None:
 
 def update_pyproject_version(version: str) -> None:
     content = PYPROJECT.read_text()
+    if re.search(rf'^version\s*=\s*"{re.escape(version)}"', content, re.MULTILINE):
+        success(f"pyproject.toml already at {version}")
+        return
     new_content = re.sub(
         r'^version\s*=\s*"[^"]*"',
         f'version = "{version}"',
@@ -445,6 +451,9 @@ def update_pyproject_version(version: str) -> None:
 
 def update_init_version(version: str) -> None:
     content = INIT_FILE.read_text()
+    if re.search(rf'^__version__\s*=\s*"{re.escape(version)}"', content, re.MULTILINE):
+        success(f"__init__.py already at {version}")
+        return
     new_content = re.sub(
         r'^__version__\s*=\s*"[^"]*"',
         f'__version__ = "{version}"',
@@ -515,9 +524,9 @@ def create_release_branch(version: str, no_push: bool, dry_run: bool) -> int | N
             "pr",
             "create",
             "--title",
-            f"Release v{version}",
+            f"chore(release): v{version}",
             "--body",
-            f"## Release v{version}\n\nVersion bump to {version}.\n\n"
+            f"## chore(release): v{version}\n\nVersion bump to {version}.\n\n"
             f"_Automated by `scripts/release.py`_",
             "--base",
             "main",

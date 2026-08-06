@@ -49,7 +49,7 @@ ai-launcher claude ~/projects
 
 ```bash
 ai-launcher claude ~/projects/solentlabs \
-  --global-files ~/projects/solentlabs/operations/ai-skills/insights-journal.md \
+  --global-files ~/.claude/RULES.md \
   --manual-paths ~/projects/personal
 ```
 

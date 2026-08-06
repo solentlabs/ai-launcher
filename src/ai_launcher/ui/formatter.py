@@ -462,11 +462,11 @@ class PreviewFormatter:
             "🔧 Skill",  # Custom capabilities
             "🤖 Agent",  # AI agent configuration
             "💡 Hint",  # Patterns and examples
-            "🏗️  Arch",  # Architecture decisions
+            "📐 Arch",  # Architecture decisions
             "📚 Docs",  # Documentation
             "🔒 Ops",  # Security and operations
             "🧪 Test",  # Testing standards
-            "⚙️  Config",  # Configuration files
+            "🔩 Config",  # Configuration files
             "🔗 Shared",  # Shared context
             "📝 Notes",  # Plans and notes
             "📦 Cache",  # Cache and history
@@ -613,7 +613,7 @@ class PreviewFormatter:
             Formatted section showing permissions, MCP servers, hooks, model
         """
 
-        lines = [f"{self.BOLD}⚙️ Session Configuration{self.RESET}"]
+        lines = [f"{self.BOLD}🔧 Session Configuration{self.RESET}"]
 
         # Permission warnings (most important — show first)
         if config.permission_warnings:

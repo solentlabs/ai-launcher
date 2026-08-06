@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-08-06
+
+### Fixed
+
+- **Preview pane no longer eats the last character of a row** — `⚙️`, `⚠️` and `🏗️` are an East
+  Asian _Neutral_ base plus a U+FE0F variation selector. fzf's `go-runewidth` scores that as one
+  column; terminals honour the selector and draw two. fzf therefore admitted one character too many
+  onto any row carrying one, the overflow wrapped past the pane, and fzf's next redraw painted over
+  the remainder — `Session Configuration` rendered as `Session Configuratio`. Replaced with glyphs
+  whose base is already East Asian Wide, so no variation selector is needed and both agree: `⚙️` →
+  `🔧` (session config header, matching the launch box), `⚙️` → `🔩` (Config category, since `🔧`
+  already marks Skill), `🏗️` → `📐` (Arch category), `⚠️` → `❗` (warnings). Added
+  `tests/test_terminal_width_safety.py`, which fails on any width-mismatched glyph reaching a
+  shipped source file.
+- **Release script: PR title now follows Conventional Commits** — was `"Release v{version}"`
+  (rejected by the PR title gate); changed to `"chore(release): v{version}"`.
+- **Release script: `poll_pr_checks` no longer times out on running checks** — `gh pr checks` exits
+  non-zero for both pending and failed states, but stdout still contains the check list. The poller
+  previously treated any non-zero exit as "no checks yet" and burned the full 1200s timeout. Fixed
+  to only wait when stdout is actually empty.
+- **Release script: phase 4 is now idempotent** — re-running after a timeout no longer fatals with
+  "Could not find version string" when the version file is already at the target version.
+
+### Changed
+
+- **Ruff pinned exactly, ending a three-way version drift** — `pyproject.toml` declared
+  `ruff>=0.5.0`, so CI resolved whatever was newest (0.16.1) while the pre-commit hook pinned
+  v0.11.0 and the local venv sat at 0.15.4. All 15 CI matrix jobs failed at the lint step on
+  `RUF100 unused noqa: S310` in `utils/fzf.py` — 0.16.1 narrowed `S310` to the opener call, making a
+  directive that every older ruff still requires into a dead one. The versions are mutually
+  exclusive on that line, so no source edit satisfies both; `ruff` is now pinned to `==0.15.9` in
+  `pyproject.toml` with the pre-commit `rev` in lockstep. Upgrading to 0.16.x is deliberate future
+  work — it also reformats Python code blocks inside three Markdown docs.
+- **`scripts/ci-local.sh` now mirrors CI** — it ran `ruff check .` but never
+  `ruff format --check .`, so a formatter-only disagreement could reach CI unseen. Adds the format
+  check plus two drift guards that block a push when the local ruff differs from the
+  `pyproject.toml` pin, or when the pre-commit `rev` differs from it (pre-commit.ci autoupdates that
+  rev weekly). Both print the exact command to fix.
+- **Changelog gate added** — new `changelog-check.yml` CI workflow fails PRs that change Python
+  source or scripts without updating `CHANGELOG.md`. Soft pre-commit warning added via
+  `scripts/check-changelog.sh`.
+
 ## [0.4.1] - 2026-05-29
 
 ### Fixed
