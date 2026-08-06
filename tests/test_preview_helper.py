@@ -124,3 +124,31 @@ class TestMain:
         out = capsys.readouterr().out
         assert "Contents:" in out
         assert "file.txt" in out
+
+    def test_scan_root_provider_failure_is_reported(self, capsys, tmp_path):
+        """A provider failure while previewing a scan root prints an inline error.
+
+        The scan-root branch loads provider context lazily and swallows any
+        failure so the preview pane still renders. Without this test the
+        recovery path is never exercised.
+        """
+        scan_root = tmp_path / "projects"
+        scan_root.mkdir()
+
+        env = {
+            "AI_LAUNCHER_PROVIDER": "claude-code",
+            "AI_LAUNCHER_SCAN_PATHS": str(scan_root),
+            "AI_LAUNCHER_MANUAL_PATHS": "",
+            "AI_LAUNCHER_GLOBAL_FILES": "",
+        }
+
+        with patch("sys.argv", ["_preview_helper.py", f"{scan_root}\t\tprojects"]):
+            with patch.dict(os.environ, env, clear=False):
+                with patch(
+                    "ai_launcher.providers.registry.ProviderRegistry.get",
+                    side_effect=RuntimeError("provider exploded"),
+                ):
+                    main()
+
+        out = capsys.readouterr().out
+        assert "❗ Error loading provider context: provider exploded" in out
