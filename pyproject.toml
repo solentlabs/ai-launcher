@@ -142,7 +142,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "S105", "PLR2004", "ARG", "SLF001", "PT006", "PT011", "PT018"]
+# S603/S607: tests invoke scripts/*.py through sys.executable to exercise their
+# CLIs — the same allowance every other directory here already carries.
+"tests/**/*.py" = ["S101", "S105", "PLR2004", "ARG", "SLF001", "PT006", "PT011", "PT018", "S603", "S607"]
 "src/ai_launcher/cli.py" = ["T20", "F821"]
 "src/ai_launcher/ui/**/*.py" = ["T20", "F821", "F841", "S603", "S607", "ARG001", "ARG002"]
 "src/ai_launcher/core/**/*.py" = ["F821", "ARG001", "ARG002", "S603", "S607"]

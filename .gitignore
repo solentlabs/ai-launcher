@@ -38,6 +38,8 @@ venv.bak/
 # pytest
 .pytest_cache/
 .coverage
+coverage.json
+coverage.xml
 htmlcov/
 *.cover
 

@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - TBD
+
+### Fixed
+
+- **Release no longer tags into a still-running CI** — `poll_main_ci()` took the latest CI run on
+  main with no commit filter. Immediately after a squash-merge the new run has not registered, so it
+  read the _previous_ run, found it green, and returned instantly. v0.4.2 then pushed its tag while
+  CI on the real commit had not started. It now matches on the merge commit's SHA and waits for that
+  run specifically.
+- **Tag protection can tell "running" from "failed"** — it collapsed check runs with
+  `all(.conclusion == "success")`, and an unfinished run carries `conclusion: null`, so a CI that
+  was merely still going read as a hard failure. That is what turned the v0.4.2 race into a red gate
+  on a commit whose CI went on to pass. It now waits out a pending CI, up to 30 minutes.
+- **`release.py` can resume after the tag is pushed** — phase 1 fatally exited on any existing tag,
+  so a release interrupted during phase 8 could not be finished by re-running it; v0.4.2's GitHub
+  release had to be created by hand. An existing tag is now a conflict only when it points at a
+  different commit, and a pushed tag resumes directly at phase 8.
+
+### Added
+
+- **The CI gates are now tested** — `scripts/gate_checks.py` holds the changelog and CI-status
+  decisions as pure functions that both the workflows and `tests/test_gate_checks.py` call, so a
+  test cannot pass while the gate does something else. Previously both lived as inline bash and jq
+  inside workflow YAML, which nothing exercised — and both failed on first contact with a release.
+  `tests/test_release_flow.py` covers the release script, which had no tests at all. Each scenario
+  that actually broke has a named regression test, verified to fail against the old logic.
+- **Local patch-coverage check** — `scripts/patch_coverage.py` reports coverage of the lines a
+  branch changed, the measure Codecov applies. The project-wide floor can pass while a patch adds
+  untested lines, so that verdict was previously visible only after a push. Wired into
+  `scripts/ci-local.sh` as warn-only, to surface what Codecov will say rather than add a stricter
+  gate than CI enforces.
+
+### Changed
+
+- **Lint runs once, before the test matrix** — it ran inside all 15 matrix jobs, so one lint error
+  failed 15 jobs identically and burned the whole matrix to report a single line. A separate `lint`
+  job reports the same error in seconds, and the matrix now `needs` it.
+- **CI verifies the tool pins** — `scripts/check-tool-pins.sh` is shared by the pre-push gate and
+  the CI lint job, so ruff version drift is caught on whichever side introduces it, including a
+  pre-commit.ci autoupdate landing a new rev without the matching `pyproject.toml` bump.
+
 ## [0.4.2] - 2026-08-06
 
 ### Fixed
