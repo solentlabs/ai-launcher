@@ -48,8 +48,16 @@ jobs:
             echo "No code changes detected"
           fi
 
+      # Release PRs are exempt. scripts/release.py bumps the version constants in
+      # pyproject.toml and src/ai_launcher/__init__.py -- which match the code
+      # pattern above -- while the changelog entry for that version landed with
+      # the feature PR, as docs/releasing.md requires. Without this exemption the
+      # gate fails every release PR and deadlocks the release flow.
       - name: Verify changelog update
-        if: steps.code_check.outputs.code_changed == 'true' && steps.changelog_check.outputs.changelog_updated == 'false'
+        if: >-
+          steps.code_check.outputs.code_changed == 'true' &&
+          steps.changelog_check.outputs.changelog_updated == 'false' &&
+          !startsWith(github.head_ref, 'release/')
         run: |
           echo "❌ CHANGELOG.md needs to be updated!"
           echo ""

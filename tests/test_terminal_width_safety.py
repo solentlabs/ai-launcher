@@ -2,7 +2,7 @@
 
 fzf lays out the preview pane with go-runewidth, which scores a variation
 selector (U+FE0F) as zero-width and an East Asian *Neutral* base as one column.
-Terminals honour the selector and draw a two-column emoji. A glyph whose base is
+Terminals honor the selector and draw a two-column emoji. A glyph whose base is
 Neutral therefore costs fzf one column and the terminal two, so fzf admits one
 character too many onto that row. The overflow wraps, and fzf's next redraw --
 which repositions with CR + cursor-forward, assuming it never left the row --
@@ -126,6 +126,6 @@ class TestCategoryPrefixesStayInSync:
             )
             label = _categorize_global_file(Path("/tmp") / filename)
             assert label.startswith(expected_prefix), (
-                f"{filename} categorised as {label!r}, which does not start with "
+                f"{filename} categorized as {label!r}, which does not start with "
                 f"{expected_prefix!r} -- provider and formatter have drifted"
             )
