@@ -11,7 +11,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **Preview pane no longer eats the last character of a row** — `⚙️`, `⚠️` and `🏗️` are an East
   Asian _Neutral_ base plus a U+FE0F variation selector. fzf's `go-runewidth` scores that as one
-  column; terminals honour the selector and draw two. fzf therefore admitted one character too many
+  column; terminals honor the selector and draw two. fzf therefore admitted one character too many
   onto any row carrying one, the overflow wrapped past the pane, and fzf's next redraw painted over
   the remainder — `Session Configuration` rendered as `Session Configuratio`. Replaced with glyphs
   whose base is already East Asian Wide, so no variation selector is needed and both agree: `⚙️` →
@@ -27,6 +27,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to only wait when stdout is actually empty.
 - **Release script: phase 4 is now idempotent** — re-running after a timeout no longer fatals with
   "Could not find version string" when the version file is already at the target version.
+- **Changelog gate no longer deadlocks the release flow** — the gate treats any change under
+  `src/ai_launcher/` or `scripts/` as code needing a changelog entry, but a release PR bumps
+  `src/ai_launcher/__init__.py` while its entry already landed with the feature PR. Every release PR
+  therefore failed the gate, blocking phase 6. Caught on the v0.4.2 release, which stopped at phase
+  6 before any tag was pushed. The verification step now skips PRs from a `release/` branch.
 
 ### Changed
 
