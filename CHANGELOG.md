@@ -30,6 +30,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Ruff pinned exactly, ending a three-way version drift** — `pyproject.toml` declared
+  `ruff>=0.5.0`, so CI resolved whatever was newest (0.16.1) while the pre-commit hook pinned
+  v0.11.0 and the local venv sat at 0.15.4. All 15 CI matrix jobs failed at the lint step on
+  `RUF100 unused noqa: S310` in `utils/fzf.py` — 0.16.1 narrowed `S310` to the opener call, making a
+  directive that every older ruff still requires into a dead one. The versions are mutually
+  exclusive on that line, so no source edit satisfies both; `ruff` is now pinned to `==0.15.9` in
+  `pyproject.toml` with the pre-commit `rev` in lockstep. Upgrading to 0.16.x is deliberate future
+  work — it also reformats Python code blocks inside three Markdown docs.
+- **`scripts/ci-local.sh` now mirrors CI** — it ran `ruff check .` but never
+  `ruff format --check .`, so a formatter-only disagreement could reach CI unseen. Adds the format
+  check plus two drift guards that block a push when the local ruff differs from the
+  `pyproject.toml` pin, or when the pre-commit `rev` differs from it (pre-commit.ci autoupdates that
+  rev weekly). Both print the exact command to fix.
 - **Changelog gate added** — new `changelog-check.yml` CI workflow fails PRs that change Python
   source or scripts without updating `CHANGELOG.md`. Soft pre-commit warning added via
   `scripts/check-changelog.sh`.
