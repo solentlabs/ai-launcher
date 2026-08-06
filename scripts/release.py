@@ -256,8 +256,21 @@ def poll_pr_checks(pr_number: int) -> bool:
     return False  # unreachable, fatal exits
 
 
-def poll_main_ci() -> bool:
-    """Poll the latest CI run on main until it completes. Returns True if passed."""
+def poll_main_ci(expected_sha: str) -> bool:
+    """Poll CI on main for a specific commit until it completes.
+
+    Must match on the commit SHA. Taking the latest run unconditionally meant
+    that immediately after a squash-merge -- before the new run had registered --
+    the *previous* run was read, found already green, and returned instantly. The
+    v0.4.2 release then tagged into a still-running CI, which tag protection saw
+    as a failure.
+
+    Args:
+        expected_sha: The merge commit that must have a passing CI run.
+
+    Returns:
+        True if that commit's CI passed.
+    """
     elapsed = 0
     while elapsed < POLL_TIMEOUT:
         result = run_gh(
@@ -269,9 +282,9 @@ def poll_main_ci() -> bool:
                 "--workflow",
                 "ci.yml",
                 "--limit",
-                "1",
+                "20",
                 "--json",
-                "status,conclusion,databaseId",
+                "status,conclusion,databaseId,headSha",
             ],
             check=False,
         )
@@ -282,25 +295,29 @@ def poll_main_ci() -> bool:
             continue
 
         runs = json.loads(result.stdout)
-        if not runs:
-            info(f"No CI runs found on main... ({elapsed}s)")
+        matching = [r for r in runs if r.get("headSha") == expected_sha]
+        if not matching:
+            # The run for this commit has not been created yet. Waiting is the
+            # only correct move -- falling back to another run is the bug this
+            # function exists to prevent.
+            info(f"No CI run yet for {expected_sha[:8]} on main... ({elapsed}s)")
             time.sleep(POLL_INTERVAL)
             elapsed += POLL_INTERVAL
             continue
 
-        run_data = runs[0]
+        run_data = matching[0]
         status = run_data.get("status")
         conclusion = run_data.get("conclusion")
         run_id = run_data.get("databaseId", "?")
 
         if status == "completed":
             if conclusion == "success":
-                success(f"CI run {run_id} passed on main")
+                success(f"CI run {run_id} passed on main for {expected_sha[:8]}")
                 return True
             fatal(f"CI run {run_id} on main concluded: {conclusion}")
             return False
 
-        info(f"CI run {run_id} status: {status} ({elapsed}s)")
+        info(f"CI run {run_id} ({expected_sha[:8]}) status: {status} ({elapsed}s)")
         time.sleep(POLL_INTERVAL)
         elapsed += POLL_INTERVAL
 
@@ -388,10 +405,28 @@ def check_on_main() -> None:
 
 
 def check_tag_not_exists(version: str) -> None:
-    result = run(["git", "tag", "-l", f"v{version}"], capture=True)
-    if result.stdout.strip():
-        fatal(f"Tag v{version} already exists locally")
-    success(f"Tag v{version} is available")
+    """Validate the tag, permitting a resume of this same release.
+
+    Fatalling on any existing tag left release.py unable to finish what it had
+    started: when v0.4.2 stopped in phase 8 on a tag-protection failure, the tag
+    was already pushed, so re-running could not get past phase 1 and the GitHub
+    release had to be created by hand. An existing tag is a genuine conflict only
+    when it points at a different commit than the one being released.
+    """
+    tag = f"v{version}"
+    result = run(["git", "tag", "-l", tag], capture=True)
+    if not result.stdout.strip():
+        success(f"Tag {tag} is available")
+        return
+
+    tagged = run(["git", "rev-list", "-n", "1", tag], capture=True).stdout.strip()
+    head = run(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    if tagged != head:
+        fatal(
+            f"Tag {tag} already exists at {tagged[:8]}, which is not HEAD "
+            f"({head[:8]}). Delete the tag or release a new version."
+        )
+    info(f"Tag {tag} already exists at HEAD — resuming this release")
 
 
 def run_quality_checks(venv: str, skip_tests: bool, skip_quality: bool) -> None:
@@ -577,8 +612,11 @@ def wait_for_main_ci(dry_run: bool) -> None:
     run(["git", "pull", "origin", "main"])
     success("On main with latest changes")
 
-    info("Waiting for CI on main...")
-    poll_main_ci()
+    # Resolve the merge commit *after* pulling, so CI is matched to the commit
+    # that will actually be tagged.
+    head = run(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    info(f"Waiting for CI on main for {head[:8]}...")
+    poll_main_ci(head)
 
 
 def create_tag_and_release(version: str, dry_run: bool) -> None:
@@ -680,6 +718,18 @@ def main() -> None:
     if not args.no_push:
         require_gh()
         success("gh CLI is installed and authenticated")
+
+    # Resume path: the tag is already pushed, so the branch/PR/merge phases are
+    # done and their inputs are gone -- the release branch has been merged and
+    # deleted. Everything that remains lives in phase 8, which is itself
+    # idempotent. Without this, a release interrupted after tagging could only be
+    # finished by hand.
+    if not dry_run and not args.no_push and tag_exists_remote(version):
+        info(f"Tag v{version} is already on the remote — resuming at phase 8")
+        header("Phase 8: Tag + Release")
+        create_tag_and_release(version, dry_run)
+        print(f"\n{BOLD}{GREEN}Release v{version} complete{NC}\n")
+        return
 
     # Phase 2: Quality
     header("Phase 2: Quality Checks")

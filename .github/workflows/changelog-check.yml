@@ -23,48 +23,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if CHANGELOG.md was modified
-        id: changelog_check
+      # The decision lives in scripts/gate_checks.py so the tests in
+      # tests/test_gate_checks.py exercise the same code this gate runs. It used
+      # to be inline bash, which nothing could test -- and it deadlocked the
+      # v0.4.2 release by failing the release PR's version bump.
+      - name: Verify changelog update
         run: |
           git fetch origin ${{ github.base_ref }}
-
-          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "^CHANGELOG.md$"; then
-            echo "changelog_updated=true" >> $GITHUB_OUTPUT
-            echo "✅ CHANGELOG.md has been updated"
-          else
-            echo "changelog_updated=false" >> $GITHUB_OUTPUT
-            echo "⚠️ CHANGELOG.md has not been updated"
-          fi
-
-      - name: Check if code changes were made
-        id: code_check
-        run: |
-          if git diff --name-only origin/${{ github.base_ref }}...HEAD \
-            | grep -qE "^(src/ai_launcher|scripts)/.*\.py$"; then
-            echo "code_changed=true" >> $GITHUB_OUTPUT
-            echo "Code changes detected"
-          else
-            echo "code_changed=false" >> $GITHUB_OUTPUT
-            echo "No code changes detected"
-          fi
-
-      # Release PRs are exempt. scripts/release.py bumps the version constants in
-      # pyproject.toml and src/ai_launcher/__init__.py -- which match the code
-      # pattern above -- while the changelog entry for that version landed with
-      # the feature PR, as docs/releasing.md requires. Without this exemption the
-      # gate fails every release PR and deadlocks the release flow.
-      - name: Verify changelog update
-        if: >-
-          steps.code_check.outputs.code_changed == 'true' &&
-          steps.changelog_check.outputs.changelog_updated == 'false' &&
-          !startsWith(github.head_ref, 'release/')
-        run: |
-          echo "❌ CHANGELOG.md needs to be updated!"
-          echo ""
-          echo "This PR contains code changes but CHANGELOG.md was not updated."
-          echo "Add a ## [X.Y.Z] entry following the Keep a Changelog format."
-          echo "See docs/releasing.md for the expected format."
-          exit 1
+          git diff --name-only origin/${{ github.base_ref }}...HEAD \
+            | python3 scripts/gate_checks.py changelog --head-ref "${{ github.head_ref }}"
 
       - name: Comment on PR if changelog missing
         if: failure()

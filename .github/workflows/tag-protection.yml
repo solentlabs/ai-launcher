@@ -30,20 +30,46 @@ jobs:
           fi
           echo "✓ Tag is on main branch"
 
+      # Waits out a pending CI rather than failing it. release.py can push the tag
+      # within seconds of the merge, so CI on main is often still running when this
+      # starts -- an unfinished check run has conclusion null, which the previous
+      # inline jq collapsed to "failure". That raced the v0.4.2 release into a red
+      # gate on a commit whose CI went on to pass.
+      #
+      # The status decision is scripts/gate_checks.py, covered by
+      # tests/test_gate_checks.py, so this cannot silently diverge from its tests.
       - name: Validate CI passed on tagged commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           COMMIT=$(git rev-parse HEAD)
-          # Check only CI workflow runs (exclude Tag Protection and other workflows)
-          CONCLUSION=$(gh api "repos/${{ github.repository }}/commits/$COMMIT/check-runs" \
-            --paginate \
-            --jq '[.check_runs[] | select(.name | startswith("test ("))] | if length == 0 then "pending" elif all(.conclusion == "success") then "success" else "failure" end')
-          if [ "$CONCLUSION" != "success" ]; then
-            echo "::error::CI check runs status is '$CONCLUSION' — must be 'success' to tag"
-            exit 1
-          fi
-          echo "✓ CI passed on tagged commit"
+          DEADLINE=$(( SECONDS + 1800 ))
+
+          while true; do
+            # Deliberately not --paginate: combined with --jq it emits one JSON
+            # document per page, which will not parse as a single payload.
+            STATUS=$(gh api \
+              "repos/${{ github.repository }}/commits/$COMMIT/check-runs?per_page=100" \
+              | python3 scripts/gate_checks.py ci-status)
+
+            case "$STATUS" in
+              success)
+                echo "✓ CI passed on tagged commit $COMMIT"
+                exit 0
+                ;;
+              failure)
+                echo "::error::CI failed on tagged commit $COMMIT — refusing to tag"
+                exit 1
+                ;;
+            esac
+
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then
+              echo "::error::Timed out after 30m waiting for CI on $COMMIT"
+              exit 1
+            fi
+            echo "CI still pending on $COMMIT — waiting ($SECONDS s)"
+            sleep 20
+          done
 
       - name: Set up Python
         uses: actions/setup-python@v5

@@ -7,7 +7,39 @@ on:
     branches: [main]
 
 jobs:
+  # Lint runs once, before the matrix. It used to run inside all 15 matrix jobs,
+  # so a single lint error failed 15 jobs identically and burned the full matrix
+  # to report one line -- which is exactly what happened on the v0.4.2 branch.
+  # One job reports the same error in ~20s at a fifteenth of the compute.
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # Catches the case where CI's resolved ruff drifts from the pin the hook
+      # and developers use -- including a pre-commit.ci autoupdate landing a new
+      # rev without the matching pyproject bump.
+      - name: Verify tool pins are consistent
+        run: bash scripts/check-tool-pins.sh
+
+      - name: Lint with ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
   test:
+    needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -41,11 +73,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-
-      - name: Lint with ruff
-        run: |
-          ruff check .
-          ruff format --check .
 
       - name: Run tests
         run: |
