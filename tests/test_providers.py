@@ -4,10 +4,15 @@ Author: Solent Labs™
 Created: 2026-02-09
 """
 
+from unittest.mock import patch
+
 import pytest
 
+from ai_launcher.providers.aider import AiderProvider
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 from ai_launcher.providers.claude import ClaudeProvider
+from ai_launcher.providers.copilot import CopilotProvider
+from ai_launcher.providers.cursor import CursorProvider
 from ai_launcher.providers.gemini import GeminiProvider
 from ai_launcher.providers.registry import ProviderRegistry, get_provider, get_registry
 
@@ -206,3 +211,28 @@ class TestProviderRegistryExtended:
         custom = CustomProvider()
         registry.register(custom)
         assert registry.get("custom-test") is custom
+
+
+class TestScopeRootsOnUnguardedProviders:
+    """Providers without a write guard accept scope_roots and launch unchanged.
+
+    Their own tools already confine or confirm out-of-folder writes (see
+    docs/project-scope.md), so AI Launcher passes them nothing extra.
+    """
+
+    @pytest.mark.parametrize(
+        ("provider_cls", "command"),
+        [
+            (GeminiProvider, ["gemini"]),
+            (CopilotProvider, ["copilot"]),
+            (CursorProvider, ["agent"]),
+            (AiderProvider, ["aider"]),
+        ],
+        ids=["gemini", "copilot", "cursor", "aider"],
+    )
+    def test_command_unchanged(self, provider_cls, command, tmp_path):
+        provider = provider_cls()
+        with patch("subprocess.run") as mock_run, patch("os.chdir"):
+            provider.launch(tmp_path, scope_roots=[tmp_path.parent])
+        mock_run.assert_called_once_with(command, check=True)
+        assert provider.metadata.guards_other_projects is False

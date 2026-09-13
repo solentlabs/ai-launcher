@@ -134,6 +134,7 @@ class TestDisplayLaunchInfo:
         config_files=None,
         has_get_version=False,
         version=None,
+        guards_other_projects=False,
     ):
         """Create a mock provider."""
         provider = MagicMock()
@@ -143,6 +144,7 @@ class TestDisplayLaunchInfo:
             command="test",
             description="Test provider",
             config_files=config_files or ["TEST.md"],
+            guards_other_projects=guards_other_projects,
         )
         type(provider).metadata = PropertyMock(return_value=metadata)
 
@@ -171,6 +173,23 @@ class TestDisplayLaunchInfo:
         captured = capsys.readouterr()
         assert "AI Launcher" in captured.out
         assert tmp_path.name in captured.out
+
+    @pytest.mark.parametrize(
+        ("guards", "with_roots", "shown"),
+        [(True, True, True), (True, False, False), (False, True, False)],
+        ids=["guarded", "no-roots", "provider-without-guard"],
+    )
+    def test_scope_line(self, tmp_path, capsys, guards, with_roots, shown):
+        """The box says so when writes to other projects will ask first."""
+        provider = self._make_provider(guards_other_projects=guards)
+        roots = [tmp_path.parent] if with_roots else []
+        display_launch_info(tmp_path, provider, verbose=True, scope_roots=roots)
+        lines = capsys.readouterr().out.splitlines()
+        scope_lines = [line for line in lines if "Scope:" in line]
+        assert bool(scope_lines) is shown
+        for line in scope_lines:
+            assert "writes to other projects ask first" in line
+            assert _visual_length(line) == 85
 
     def test_verbose_shows_provider_info(self, tmp_path, capsys):
         provider = self._make_provider()

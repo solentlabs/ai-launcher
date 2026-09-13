@@ -18,7 +18,7 @@ import shutil
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence
 
 from ai_launcher.core.provider_data import ContextFile, ProviderPreviewData
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
@@ -64,11 +64,13 @@ class CursorProvider(AIProvider):
         """
         return shutil.which("agent") is not None
 
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:  # noqa: ARG002
         """Launch Cursor CLI in the specified project directory.
 
         Args:
             project_path: Path to the project directory
+            scope_roots: Unused; see docs/project-scope.md for how this tool
+                treats writes outside the project
 
         Raises:
             FileNotFoundError: If Cursor CLI is not found

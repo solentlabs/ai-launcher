@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-13
+
+### Added
+
+- **A session stays in the project it was launched in (Claude Code)** — a handoff prompt for one
+  project was pasted into a session launched in another. The session did the work from the wrong
+  folder, under the wrong project's CLAUDE.md, settings and memory, and nothing stopped it: broad
+  allow rules (`Edit`, `Write`, `Bash(*)`) let Claude Code write outside its folder without asking.
+  AI Launcher now adds two layers when it launches Claude:
+
+  - The session is told which project it is in, so a request for another project is flagged before
+    any work starts. A pasted handoff for another project gets that answer before any file is
+    touched.
+  - A `PreToolUse` hook (`core/scope_guard.py`, passed with `--settings`) makes any write under the
+    scan folder or a manual project, but outside the chosen project, ask first. This overrides allow
+    rules. Reads never prompt, and writes outside the scan folder or to Claude's own `~/.claude` go
+    through. Shell commands are judged from their text (redirects, file-changing commands, copy
+    destinations, git's changing subcommands), which catches accidents but is not a sandbox.
+  - The launch box shows `🔒 Scope: writes to other projects ask first`.
+
+  Checked end to end against Claude Code 2.1.270. With the hook, a Write, a redirect and a
+  `git commit` aimed at a sibling project all stopped for approval, while a read of it and a write
+  inside the project went through. Without the hook, the same write went through silently. See
+  [docs/project-scope.md](docs/project-scope.md).
+
+### Changed
+
+- **`AIProvider.launch()` takes `scope_roots`** — the folders holding other projects.
+  `ProviderMetadata.guards_other_projects` says whether a provider uses them. A custom provider must
+  accept the new argument, since `launch_with_title()` now passes it. Gemini, Copilot, Aider and
+  Cursor accept it and ignore it; how each of those tools treats writes outside the project is
+  recorded in docs/project-scope.md.
+
+### Not ported
+
+- **Bash prototype** — `bin/ai-launcher` has no scope guard, because the hook needs the Python
+  package. This is an intentional divergence.
+
 ## [0.4.3] - 2026-08-06
 
 ### Fixed

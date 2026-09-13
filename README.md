@@ -127,6 +127,16 @@ Select a project, and your AI tool opens with full context.
 - 👁️ **Context visualization** - View what files AI tools access
 - 🧠 **Context awareness** - Detects CLAUDE.md, GEMINI.md, and other context files
 
+### Project Scope
+
+- 🔒 **One session, one project** - Claude Code is told which project it was launched in and flags a
+  request meant for another project before starting
+- ✋ **Asks before cross-project writes** - A write into another project under your scan folder
+  stops for your approval, even with broad allow rules like `Bash(*)`
+- 📖 **Reads stay free** - Looking at other projects never prompts
+
+See [Project Scope](https://github.com/solentlabs/ai-launcher/blob/main/docs/project-scope.md).
+
 ### Terminal Window Title
 
 - 📺 **Auto title setting** - Terminal shows "project → provider" for easy window identification
@@ -169,6 +179,7 @@ Your code and context should stay on your machine. AI Launcher:
 
 - [Installation Guide](https://github.com/solentlabs/ai-launcher/blob/main/docs/installation.md)
 - [Configuration](https://github.com/solentlabs/ai-launcher/blob/main/docs/configuration.md)
+- [Project Scope](https://github.com/solentlabs/ai-launcher/blob/main/docs/project-scope.md)
 - [Windows Terminal Setup](https://github.com/solentlabs/ai-launcher/blob/main/docs/windows-terminal.md)
 - [Troubleshooting](https://github.com/solentlabs/ai-launcher/blob/main/docs/troubleshooting.md)
 

@@ -10,7 +10,7 @@ Last Modified: 2026-02-10 (Added cleanup config to provider calls)
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 import typer
 
@@ -216,14 +216,17 @@ def _run_launcher(
         print("AI Launcher: No project selected")
         sys.exit(0)
 
-    # Launch AI provider
-    launch_ai(selected_project.path, config=config)
+    # Launch AI provider. Every scanned folder and manual project is guarded:
+    # writes there, outside the selected project, ask first.
+    scope_roots = [*scan_paths, *(p.path for p in manual_project_list)]
+    launch_ai(selected_project.path, config=config, scope_roots=scope_roots)
 
 
 def launch_ai(
     project_path: Path,
     provider: Optional["AIProvider"] = None,
     config: Optional[ConfigData] = None,
+    scope_roots: Sequence[Path] = (),
 ) -> None:
     """Launch AI provider in the specified project directory.
 
@@ -231,6 +234,8 @@ def launch_ai(
         project_path: Path to the project
         provider: Optional AIProvider instance. If None, determined from config.
         config: Optional ConfigData. If None, default config is created.
+        scope_roots: Directories holding other projects; writes there ask first
+            (for providers that support it)
     """
     from ai_launcher.providers.registry import get_provider
 
@@ -274,11 +279,12 @@ def launch_ai(
     provider.cleanup_environment(verbose=True, cleanup_config=config.cleanup)
 
     # Display launch information and launch provider
-    display_launch_info(project_path, provider, verbose=True)
+    display_launch_info(project_path, provider, verbose=True, scope_roots=scope_roots)
     provider.launch_with_title(
         project_path,
         set_title=config.ui.set_terminal_title,
         title_format=config.ui.terminal_title_format,
+        scope_roots=scope_roots,
     )
 
 

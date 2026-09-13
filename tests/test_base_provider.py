@@ -4,7 +4,7 @@ Author: Solent Labs™
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 from unittest.mock import patch
 
 import pytest
@@ -29,7 +29,7 @@ class ConcreteProvider(AIProvider):
     def is_installed(self) -> bool:
         return True
 
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
         pass
 
     def cleanup_environment(
@@ -99,6 +99,15 @@ class TestLaunchWithTitle:
             ):
                 provider.launch_with_title(tmp_path)
                 mock_set.assert_called_once_with("my-proj → Test Provider")
+
+    def test_forwards_scope_roots(self, provider, tmp_path):
+        roots = [tmp_path.parent]
+        with patch.object(provider, "launch") as mock_launch:
+            provider.launch_with_title(tmp_path, set_title=False, scope_roots=roots)
+        mock_launch.assert_called_once_with(tmp_path, scope_roots=roots)
+
+    def test_metadata_does_not_guard_by_default(self, provider):
+        assert provider.metadata.guards_other_projects is False
 
     def test_no_title_when_disabled(self, provider, tmp_path):
         with patch("ai_launcher.providers.base.set_terminal_title") as mock_set:

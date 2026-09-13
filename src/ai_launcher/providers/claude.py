@@ -8,13 +8,15 @@ Created: 2026-02-09
 Updated: 2026-02-12 (Consolidated claude_data.py into this module)
 """
 
+import json
 import os
+import shlex
 import shutil
 import subprocess  # nosec B404
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
 from ai_launcher.core.provider_data import (
     ContextFile,
@@ -29,10 +31,52 @@ from ai_launcher.core.provider_data import (
     SessionStats,
     SkillInfo,
 )
+from ai_launcher.core.scope_guard import GUARDED_TOOLS
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import CleanupConfig
+
+# Appended to Claude's system prompt so a request meant for another project is
+# flagged before any work starts, not only when a write is attempted.
+SCOPE_STATEMENT = (
+    "AI Launcher started this session in the project {name} ({path}). "
+    "Reading files anywhere is fine, but changes belong in this project. "
+    "If a request is for work in a different project, say so before starting "
+    "and suggest opening a session there instead."
+)
+
+
+def _shell_quote(value: str) -> str:
+    """Quote one word of a hook command for the shell Claude runs it in."""
+    if os.name == "nt":
+        return f'"{value}"'
+    return shlex.quote(value)
+
+
+def scope_guard_settings(
+    project_path: Path, scope_roots: Sequence[Path]
+) -> Dict[str, Any]:
+    """Claude Code settings adding the scope guard as a PreToolUse hook.
+
+    Passed with --settings, the hook adds to the user's own hooks rather than
+    replacing them, and its "ask" overrides allow rules such as Bash(*).
+    """
+    words = [sys.executable, "-m", "ai_launcher.core.scope_guard"]
+    words += ["--project", str(project_path)]
+    for root in scope_roots:
+        words += ["--root", str(root)]
+    command = " ".join(_shell_quote(word) for word in words)
+    return {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "|".join(GUARDED_TOOLS),
+                    "hooks": [{"type": "command", "command": command}],
+                }
+            ]
+        }
+    }
 
 
 class ClaudeProvider(AIProvider):
@@ -61,6 +105,7 @@ class ClaudeProvider(AIProvider):
             description="Anthropic's AI pair programmer",
             config_files=["CLAUDE.md", ".clauderc"],
             requires_installation=True,
+            guards_other_projects=True,
         )
 
     def is_installed(self) -> bool:
@@ -71,11 +116,16 @@ class ClaudeProvider(AIProvider):
         """
         return shutil.which("claude") is not None
 
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
         """Launch Claude Code in the specified project directory.
+
+        The session is told which project it is in. With scope_roots, writes
+        that land under a root but outside the project ask first (see
+        core/scope_guard.py).
 
         Args:
             project_path: Path to the project directory
+            scope_roots: Directories holding other projects to guard
 
         Raises:
             FileNotFoundError: If Claude CLI is not found
@@ -84,9 +134,18 @@ class ClaudeProvider(AIProvider):
         # Change to project directory
         os.chdir(project_path)
 
+        cmd = [
+            "claude",
+            "--append-system-prompt",
+            SCOPE_STATEMENT.format(name=project_path.name, path=project_path),
+        ]
+        if scope_roots:
+            settings = scope_guard_settings(project_path, scope_roots)
+            cmd += ["--settings", json.dumps(settings)]
+
         # Launch Claude
         try:
-            subprocess.run(["claude"], check=True)  # nosec B603, B607
+            subprocess.run(cmd, check=True)  # nosec B603, B607
         except FileNotFoundError:
             print("Error: 'claude' command not found.")
             print("Make sure Claude Code CLI is installed.")

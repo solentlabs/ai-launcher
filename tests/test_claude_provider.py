@@ -5,14 +5,17 @@ Created: 2026-02-12
 Updated: 2026-03-03 (Cross-platform compatibility: mock_home fixture, os.sep)
 """
 
+import json
 import os
+import subprocess
+import sys
 import time
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from ai_launcher.core.models import CleanupConfig
-from ai_launcher.providers.claude import ClaudeProvider
+from ai_launcher.providers.claude import ClaudeProvider, _shell_quote
 
 
 class TestClaudeCleanup:
@@ -178,6 +181,94 @@ class TestClaudeCleanup:
         # Should complete without raising exceptions
 
 
+class TestClaudeLaunchScope:
+    """launch() tells Claude which project it is in, and guards the others."""
+
+    @pytest.fixture
+    def provider(self):
+        return ClaudeProvider()
+
+    @pytest.fixture
+    def dirs(self, tmp_path):
+        # Spaces in every path: the hook command must survive shell quoting.
+        root = tmp_path / "my projects"
+        project = root / "cable modem"
+        other = root / "angel captain"
+        for repo in (project, other):
+            repo.mkdir(parents=True)
+        return root, project, other
+
+    def _launch_cmd(self, provider, project, **kwargs):
+        with patch("subprocess.run") as mock_run, patch("os.chdir"):
+            provider.launch(project, **kwargs)
+        return mock_run.call_args[0][0]
+
+    @staticmethod
+    def _option(cmd, flag):
+        return cmd[cmd.index(flag) + 1]
+
+    def test_scope_statement_names_project(self, provider, dirs):
+        _, project, _ = dirs
+        cmd = self._launch_cmd(provider, project)
+        assert cmd[0] == "claude"
+        statement = self._option(cmd, "--append-system-prompt")
+        assert "cable modem" in statement
+        assert "different project" in statement
+
+    def test_no_scan_roots_means_no_guard(self, provider, dirs):
+        _, project, _ = dirs
+        assert "--settings" not in self._launch_cmd(provider, project)
+
+    def test_guard_hook_is_passed_as_settings(self, provider, dirs):
+        root, project, _ = dirs
+        cmd = self._launch_cmd(provider, project, scope_roots=[root])
+        settings = json.loads(self._option(cmd, "--settings"))
+        (entry,) = settings["hooks"]["PreToolUse"]
+        assert set(entry["matcher"].split("|")) == {
+            "Write",
+            "Edit",
+            "MultiEdit",
+            "NotebookEdit",
+            "Bash",
+        }
+        (hook,) = entry["hooks"]
+        assert hook["type"] == "command"
+        assert "ai_launcher.core.scope_guard" in hook["command"]
+
+    @pytest.mark.parametrize(
+        ("os_name", "expected"),
+        [("posix", "'my projects'"), ("nt", '"my projects"')],
+        ids=["posix", "windows"],
+    )
+    def test_shell_quote(self, monkeypatch, os_name, expected):
+        monkeypatch.setattr("ai_launcher.providers.claude.os.name", os_name)
+        assert _shell_quote("my projects") == expected
+
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="runs the hook through a POSIX shell"
+    )
+    def test_guard_hook_command_runs(self, provider, dirs):
+        """The exact command Claude will run asks before a sibling write."""
+        root, project, other = dirs
+        cmd = self._launch_cmd(provider, project, scope_roots=[root])
+        settings = json.loads(self._option(cmd, "--settings"))
+        command = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        event = {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(other / "README.md")},
+            "cwd": str(project),
+        }
+        result = subprocess.run(
+            ["sh", "-c", command],
+            input=json.dumps(event),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        decision = json.loads(result.stdout)["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "ask"
+
+
 class TestClaudeProviderBasics:
     """Tests for basic Claude provider functionality."""
 
@@ -193,6 +284,7 @@ class TestClaudeProviderBasics:
         assert metadata.display_name == "Claude Code"
         assert metadata.command == "claude"
         assert "CLAUDE.md" in metadata.config_files
+        assert metadata.guards_other_projects is True
 
     def test_is_installed(self, provider):
         """Test is_installed check."""
