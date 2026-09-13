@@ -13,6 +13,7 @@
 | Configuration reference                    | [docs/configuration.md](docs/configuration.md)                     |
 | Context transparency                       | [docs/context-transparency.md](docs/context-transparency.md)       |
 | Permission transparency                    | [docs/permission-transparency.md](docs/permission-transparency.md) |
+| Project scope guard                        | [docs/project-scope.md](docs/project-scope.md)                     |
 | Development workflow, conventions, testing | [CONTRIBUTING.md](CONTRIBUTING.md)                                 |
 | Release process                            | [docs/releasing.md](docs/releasing.md)                             |
 | Version history                            | [CHANGELOG.md](CHANGELOG.md)                                       |

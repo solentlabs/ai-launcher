@@ -9,6 +9,7 @@
 | [troubleshooting.md](troubleshooting.md)           | Common issues and fixes (includes terminal title)     |
 | [windows-terminal.md](windows-terminal.md)         | Windows Terminal profile setup for WSL                |
 | [context-transparency.md](context-transparency.md) | What context Claude Code loads and how to optimize it |
+| [project-scope.md](project-scope.md)               | Why writes to other projects ask first                |
 
 ## For Contributors
 

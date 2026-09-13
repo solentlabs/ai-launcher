@@ -8,7 +8,7 @@ import contextlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Sequence
 
 if TYPE_CHECKING:
     from ai_launcher.providers.base import AIProvider
@@ -562,6 +562,7 @@ def display_launch_info(
     project_path: Path,
     provider: "AIProvider",
     verbose: bool = True,
+    scope_roots: Sequence[Path] = (),
 ) -> None:
     """Display launch information before starting the AI provider.
 
@@ -572,6 +573,7 @@ def display_launch_info(
         project_path: Path to the project being launched
         provider: AI provider instance
         verbose: Whether to show full details (default: True)
+        scope_roots: Directories holding other projects that the launch guards
     """
     if not verbose:
         # Minimal output - just launching message
@@ -618,6 +620,8 @@ def display_launch_info(
         project_str = str(project_path)
 
     print(_pad_line(f"│ 📁 Project:  {project_str}", width))
+    if metadata.guards_other_projects and scope_roots:
+        print(_pad_line("│ 🔒 Scope:    writes to other projects ask first", width))
     print(_pad_line("│", width))
 
     # Context sources summary (from provider data)

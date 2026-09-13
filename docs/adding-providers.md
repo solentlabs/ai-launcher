@@ -43,7 +43,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 
@@ -69,7 +69,7 @@ class YourToolProvider(AIProvider):
         """Check if tool CLI is installed."""
         return shutil.which("yourtool") is not None
 
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
         """Launch tool in project directory."""
         os.chdir(project_path)
         try:
@@ -104,6 +104,13 @@ class YourToolProvider(AIProvider):
                 print(f"  → Cleaned {self.metadata.display_name} cache")
 ```
 
+`scope_roots` holds the folders that contain the user's other projects: the scan root and any
+`--manual-paths`. A provider whose tool lets AI Launcher intercept writes uses them to make writes
+into another project ask first, and sets `guards_other_projects=True` in its metadata so the launch
+box says so. Claude Code does this (see [project-scope.md](project-scope.md)). Every other provider
+accepts the argument and ignores it. If your tool can confine writes at launch, wire it up;
+otherwise add it to the table in project-scope.md.
+
 ### 2. That's It — Auto-Discovery Handles Registration
 
 The `ProviderRegistry` automatically discovers all `AIProvider` subclasses in the `providers/`
@@ -131,7 +138,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 
@@ -163,7 +170,7 @@ class AiderProvider(AIProvider):
     def is_installed(self) -> bool:
         return shutil.which("aider") is not None
 
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
         os.chdir(project_path)
 
         # Check for config file
@@ -216,7 +223,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 
@@ -246,7 +253,7 @@ class CursorProvider(AIProvider):
     def is_installed(self) -> bool:
         return shutil.which("cursor") is not None
 
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
         os.chdir(project_path)
 
         try:
@@ -300,7 +307,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 
@@ -345,7 +352,7 @@ class CopilotProvider(AIProvider):
         except Exception:
             return False
 
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
         os.chdir(project_path)
 
         try:
@@ -390,7 +397,7 @@ class CopilotProvider(AIProvider):
 Some tools need specific flags:
 
 ```python
-def launch(self, project_path: Path) -> None:
+def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
     os.chdir(project_path)
 
     # Always launch with specific model
@@ -426,7 +433,7 @@ def metadata(self) -> ProviderMetadata:
         # ...
     )
 
-def launch(self, project_path: Path) -> None:
+def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
     subprocess.run(["gh", "copilot", "chat"], check=True)
 ```
 
@@ -483,7 +490,7 @@ def is_installed(self) -> bool:
 ### Pattern 3: IDE/Editor
 
 ```python
-def launch(self, project_path: Path) -> None:
+def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
     # Don't cd, pass path as argument
     subprocess.run(["your-ide", str(project_path)], check=True)
 ```

@@ -10,7 +10,7 @@ Created: 2026-02-09
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence
 
 from ai_launcher.utils.terminal import format_terminal_title, set_terminal_title
 
@@ -30,6 +30,8 @@ class ProviderMetadata:
         description: Brief description of the provider
         config_files: List of config files the provider uses (e.g., ["CLAUDE.md"])
         requires_installation: Whether installation check is needed
+        guards_other_projects: Whether launch() makes writes outside the
+            project ask first when given scope_roots (shown in the launch box)
     """
 
     name: str
@@ -38,6 +40,7 @@ class ProviderMetadata:
     description: str
     config_files: List[str] = field(default_factory=list)
     requires_installation: bool = True
+    guards_other_projects: bool = False
 
 
 class AIProvider(ABC):
@@ -61,7 +64,9 @@ class AIProvider(ABC):
         ...     def is_installed(self) -> bool:
         ...         return shutil.which("myai") is not None
         ...
-        ...     def launch(self, project_path: Path) -> None:
+        ...     def launch(
+        ...         self, project_path: Path, scope_roots: Sequence[Path] = ()
+        ...     ) -> None:
         ...         os.chdir(project_path)
         ...         subprocess.run(["myai"], check=True)
         ...
@@ -88,11 +93,15 @@ class AIProvider(ABC):
         """
 
     @abstractmethod
-    def launch(self, project_path: Path) -> None:
+    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
         """Launch AI tool in the specified project directory.
 
         Args:
             project_path: Path to the project directory to launch in
+            scope_roots: Directories holding other projects (the scan roots
+                and manual projects). A provider that can guard writes uses
+                them to ask before the session changes another project; the
+                others ignore them.
 
         Raises:
             FileNotFoundError: If provider CLI is not found
@@ -229,6 +238,7 @@ class AIProvider(ABC):
         project_path: Path,
         set_title: bool = True,
         title_format: str = "{project} → {provider}",
+        scope_roots: Sequence[Path] = (),
     ) -> None:
         """Launch provider with optional terminal title setting.
 
@@ -240,6 +250,7 @@ class AIProvider(ABC):
             set_title: Whether to set terminal title before launching
             title_format: Format string for terminal title
                          Available variables: {project}, {provider}, {path}, {parent}
+            scope_roots: Directories holding other projects, passed to launch()
 
         Raises:
             FileNotFoundError: If provider CLI is not found
@@ -255,4 +266,4 @@ class AIProvider(ABC):
             set_terminal_title(title)
 
         # Launch provider
-        self.launch(project_path)
+        self.launch(project_path, scope_roots=scope_roots)

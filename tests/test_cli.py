@@ -168,3 +168,34 @@ def test_launch_ai_per_project_override(mock_display, mock_get_provider, tmp_pat
     launch_ai(tmp_path, config=config)
 
     mock_get_provider.assert_called_once_with("gemini")
+
+
+@patch("ai_launcher.cli.launch_ai")
+@patch("ai_launcher.cli.select_project")
+@patch("ai_launcher.utils.fzf.ensure_fzf", return_value=True)
+def test_launch_passes_scope_roots(mock_fzf, mock_select, mock_launch, tmp_path):
+    """The scan root and manual projects become the guarded roots."""
+    scan = tmp_path / "scan"
+    (scan / "proj" / ".git").mkdir(parents=True)
+    manual = tmp_path / "manual-proj"
+    manual.mkdir()
+    mock_select.side_effect = lambda projects, *args, **kwargs: projects[0]
+
+    result = runner.invoke(app, ["claude", str(scan), "--manual-paths", str(manual)])
+
+    assert result.exit_code == 0, result.output
+    assert mock_launch.call_args.kwargs["scope_roots"] == [scan.resolve(), manual]
+
+
+@patch("ai_launcher.providers.registry.get_provider")
+@patch("ai_launcher.cli.display_launch_info")
+def test_launch_ai_forwards_scope_roots(mock_display, mock_get_provider, tmp_path):
+    """launch_ai hands the roots to both the launch box and the provider."""
+    mock_provider = MagicMock()
+    mock_get_provider.return_value = mock_provider
+    roots = [tmp_path.parent]
+
+    launch_ai(tmp_path, scope_roots=roots)
+
+    assert mock_display.call_args.kwargs["scope_roots"] == roots
+    assert mock_provider.launch_with_title.call_args.kwargs["scope_roots"] == roots

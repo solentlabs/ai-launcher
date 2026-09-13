@@ -641,6 +641,67 @@ See [Permission Transparency](permission-transparency.md) for the full feature s
 
 ---
 
+## Project Scope Guard
+
+### Problem
+
+A session launched in one project was handed work for another (a pasted handoff prompt). It did that
+work from the wrong folder, under the wrong project's CLAUDE.md, settings and memory. Nothing
+stopped it: broad allow rules (`Edit`, `Write`, `Bash(*)`) let Claude Code write outside its launch
+folder without a prompt. That was reproduced with `claude -p` before the fix.
+
+### Where It Sits in the Stack
+
+```text
+cli.py            scope_roots = scan paths + manual projects
+   ↓
+launch_ai()       → display_launch_info(..., scope_roots)   "🔒 Scope" line
+   ↓
+provider.launch(project_path, scope_roots)
+   ↓ (ClaudeProvider only)
+claude --append-system-prompt "<launched in PROJECT; flag other-project requests>"
+       --settings '{"hooks": {"PreToolUse": [scope_guard]}}'
+   ↓ (on every Write / Edit / MultiEdit / NotebookEdit / Bash)
+python -m ai_launcher.core.scope_guard --project P --root R...
+   → nothing, or {"permissionDecision": "ask", "systemMessage": reason}
+```
+
+### Decisions
+
+- **Two layers.** The appended system prompt catches a request for another project when it arrives,
+  before any reading or planning under the wrong rules. The hook catches the write itself, and it is
+  enforced by code rather than left to the model.
+- **Ask, not deny.** Some cross-project edits are deliberate; the user approves them in the prompt.
+- **Reads are never gated.** Only writes can do damage, and prompting on reads would teach users to
+  approve without reading.
+- **Only writes under a scan root count.** Writes elsewhere (`/tmp`, `~/.bashrc`) are not another
+  project. Claude's own folder (`~/.claude`, or `CLAUDE_CONFIG_DIR`) is exempt even under a root, so
+  memory saves never prompt.
+- **Hook via `--settings`.** Verified on Claude Code 2.1.270: a `--settings` hook adds to the user's
+  and project's hooks rather than replacing them, and its `ask` overrides allow rules. The
+  permission dialog does not show the hook's reason, so it is also sent as `systemMessage`, which
+  Claude prints under the tool call once the dialog is answered.
+- **Shell commands are classified from their text** (`core/scope_guard.py`): redirects,
+  file-changing commands, copy destinations and git's changing subcommands are writes; a short list
+  of commands is read-only; anything else run inside another project is a write. It is a guard
+  against accidents, not a sandbox.
+- **Not Claude Code's sandbox.** It confines shell writes at the OS level, but it also restricts
+  network access (breaking `gh`, `pip`, `git push` until configured) and needs bubblewrap on Linux.
+  That is too much for a launcher to impose.
+- **Fails open, visibly.** A guard error exits 1, which Claude Code shows as a non-blocking hook
+  error. A bug in the guard must not stop work. The module is stdlib-only and takes about 0.1s per
+  call.
+- **Other providers get nothing extra.** Copilot already asks for paths outside its folder, Gemini's
+  file tools refuse them, and Aider asks before editing any file not in the chat. Cursor's CLI
+  behaviour is undocumented. Their `launch()` accepts `scope_roots` and ignores it; the table in
+  [project-scope.md](project-scope.md) records each one.
+- **Bash prototype diverges.** The hook needs the Python package, so `bin/ai-launcher` has no guard.
+  This is noted in the changelog.
+- **Launching by name was considered and dropped.** The failure is not picking the wrong project in
+  the selector. It is a session being given another project's work after launch.
+
+---
+
 ## Future Architecture
 
 ### Multi-Tool Support
@@ -714,4 +775,4 @@ for plugin in plugins:
 
 ---
 
-**Last Updated:** 2026-03-25 **Status:** Living document, will evolve with project
+**Last Updated:** 2026-09-13 **Status:** Living document, will evolve with project
