@@ -11,6 +11,7 @@ import io
 import json
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -255,6 +256,28 @@ class TestBashCommands:
         targets = scope.write_targets("Bash", {"command": command}, layout["other"])
         assert bool(targets) is asks
 
+    @pytest.mark.parametrize(
+        "command",
+        ["rm ../angel-captain/*.pyc", "rm ../angel-captain/*/cache"],
+        ids=["wildcard-name", "wildcard-folder"],
+    )
+    def test_unresolvable_path_still_checked(self, scope, layout, monkeypatch, command):
+        """Windows before Python 3.10 raises on resolve() for names like *.pyc.
+
+        The guard must not crash (and so let the write through); the folder the
+        name sits in still decides which project it touches.
+        """
+        real_resolve = Path.resolve
+
+        def windows_resolve(self, strict=False):
+            if "*" in str(self):
+                raise OSError(123, "The filename syntax is incorrect", str(self))
+            return real_resolve(self, strict)
+
+        monkeypatch.setattr(Path, "resolve", windows_resolve)
+        targets = scope.write_targets("Bash", {"command": command}, layout["project"])
+        assert targets
+
     def test_unbalanced_quotes_still_checked(self, scope, layout):
         """A command shlex cannot parse falls back to a coarse check, not a pass."""
         command = "echo \"it's > ../angel-captain/x.txt"
@@ -307,7 +330,9 @@ class TestDecide:
             "ai_launcher.core.scope_guard.Path.home", return_value=tmp_path / "home"
         ):
             output = decide(event, scope)
-        assert str((root / "b" / "f").resolve()) in json.dumps(output)
+        # Compare against the decoded reason: JSON text escapes Windows backslashes.
+        reason = output["hookSpecificOutput"]["permissionDecisionReason"]
+        assert str((root / "b" / "f").resolve()) in reason
 
     def test_several_targets_are_counted(self, scope, layout):
         event = {

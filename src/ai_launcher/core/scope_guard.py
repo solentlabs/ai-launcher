@@ -189,7 +189,16 @@ class ProjectScope:
         path = Path(os.path.expandvars(word)).expanduser()
         if not path.is_absolute():
             path = cwd / path
-        return path.resolve()
+        try:
+            return path.resolve()
+        except OSError:
+            # Windows before Python 3.10 cannot resolve names such as "*.pyc".
+            # The folder the name sits in still decides which project it hits.
+            path = Path(os.path.normpath(path))
+            try:
+                return path.parent.resolve() / path.name
+            except OSError:
+                return path
 
     def is_other_project(self, path: Path) -> bool:
         """True if writing to path would change something outside the project."""
