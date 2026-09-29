@@ -55,17 +55,22 @@ def _shell_quote(value: str) -> str:
 
 
 def scope_guard_settings(
-    project_path: Path, scope_roots: Sequence[Path]
+    project_path: Path,
+    scope_roots: Sequence[Path],
+    scope_exempt: Sequence[Path] = (),
 ) -> Dict[str, Any]:
     """Claude Code settings adding the scope guard as a PreToolUse hook.
 
     Passed with --settings, the hook adds to the user's own hooks rather than
     replacing them, and its "ask" overrides allow rules such as Bash(*).
+    Writes under scope_exempt never ask.
     """
     words = [sys.executable, "-m", "ai_launcher.core.scope_guard"]
     words += ["--project", str(project_path)]
     for root in scope_roots:
         words += ["--root", str(root)]
+    for exempt in scope_exempt:
+        words += ["--exempt", str(exempt)]
     command = " ".join(_shell_quote(word) for word in words)
     return {
         "hooks": {
@@ -116,7 +121,12 @@ class ClaudeProvider(AIProvider):
         """
         return shutil.which("claude") is not None
 
-    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
+    def launch(
+        self,
+        project_path: Path,
+        scope_roots: Sequence[Path] = (),
+        scope_exempt: Sequence[Path] = (),
+    ) -> None:
         """Launch Claude Code in the specified project directory.
 
         The session is told which project it is in. With scope_roots, writes
@@ -126,6 +136,7 @@ class ClaudeProvider(AIProvider):
         Args:
             project_path: Path to the project directory
             scope_roots: Directories holding other projects to guard
+            scope_exempt: Directories the session may write to without asking
 
         Raises:
             FileNotFoundError: If Claude CLI is not found
@@ -140,7 +151,7 @@ class ClaudeProvider(AIProvider):
             SCOPE_STATEMENT.format(name=project_path.name, path=project_path),
         ]
         if scope_roots:
-            settings = scope_guard_settings(project_path, scope_roots)
+            settings = scope_guard_settings(project_path, scope_roots, scope_exempt)
             cmd += ["--settings", json.dumps(settings)]
 
         # Launch Claude

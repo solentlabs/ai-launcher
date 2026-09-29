@@ -654,15 +654,16 @@ folder without a prompt. That was reproduced with `claude -p` before the fix.
 
 ```text
 cli.py            scope_roots = scan paths + manual projects
+                  scope_exempt = --allow-writes folders
    ↓
-launch_ai()       → display_launch_info(..., scope_roots)   "🔒 Scope" line
+launch_ai()       → display_launch_info(..., scope_roots, scope_exempt)   "🔒 Scope" line
    ↓
-provider.launch(project_path, scope_roots)
+provider.launch(project_path, scope_roots, scope_exempt)
    ↓ (ClaudeProvider only)
 claude --append-system-prompt "<launched in PROJECT; flag other-project requests>"
        --settings '{"hooks": {"PreToolUse": [scope_guard]}}'
    ↓ (on every Write / Edit / MultiEdit / NotebookEdit / Bash)
-python -m ai_launcher.core.scope_guard --project P --root R...
+python -m ai_launcher.core.scope_guard --project P --root R... [--exempt E...]
    → nothing, or {"permissionDecision": "ask", "systemMessage": reason}
 ```
 
@@ -676,7 +677,8 @@ python -m ai_launcher.core.scope_guard --project P --root R...
   approve without reading.
 - **Only writes under a scan root count.** Writes elsewhere (`/tmp`, `~/.bashrc`) are not another
   project. Claude's own folder (`~/.claude`, or `CLAUDE_CONFIG_DIR`) is exempt even under a root, so
-  memory saves never prompt.
+  memory saves never prompt. Folders passed to `--allow-writes` are exempt too, for places every
+  session writes on purpose, such as a shared journal.
 - **Hook via `--settings`.** Verified on Claude Code 2.1.270: a `--settings` hook adds to the user's
   and project's hooks rather than replacing them, and its `ask` overrides allow rules. The
   permission dialog does not show the hook's reason, so it is also sent as `systemMessage`, which
@@ -694,7 +696,9 @@ python -m ai_launcher.core.scope_guard --project P --root R...
 - **Other providers get nothing extra.** Copilot already asks for paths outside its folder, Gemini's
   file tools refuse them, and Aider asks before editing any file not in the chat. Cursor's CLI
   behaviour is undocumented. Their `launch()` accepts `scope_roots` and ignores it; the table in
-  [project-scope.md](project-scope.md) records each one.
+  [project-scope.md](project-scope.md) records each one. Gemini passes `scope_exempt` as
+  `--include-directories`, since its own confinement would otherwise refuse an allowed folder; the
+  others ignore it.
 - **Bash prototype diverges.** The hook needs the Python package, so `bin/ai-launcher` has no guard.
   This is noted in the changelog.
 - **Launching by name was considered and dropped.** The failure is not picking the wrong project in

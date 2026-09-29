@@ -383,6 +383,37 @@ class TestHookEntryPoint:
         else:
             assert out == ""
 
+    @pytest.mark.parametrize(
+        ("tool_name", "tool_input"),
+        [
+            ("Write", {"file_path": "{other}/journal/2026-09/a.md"}),
+            ("Bash", {"command": "mkdir -p {other}/journal/2026-09"}),
+            ("Write", {"file_path": "{home}/.claude/projects/x/memory/a.md"}),
+        ],
+        ids=["file-in-allowed", "bash-in-allowed", "claude-folder-still-exempt"],
+    )
+    def test_exempt_folders_write_silently(
+        self, layout, argv, monkeypatch, capsys, tool_name, tool_input
+    ):
+        """--exempt adds to Claude's own folder; writes under either pass."""
+        argv = [*argv, "--exempt", str(layout["other"] / "journal")]
+        event = {
+            "tool_name": tool_name,
+            "tool_input": {k: _fill(v, layout) for k, v in tool_input.items()},
+            "cwd": str(layout["project"]),
+        }
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(event)))
+        assert main(argv) == 0
+        assert capsys.readouterr().out == ""
+
+    def test_exempt_does_not_cover_rest_of_sibling(
+        self, layout, argv, monkeypatch, capsys
+    ):
+        argv = [*argv, "--exempt", str(layout["other"] / "journal")]
+        monkeypatch.setattr("sys.stdin", io.StringIO(self._event(layout, "other")))
+        assert main(argv) == 0
+        assert json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+
     def test_malformed_input_fails_visibly_without_blocking(
         self, argv, monkeypatch, capsys
     ):

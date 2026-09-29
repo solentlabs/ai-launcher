@@ -134,6 +134,8 @@ Select a project, and your AI tool opens with full context.
 - ✋ **Asks before cross-project writes** - A write into another project under your scan folder
   stops for your approval, even with broad allow rules like `Bash(*)`
 - 📖 **Reads stay free** - Looking at other projects never prompts
+- 📓 **Shared folders** - `--allow-writes ~/projects/journal` lets every session write to a folder
+  they all share without asking (Claude Code and Gemini)
 
 See [Project Scope](https://github.com/solentlabs/ai-launcher/blob/main/docs/project-scope.md).
 

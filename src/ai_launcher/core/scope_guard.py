@@ -13,8 +13,9 @@ Rules:
       project ask first. That covers sibling projects and loose files between
       them.
     - Writes outside every scan root pass (``/tmp``, ``~/.bashrc``), and so do
-      writes to Claude's own folder (memory, plans) even when it sits under a
-      scan root.
+      writes to Claude's own folder (memory, plans) and to folders the user
+      allowed (``--exempt``, e.g. a journal every project writes to) even
+      when they sit under a scan root.
 
 File tools name their target directly. Shell commands are classified by
 reading the command text: output redirects, file-changing commands and git's
@@ -25,7 +26,8 @@ variable can write where the text does not say.
 Paths are resolved (symlinks followed) for comparison only, so a link inside
 the project that points into another project is still that other project.
 
-Runs as ``python -m ai_launcher.core.scope_guard --project P --root R...``
+Runs as ``python -m ai_launcher.core.scope_guard --project P --root R...
+[--exempt E...]``
 with the hook event JSON on stdin. Stdlib only: it runs on every file edit and
 shell command, so it must start fast.
 
@@ -433,11 +435,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="ai_launcher.core.scope_guard")
     parser.add_argument("--project", required=True, type=Path)
     parser.add_argument("--root", action="append", default=[], type=Path)
+    parser.add_argument("--exempt", action="append", default=[], type=Path)
     args = parser.parse_args(argv)
 
     try:
         event = json.load(sys.stdin)
-        output = decide(event, ProjectScope(args.project, args.root))
+        exempt = [_claude_config_dir(), *args.exempt]
+        output = decide(event, ProjectScope(args.project, args.root, exempt))
     except Exception as error:
         # Exit 1 is a non-blocking hook error: Claude shows it and proceeds.
         sys.stderr.write(f"AI Launcher scope guard failed: {error}\n")

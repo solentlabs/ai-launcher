@@ -185,6 +185,32 @@ def test_launch_passes_scope_roots(mock_fzf, mock_select, mock_launch, tmp_path)
 
     assert result.exit_code == 0, result.output
     assert mock_launch.call_args.kwargs["scope_roots"] == [scan.resolve(), manual]
+    assert mock_launch.call_args.kwargs["scope_exempt"] == []
+
+
+@patch("ai_launcher.cli.launch_ai")
+@patch("ai_launcher.cli.select_project")
+@patch("ai_launcher.utils.fzf.ensure_fzf", return_value=True)
+@pytest.mark.parametrize("command", ["claude", "gemini"])
+def test_allow_writes_become_scope_exempt(
+    mock_fzf, mock_select, mock_launch, tmp_path, monkeypatch, command
+):
+    """--allow-writes folders (with ~) are passed on as exempt from the guard."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    scan = tmp_path / "scan"
+    (scan / "proj" / ".git").mkdir(parents=True)
+    mock_select.side_effect = lambda projects, *args, **kwargs: projects[0]
+
+    result = runner.invoke(
+        app, [command, str(scan), "--allow-writes", "~/journal, /srv/notes ,"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert mock_launch.call_args.kwargs["scope_exempt"] == [
+        tmp_path / "journal",
+        Path("/srv/notes"),
+    ]
 
 
 @patch("ai_launcher.providers.registry.get_provider")
@@ -195,7 +221,10 @@ def test_launch_ai_forwards_scope_roots(mock_display, mock_get_provider, tmp_pat
     mock_get_provider.return_value = mock_provider
     roots = [tmp_path.parent]
 
-    launch_ai(tmp_path, scope_roots=roots)
+    exempt = [tmp_path.parent / "journal"]
 
-    assert mock_display.call_args.kwargs["scope_roots"] == roots
-    assert mock_provider.launch_with_title.call_args.kwargs["scope_roots"] == roots
+    launch_ai(tmp_path, scope_roots=roots, scope_exempt=exempt)
+
+    for call in (mock_display.call_args, mock_provider.launch_with_title.call_args):
+        assert call.kwargs["scope_roots"] == roots
+        assert call.kwargs["scope_exempt"] == exempt

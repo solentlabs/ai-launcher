@@ -217,7 +217,8 @@ class TestScopeRootsOnUnguardedProviders:
     """Providers without a write guard accept scope_roots and launch unchanged.
 
     Their own tools already confine or confirm out-of-folder writes (see
-    docs/project-scope.md), so AI Launcher passes them nothing extra.
+    docs/project-scope.md), so AI Launcher passes them nothing extra, except
+    Gemini's allowed folders (below).
     """
 
     @pytest.mark.parametrize(
@@ -236,3 +237,35 @@ class TestScopeRootsOnUnguardedProviders:
             provider.launch(tmp_path, scope_roots=[tmp_path.parent])
         mock_run.assert_called_once_with(command, check=True)
         assert provider.metadata.guards_other_projects is False
+
+    @pytest.mark.parametrize(
+        ("provider_cls", "command"),
+        [
+            (CopilotProvider, ["copilot"]),
+            (CursorProvider, ["agent"]),
+            (AiderProvider, ["aider"]),
+        ],
+        ids=["copilot", "cursor", "aider"],
+    )
+    def test_allowed_folders_ignored(self, provider_cls, command, tmp_path):
+        provider = provider_cls()
+        with patch("subprocess.run") as mock_run, patch("os.chdir"):
+            provider.launch(tmp_path, scope_exempt=[tmp_path / "journal"])
+        mock_run.assert_called_once_with(command, check=True)
+
+    def test_gemini_adds_allowed_folders_to_workspace(self, tmp_path):
+        """Gemini's file tools refuse writes outside the workspace, so an
+        allowed folder is included in it."""
+        journal, notes = tmp_path / "journal", tmp_path / "my notes"
+        with patch("subprocess.run") as mock_run, patch("os.chdir"):
+            GeminiProvider().launch(tmp_path, scope_exempt=[journal, notes])
+        mock_run.assert_called_once_with(
+            [
+                "gemini",
+                "--include-directories",
+                str(journal),
+                "--include-directories",
+                str(notes),
+            ],
+            check=True,
+        )

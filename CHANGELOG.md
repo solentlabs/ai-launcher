@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-29
+
+### Added
+
+- **`--allow-writes` for folders every session shares (Claude Code)** — a journal that all projects
+  write to sat under the scan folder, so the scope guard asked on every journal write from every
+  session. `ai-launcher claude ~/projects --allow-writes ~/projects/journal` (comma-separated, like
+  `--manual-paths`) exempts those folders: writes inside them go ahead, the rest of the project they
+  sit in still asks. The hook takes them as `--exempt`, alongside Claude's own `~/.claude`, and the
+  launch box lists them under the scope line.
+- **`--allow-writes` for Gemini** — Gemini's file tools refuse writes outside its workspace, so the
+  same journal was refused there outright. `ai-launcher gemini` takes the flag and passes each
+  folder as `--include-directories`.
+
+### Changed
+
+- **`AIProvider.launch()` and `launch_with_title()` take `scope_exempt`** — the folders under
+  `scope_roots` that may be written without asking. A custom provider must accept the new argument,
+  since `launch_with_title()` now passes it. Copilot, Aider and Cursor accept it and ignore it.
+
+### Not ported
+
+- **Bash prototype** — `bin/ai-launcher` has no scope guard, so it has no `--allow-writes` either.
+
 ## [0.5.0] - 2026-09-13
 
 ### Added

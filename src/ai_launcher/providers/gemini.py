@@ -61,13 +61,24 @@ class GeminiProvider(AIProvider):
         """
         return shutil.which("gemini") is not None
 
-    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:  # noqa: ARG002
+    def launch(
+        self,
+        project_path: Path,
+        scope_roots: Sequence[Path] = (),  # noqa: ARG002
+        scope_exempt: Sequence[Path] = (),
+    ) -> None:
         """Launch Gemini CLI in the specified project directory.
+
+        Gemini's file tools already refuse writes outside its workspace, so
+        other projects need no guard from AI Launcher. Allowed folders are
+        added to that workspace with --include-directories.
 
         Args:
             project_path: Path to the project directory
             scope_roots: Unused; see docs/project-scope.md for how this tool
                 treats writes outside the project
+            scope_exempt: Folders the session may write to (e.g. a shared
+                journal), added to Gemini's workspace
 
         Raises:
             FileNotFoundError: If Gemini CLI is not found
@@ -76,9 +87,13 @@ class GeminiProvider(AIProvider):
         # Change to project directory
         os.chdir(project_path)
 
+        cmd = ["gemini"]
+        for exempt in scope_exempt:
+            cmd += ["--include-directories", str(exempt)]
+
         # Launch Gemini
         try:
-            subprocess.run(["gemini"], check=True)  # nosec B603, B607
+            subprocess.run(cmd, check=True)  # nosec B603, B607
         except FileNotFoundError:
             print("Error: 'gemini' command not found.")
             print("Install: npm install -g @google/gemini-cli")
