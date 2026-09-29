@@ -66,6 +66,7 @@ def _run_launcher(
     global_files: Optional[str] = None,
     manual_paths: Optional[str] = None,
     check_permissions: bool = False,
+    allow_writes: Optional[str] = None,
 ) -> None:
     """Internal function to run the launcher with specified provider."""
 
@@ -217,9 +218,20 @@ def _run_launcher(
         sys.exit(0)
 
     # Launch AI provider. Every scanned folder and manual project is guarded:
-    # writes there, outside the selected project, ask first.
+    # writes there, outside the selected project, ask first, except into the
+    # --allow-writes folders.
     scope_roots = [*scan_paths, *(p.path for p in manual_project_list)]
-    launch_ai(selected_project.path, config=config, scope_roots=scope_roots)
+    scope_exempt = [
+        Path(aw.strip()).expanduser()
+        for aw in (allow_writes or "").split(",")
+        if aw.strip()
+    ]
+    launch_ai(
+        selected_project.path,
+        config=config,
+        scope_roots=scope_roots,
+        scope_exempt=scope_exempt,
+    )
 
 
 def launch_ai(
@@ -227,6 +239,7 @@ def launch_ai(
     provider: Optional["AIProvider"] = None,
     config: Optional[ConfigData] = None,
     scope_roots: Sequence[Path] = (),
+    scope_exempt: Sequence[Path] = (),
 ) -> None:
     """Launch AI provider in the specified project directory.
 
@@ -236,6 +249,7 @@ def launch_ai(
         config: Optional ConfigData. If None, default config is created.
         scope_roots: Directories holding other projects; writes there ask first
             (for providers that support it)
+        scope_exempt: Directories under scope_roots writable without asking
     """
     from ai_launcher.providers.registry import get_provider
 
@@ -279,12 +293,19 @@ def launch_ai(
     provider.cleanup_environment(verbose=True, cleanup_config=config.cleanup)
 
     # Display launch information and launch provider
-    display_launch_info(project_path, provider, verbose=True, scope_roots=scope_roots)
+    display_launch_info(
+        project_path,
+        provider,
+        verbose=True,
+        scope_roots=scope_roots,
+        scope_exempt=scope_exempt,
+    )
     provider.launch_with_title(
         project_path,
         set_title=config.ui.set_terminal_title,
         title_format=config.ui.terminal_title_format,
         scope_roots=scope_roots,
+        scope_exempt=scope_exempt,
     )
 
 
@@ -328,6 +349,12 @@ def claude(
     manual_paths: Optional[str] = typer.Option(
         None, "--manual-paths", help="Comma-separated list of manual project paths"
     ),
+    allow_writes: Optional[str] = typer.Option(
+        None,
+        "--allow-writes",
+        help="Comma-separated folders the session may write to without asking, "
+        "even inside other projects (e.g. a shared journal)",
+    ),
 ) -> None:
     """Launch Claude Code with project selection.
 
@@ -338,6 +365,7 @@ def claude(
         ai-launcher claude ~/projects --global-files ~/.claude/RULES.md
         ai-launcher claude ~/projects --cleanup --clean-cache
         ai-launcher claude ~/projects --check-permissions
+        ai-launcher claude ~/projects --allow-writes ~/projects/journal
     """
     # Just call main() with provider forced to claude-code
     _run_launcher(
@@ -355,6 +383,7 @@ def claude(
         global_files,
         manual_paths,
         check_permissions,
+        allow_writes=allow_writes,
     )
 
 
@@ -393,6 +422,12 @@ def gemini(
     manual_paths: Optional[str] = typer.Option(
         None, "--manual-paths", help="Comma-separated list of manual project paths"
     ),
+    allow_writes: Optional[str] = typer.Option(
+        None,
+        "--allow-writes",
+        help="Comma-separated folders the session may write to, "
+        "added to Gemini's workspace (e.g. a shared journal)",
+    ),
 ) -> None:
     """Launch Gemini CLI with project selection.
 
@@ -402,6 +437,7 @@ def gemini(
         ai-launcher gemini ~/projects/external
         ai-launcher gemini ~/projects --global-files ~/.claude/RULES.md
         ai-launcher gemini ~/projects --cleanup --clean-cache
+        ai-launcher gemini ~/projects --allow-writes ~/projects/journal
     """
     # Just call main() with provider forced to gemini
     _run_launcher(
@@ -418,6 +454,7 @@ def gemini(
         clean_npm,
         global_files,
         manual_paths,
+        allow_writes=allow_writes,
     )
 
 

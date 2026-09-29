@@ -191,6 +191,28 @@ class TestDisplayLaunchInfo:
             assert "writes to other projects ask first" in line
             assert _visual_length(line) == 85
 
+    def test_scope_line_lists_allowed_folders(self, tmp_path, capsys):
+        """Each --allow-writes folder is shown under the scope line, in ~ form;
+        a long one keeps its end and still fits the box."""
+        provider = self._make_provider(guards_other_projects=True)
+        journal = Path.home() / "journal"
+        deep = tmp_path.joinpath(*["Software Development"] * 5, "shared-journal")
+        display_launch_info(
+            tmp_path,
+            provider,
+            verbose=True,
+            scope_roots=[tmp_path.parent],
+            scope_exempt=[journal, deep],
+        )
+        lines = capsys.readouterr().out.splitlines()
+        index = next(i for i, line in enumerate(lines) if "Scope:" in line)
+        short, long = lines[index + 1], lines[index + 2]
+        assert "except ~/journal" in short
+        assert "except ..." in long
+        assert long.rstrip("│ ").endswith("shared-journal")
+        for line in (short, long):
+            assert _visual_length(line) == 85
+
     def test_verbose_shows_provider_info(self, tmp_path, capsys):
         provider = self._make_provider()
         display_launch_info(tmp_path, provider, verbose=True)

@@ -558,11 +558,20 @@ def _check_sibling_projects(project_path: Path) -> dict:
     return info
 
 
+def _tilde(path: Path) -> str:
+    """Show a path with ~ for the home directory, for brevity."""
+    try:
+        return f"~/{path.relative_to(Path.home())}"
+    except ValueError:
+        return str(path)
+
+
 def display_launch_info(
     project_path: Path,
     provider: "AIProvider",
     verbose: bool = True,
     scope_roots: Sequence[Path] = (),
+    scope_exempt: Sequence[Path] = (),
 ) -> None:
     """Display launch information before starting the AI provider.
 
@@ -574,6 +583,7 @@ def display_launch_info(
         provider: AI provider instance
         verbose: Whether to show full details (default: True)
         scope_roots: Directories holding other projects that the launch guards
+        scope_exempt: Directories the guard lets the session write to freely
     """
     if not verbose:
         # Minimal output - just launching message
@@ -612,16 +622,17 @@ def display_launch_info(
 
     print(_pad_line(f"│ 🤖 Provider: {provider_label}", width))
 
-    # Project path - use tilde notation for brevity
-    try:
-        rel_path = project_path.relative_to(Path.home())
-        project_str = f"~/{rel_path}"
-    except ValueError:
-        project_str = str(project_path)
-
-    print(_pad_line(f"│ 📁 Project:  {project_str}", width))
+    print(_pad_line(f"│ 📁 Project:  {_tilde(project_path)}", width))
     if metadata.guards_other_projects and scope_roots:
         print(_pad_line("│ 🔒 Scope:    writes to other projects ask first", width))
+        prefix = "│             except "
+        room = width - 2 - _visual_length(prefix)
+        for exempt in scope_exempt:
+            shown = _tilde(exempt)
+            if len(shown) > room:
+                # Keep the end: the folder name says what is allowed.
+                shown = "..." + shown[len(shown) - room + 3 :]
+            print(_pad_line(prefix + shown, width))
     print(_pad_line("│", width))
 
     # Context sources summary (from provider data)

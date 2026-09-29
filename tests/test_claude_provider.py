@@ -247,10 +247,15 @@ class TestClaudeLaunchScope:
     @pytest.mark.skipif(
         sys.platform == "win32", reason="runs the hook through a POSIX shell"
     )
-    def test_guard_hook_command_runs(self, provider, dirs):
-        """The exact command Claude will run asks before a sibling write."""
+    @pytest.mark.parametrize("allowed", [False, True], ids=["guarded", "allowed"])
+    def test_guard_hook_command_runs(self, provider, dirs, allowed):
+        """The exact command Claude will run asks before a sibling write,
+        unless that sibling was allowed."""
         root, project, other = dirs
-        cmd = self._launch_cmd(provider, project, scope_roots=[root])
+        exempt = [other] if allowed else []
+        cmd = self._launch_cmd(
+            provider, project, scope_roots=[root], scope_exempt=exempt
+        )
         settings = json.loads(self._option(cmd, "--settings"))
         command = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
         event = {
@@ -265,8 +270,11 @@ class TestClaudeLaunchScope:
             text=True,
             check=True,
         )
-        decision = json.loads(result.stdout)["hookSpecificOutput"]
-        assert decision["permissionDecision"] == "ask"
+        if allowed:
+            assert result.stdout == ""
+        else:
+            decision = json.loads(result.stdout)["hookSpecificOutput"]
+            assert decision["permissionDecision"] == "ask"
 
 
 class TestClaudeProviderBasics:

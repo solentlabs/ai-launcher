@@ -15,6 +15,7 @@ ai-launcher claude [OPTIONS] [PATH]
 | `PATH`              | Directory to scan for projects                         | `~/projects`                             |
 | `--global-files`    | Comma-separated context files to load for all projects | `--global-files ~/standards.md,~/ops.md` |
 | `--manual-paths`    | Comma-separated non-git directories to include         | `--manual-paths ~/scripts,~/notes`       |
+| `--allow-writes`    | Comma-separated folders writable without asking (\*)   | `--allow-writes ~/projects/journal`      |
 | `--discover` / `-d` | Show discovery report (installed providers, projects)  |                                          |
 | `--context` / `-c`  | Interactive context viewer                             |                                          |
 | `--list`            | List all discovered projects                           |                                          |
@@ -24,6 +25,10 @@ ai-launcher claude [OPTIONS] [PATH]
 | `--clean-provider`  | Clean provider-specific files only                     |                                          |
 | `--clean-cache`     | Clean system cache                                     |                                          |
 | `--clean-npm`       | Clean npm cache                                        |                                          |
+
+(\*) `claude` and `gemini` only: folders exempt from the
+[project scope](project-scope.md#allowing-shared-folders) guard (for Gemini, added to its
+workspace), such as a journal every project writes to.
 
 ## Available Providers
 

@@ -29,7 +29,12 @@ class ConcreteProvider(AIProvider):
     def is_installed(self) -> bool:
         return True
 
-    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
+    def launch(
+        self,
+        project_path: Path,
+        scope_roots: Sequence[Path] = (),
+        scope_exempt: Sequence[Path] = (),
+    ) -> None:
         pass
 
     def cleanup_environment(
@@ -100,11 +105,16 @@ class TestLaunchWithTitle:
                 provider.launch_with_title(tmp_path)
                 mock_set.assert_called_once_with("my-proj → Test Provider")
 
-    def test_forwards_scope_roots(self, provider, tmp_path):
+    def test_forwards_scope(self, provider, tmp_path):
         roots = [tmp_path.parent]
+        exempt = [tmp_path.parent / "journal"]
         with patch.object(provider, "launch") as mock_launch:
-            provider.launch_with_title(tmp_path, set_title=False, scope_roots=roots)
-        mock_launch.assert_called_once_with(tmp_path, scope_roots=roots)
+            provider.launch_with_title(
+                tmp_path, set_title=False, scope_roots=roots, scope_exempt=exempt
+            )
+        mock_launch.assert_called_once_with(
+            tmp_path, scope_roots=roots, scope_exempt=exempt
+        )
 
     def test_metadata_does_not_guard_by_default(self, provider):
         assert provider.metadata.guards_other_projects is False

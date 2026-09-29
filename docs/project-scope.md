@@ -18,9 +18,27 @@ session:
 | write inside another project, e.g. `angel-captain`        | **Stops and asks you first**     |
 | write any other file under `~/projects`                   | **Stops and asks you first**     |
 | write Claude's own files (`~/.claude`: memory, plans)     | Goes ahead, even if you scan `~` |
+| write inside a folder passed to `--allow-writes`          | Goes ahead                       |
 | write anywhere outside `~/projects` (`/tmp`, `~/.bashrc`) | Goes ahead                       |
 
 "Under `~/projects`" means under any folder you passed to scan, plus any `--manual-paths` project.
+
+## Allowing Shared Folders
+
+Some folders are written by every session on purpose, such as a journal that all your projects log
+to. If that folder sits under a scan root or a manual project, every write to it would ask. Pass it
+to `--allow-writes` (comma-separated, like `--manual-paths`) and writes inside it go ahead:
+
+```bash
+ai-launcher claude ~/projects --allow-writes ~/projects/journal
+```
+
+Only the named folder is allowed. The rest of the project it sits in still asks first. The launch
+box lists each allowed folder under the scope line.
+
+`ai-launcher gemini` takes the same flag. Gemini's file tools refuse writes outside its workspace,
+so a journal outside the project would otherwise be refused, not asked. AI Launcher passes each
+allowed folder as `--include-directories`, which adds it to that workspace.
 
 ## What You See (Claude Code)
 
@@ -57,7 +75,8 @@ that writes on its own can change another project without the command text sayin
 
 The guard is built for Claude Code, where the incident that prompted it happened, and where broad
 allow rules (`Edit`, `Write`, `Bash(*)`) let out-of-folder writes through without asking. The other
-tools behave as follows, according to their documentation. AI Launcher passes them nothing extra.
+tools behave as follows, according to their documentation. AI Launcher passes them nothing extra,
+except Gemini's `--allow-writes` folders (see [above](#allowing-shared-folders)).
 
 | Tool             | Writes outside the project                                                       |
 | ---------------- | -------------------------------------------------------------------------------- |

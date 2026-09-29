@@ -65,7 +65,10 @@ class AIProvider(ABC):
         ...         return shutil.which("myai") is not None
         ...
         ...     def launch(
-        ...         self, project_path: Path, scope_roots: Sequence[Path] = ()
+        ...         self,
+        ...         project_path: Path,
+        ...         scope_roots: Sequence[Path] = (),
+        ...         scope_exempt: Sequence[Path] = (),
         ...     ) -> None:
         ...         os.chdir(project_path)
         ...         subprocess.run(["myai"], check=True)
@@ -93,7 +96,12 @@ class AIProvider(ABC):
         """
 
     @abstractmethod
-    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:
+    def launch(
+        self,
+        project_path: Path,
+        scope_roots: Sequence[Path] = (),
+        scope_exempt: Sequence[Path] = (),
+    ) -> None:
         """Launch AI tool in the specified project directory.
 
         Args:
@@ -102,6 +110,8 @@ class AIProvider(ABC):
                 and manual projects). A provider that can guard writes uses
                 them to ask before the session changes another project; the
                 others ignore them.
+            scope_exempt: Directories under scope_roots the session may write
+                to without asking (e.g. a shared journal)
 
         Raises:
             FileNotFoundError: If provider CLI is not found
@@ -239,6 +249,7 @@ class AIProvider(ABC):
         set_title: bool = True,
         title_format: str = "{project} → {provider}",
         scope_roots: Sequence[Path] = (),
+        scope_exempt: Sequence[Path] = (),
     ) -> None:
         """Launch provider with optional terminal title setting.
 
@@ -251,6 +262,7 @@ class AIProvider(ABC):
             title_format: Format string for terminal title
                          Available variables: {project}, {provider}, {path}, {parent}
             scope_roots: Directories holding other projects, passed to launch()
+            scope_exempt: Directories writable without asking, passed to launch()
 
         Raises:
             FileNotFoundError: If provider CLI is not found
@@ -266,4 +278,4 @@ class AIProvider(ABC):
             set_terminal_title(title)
 
         # Launch provider
-        self.launch(project_path, scope_roots=scope_roots)
+        self.launch(project_path, scope_roots=scope_roots, scope_exempt=scope_exempt)

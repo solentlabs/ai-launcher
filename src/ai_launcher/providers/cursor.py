@@ -64,13 +64,19 @@ class CursorProvider(AIProvider):
         """
         return shutil.which("agent") is not None
 
-    def launch(self, project_path: Path, scope_roots: Sequence[Path] = ()) -> None:  # noqa: ARG002
+    def launch(
+        self,
+        project_path: Path,
+        scope_roots: Sequence[Path] = (),  # noqa: ARG002
+        scope_exempt: Sequence[Path] = (),  # noqa: ARG002
+    ) -> None:
         """Launch Cursor CLI in the specified project directory.
 
         Args:
             project_path: Path to the project directory
             scope_roots: Unused; see docs/project-scope.md for how this tool
                 treats writes outside the project
+            scope_exempt: Unused, as scope_roots
 
         Raises:
             FileNotFoundError: If Cursor CLI is not found
