@@ -33,6 +33,7 @@ from ai_launcher.core.provider_data import (
 )
 from ai_launcher.core.scope_guard import GUARDED_TOOLS
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
+from ai_launcher.utils.session import encode_project_path
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import CleanupConfig
@@ -482,25 +483,6 @@ def _get_project_context_file(project_path: Path) -> ContextFile:
         )
 
 
-def _encode_project_path(project_path: Path) -> str:
-    """Encode project path into Claude's session directory naming format.
-
-    Claude Code stores session data in directories named by encoding the project path:
-    - Replace directory separators with hyphens
-    - Example: /home/user/projects/foo -> -home-user-projects-foo
-
-    Args:
-        project_path: Absolute path to the project
-
-    Returns:
-        Encoded directory name
-    """
-    abs_path = Path(os.path.abspath(project_path))  # noqa: PTH100 - resolve() follows symlinks
-    path_str = str(abs_path)
-    encoded = path_str.replace(os.sep, "-")
-    return encoded
-
-
 def _get_session_dir(project_path: Path) -> Optional[Path]:
     """Get the Claude Code session directory for a project.
 
@@ -510,7 +492,7 @@ def _get_session_dir(project_path: Path) -> Optional[Path]:
     Returns:
         Path to session directory if it exists, None otherwise
     """
-    encoded_name = _encode_project_path(project_path)
+    encoded_name = encode_project_path(project_path)
     session_dir = Path.home() / ".claude" / "projects" / encoded_name
     return session_dir if session_dir.exists() else None
 
@@ -1035,7 +1017,7 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
 def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
     """Get Claude memory information for personal and project memory.
 
-    Uses _encode_project_path() to dynamically find the correct memory
+    Uses encode_project_path() to dynamically find the correct memory
     directories (no hardcoded paths).
 
     Args:
@@ -1049,7 +1031,7 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
 
     # Personal memory - encode home directory path
     home = Path.home()
-    personal_encoded = _encode_project_path(home)
+    personal_encoded = encode_project_path(home)
     personal_mem = (
         home / ".claude" / "projects" / personal_encoded / "memory" / "MEMORY.md"
     )
@@ -1062,7 +1044,7 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
             pass
 
     # Project memory - encode project path
-    project_encoded = _encode_project_path(project_path)
+    project_encoded = encode_project_path(project_path)
     project_mem = (
         home / ".claude" / "projects" / project_encoded / "memory" / "MEMORY.md"
     )

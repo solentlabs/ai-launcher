@@ -69,8 +69,11 @@ docs:** <https://code.claude.com/docs/en/memory>
 
 **Path encoding:**
 
+- Every character that is not an ASCII letter or digit becomes `-`
 - `/home/user/my_project` → `-home-user-my-project`
-- Both `/` and `_` convert to `-`
+- `/home/user/site.example.com` → `-home-user-site-example-com`
+- `C:\Projects\my_project` → `C--Projects-my-project`
+- AI Launcher encodes paths in one place, `encode_project_path()` in `utils/session.py`
 - Example: `/home/kwschulz/projects/solentlabs/network-monitoring/cable_modem_monitor`
   - Becomes: `-home-kwschulz-projects-solentlabs-network-monitoring-cable-modem-monitor`
 

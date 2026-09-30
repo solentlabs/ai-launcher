@@ -87,13 +87,10 @@ class TestFileTools:
         targets = scope.write_targets(tool, tool_input, layout["project"])
         assert bool(targets) is asks
 
-    def test_symlink_into_sibling_counts_as_sibling(self, scope, layout):
+    def test_symlink_into_sibling_counts_as_sibling(self, scope, layout, make_symlink):
         """A link inside the project that points at another project is not a way out."""
         link = layout["project"] / "vendor"
-        try:
-            link.symlink_to(layout["other"], target_is_directory=True)
-        except OSError:
-            pytest.skip("symlinks not permitted on this platform")
+        make_symlink(link, layout["other"], target_is_directory=True)
         targets = scope.write_targets(
             "Write", {"file_path": str(link / "x.py")}, layout["project"]
         )

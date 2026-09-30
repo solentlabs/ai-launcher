@@ -7,6 +7,7 @@ Created: 2026-02-10
 """
 
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -19,16 +20,35 @@ from ai_launcher.utils.humanize import (
 )
 
 
+def encode_path_string(path_str: str) -> str:
+    """Encode a path the way Claude Code names its per-project directories.
+
+    Every character that is not an ASCII letter or digit becomes a hyphen. That
+    covers both path separators, the Windows drive colon, underscores and dots.
+
+    Args:
+        path_str: Absolute path, in the form the operating system gives it
+
+    Returns:
+        Encoded directory name
+
+    Examples:
+        >>> encode_path_string("/home/user/my_project")
+        '-home-user-my-project'
+        >>> encode_path_string("C:\\Projects\\my_project")
+        'C--Projects-my-project'
+    """
+    return re.sub(r"[^a-zA-Z0-9]", "-", path_str)
+
+
 def encode_project_path(project_path: Path) -> str:
     """Encode project path into Claude's session directory naming format.
 
-    Claude Code stores session data in directories named by encoding the project path:
-    - Replace directory separators with hyphens
-    - Remove leading separator
-    - Example: /home/user/projects/foo -> -home-user-projects-foo
+    Claude Code stores a project's sessions and memory in a directory named
+    after the project path. See encode_path_string() for the rule.
 
     Args:
-        project_path: Absolute path to the project
+        project_path: Path to the project
 
     Returns:
         Encoded directory name
@@ -40,13 +60,8 @@ def encode_project_path(project_path: Path) -> str:
         '-home-user-work'
     """
     # Convert to absolute path without resolving symlinks
-    abs_path = Path(os.path.abspath(project_path))  # noqa: PTH100 - resolve() follows symlinks
-    path_str = str(abs_path)
-
-    # Replace path separator with hyphens
-    encoded = path_str.replace(os.sep, "-")
-
-    return encoded
+    abs_path = os.path.abspath(project_path)  # noqa: PTH100 - resolve() follows symlinks
+    return encode_path_string(abs_path)
 
 
 def get_claude_session_dir(project_path: Path) -> Optional[Path]:

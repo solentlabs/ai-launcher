@@ -106,7 +106,8 @@ ai-launcher claude --discover ~/projects
 ai-launcher claude --context
 ```
 
-Select a project, and your AI tool opens with full context.
+Select a project, and your AI tool opens with full context. Press Ctrl-O instead of Enter to open
+the project with another installed tool, or in a plain shell.
 
 ## Features
 
@@ -122,6 +123,7 @@ Select a project, and your AI tool opens with full context.
 ### Multi-Provider Support
 
 - 🤖 **Provider abstraction** - Switch between Claude Code, Gemini, and more
+- 🔀 **Open with** - Ctrl-O on a project lists your installed tools and a plain shell
 - 🔧 **Per-project configuration** - Different AI tools for different projects
 - 📊 **Discovery mode** - See what providers are installed
 - 👁️ **Context visualization** - View what files AI tools access

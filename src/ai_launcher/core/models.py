@@ -55,6 +55,22 @@ class Project:
 
 
 @dataclass
+class Selection:
+    """What the project picker returned: a project and what to open it with.
+
+    Attributes:
+        project: The project that was picked
+        provider: Name of a provider picked from the Open With list, or None
+                  for the default provider
+        use_shell: True when the Shell row was picked instead of a provider
+    """
+
+    project: Project
+    provider: Optional[str] = None
+    use_shell: bool = False
+
+
+@dataclass
 class ScanConfig:
     """Configuration for project scanning."""
 

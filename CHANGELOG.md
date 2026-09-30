@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-30
+
+### Added
+
+- **Ctrl-O opens a project with another tool, or in a shell** — the tool was fixed when the launcher
+  started, so `ai-launcher claude ~/projects` could only open a project in Claude Code. Ctrl-O on a
+  project now opens a small dialog over the picker, which is greyed out behind it in terminals that
+  can recolour what is on screen (Windows Terminal can; tmux cannot). Run natively on Windows, from
+  PowerShell, the dialog is drawn on an empty screen, because fzf there does not leave the picker
+  up. It lists the installed tools, the default first, and a Shell row. A tool picked there launches
+  with the flags the run was given, so the same cleanup and scope guard. Shell runs the first of
+  `$SHELL`, `%COMSPEC%` and `/bin/sh` that can be run (on Windows that is `cmd.exe`, even from
+  PowerShell, unless `SHELL` is set) with no cleanup and no guard, and the launcher exits with the
+  shell's status. Esc returns to the picker. Enter is unchanged, and the header gains one line:
+  `Ctrl-O for other tools`.
+- **Bash prototype** — `bin/ai-launcher` has the same key, list and shell rule. It launches only
+  Claude, so its list has two rows, Claude Code and Shell. As before, it sets no terminal title, and
+  it records a project opened in a shell in its last-opened history.
+
+### Changed
+
+- **`select_project()` returns a `Selection`** — the project and what to open it with (the default
+  tool, a named provider, or the shell), in place of a bare `Project`. Code calling it must read
+  `selection.project`.
+
+### Fixed
+
+- **Memory and sessions are found for any project path** — Claude Code names a project's folder
+  under `~/.claude/projects` by turning every character that is not a letter or digit into `-`. AI
+  Launcher had three copies of that rule, none complete. The preview pane only replaced the path
+  separator, so a project with an underscore or a dot in its path (`cable_modem_monitor`) showed no
+  memory and no sessions. The launch report also replaced `_`, but on Windows it left the drive
+  colon and backslashes in place and never found the memory file. All three now use one function.
+  The bash prototype has the same rule.
+- **Symlink tests skip where symlinks cannot be created** — on a Windows account without
+  administrator rights or Developer Mode, three tests failed while setting up. They now skip, as the
+  scope guard's symlink test already did.
+
 ## [0.6.0] - 2026-09-29
 
 ### Added

@@ -104,7 +104,7 @@ def test_scan_handles_missing_directory():
     assert projects == []
 
 
-def test_scan_follows_symlinks(tmp_path):
+def test_scan_follows_symlinks(tmp_path, make_symlink):
     """Test that symlinks/junctions are followed during scanning."""
     # Create a real repo in a separate location
     real_dir = tmp_path / "real_repos" / "my-project"
@@ -114,7 +114,7 @@ def test_scan_follows_symlinks(tmp_path):
     scan_root = tmp_path / "projects"
     scan_root.mkdir()
     link_target = scan_root / "linked-org"
-    link_target.symlink_to(tmp_path / "real_repos", target_is_directory=True)
+    make_symlink(link_target, tmp_path / "real_repos", target_is_directory=True)
 
     projects = scan_for_git_repos([scan_root], max_depth=5, prune_dirs=[])
 
@@ -122,7 +122,7 @@ def test_scan_follows_symlinks(tmp_path):
     assert projects[0].name == "my-project"
 
 
-def test_scan_handles_symlink_cycles(tmp_path):
+def test_scan_handles_symlink_cycles(tmp_path, make_symlink):
     """Test that circular symlinks don't cause infinite loops."""
     # Create a repo
     repo = tmp_path / "projects" / "repo"
@@ -130,7 +130,7 @@ def test_scan_handles_symlink_cycles(tmp_path):
 
     # Create a circular symlink: projects/loop -> projects
     loop = tmp_path / "projects" / "loop"
-    loop.symlink_to(tmp_path / "projects", target_is_directory=True)
+    make_symlink(loop, tmp_path / "projects", target_is_directory=True)
 
     projects = scan_for_git_repos([tmp_path / "projects"], max_depth=5, prune_dirs=[])
 

@@ -8,6 +8,10 @@ Author: Solent Labs™
 Last Modified: 2026-02-10 (Added cleanup config to provider calls)
 """
 
+import os
+import shutil
+import signal
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Sequence
@@ -16,10 +20,11 @@ import typer
 
 from ai_launcher import __version__
 from ai_launcher.core.discovery import get_all_projects
-from ai_launcher.core.models import ConfigData
+from ai_launcher.core.models import ConfigData, UIConfig
 from ai_launcher.ui.selector import select_project, show_project_list
 from ai_launcher.ui.startup_report import display_launch_info
 from ai_launcher.utils.logging import setup_logging
+from ai_launcher.utils.terminal import format_terminal_title, set_terminal_title
 
 if TYPE_CHECKING:
     from ai_launcher.providers.base import AIProvider
@@ -209,13 +214,25 @@ def _run_launcher(
         manual_paths_list = [mp.strip() for mp in manual_paths.split(",") if mp.strip()]
 
     # Interactive selection
-    selected_project = select_project(
+    selection = select_project(
         all_projects, config.ui.show_git_status, config, scan_paths, manual_paths_list
     )
 
-    if selected_project is None:
+    if selection is None:
         print("AI Launcher: No project selected")
         sys.exit(0)
+
+    # The Shell row of the Open With list: no provider, so no cleanup or guard
+    if selection.use_shell:
+        launch_shell(selection.project.path, config)
+        return
+
+    # A provider picked from the Open With list replaces the default
+    provider = None
+    if selection.provider:
+        from ai_launcher.providers.registry import get_provider
+
+        provider = get_provider(selection.provider)
 
     # Launch AI provider. Every scanned folder and manual project is guarded:
     # writes there, outside the selected project, ask first, except into the
@@ -227,11 +244,72 @@ def _run_launcher(
         if aw.strip()
     ]
     launch_ai(
-        selected_project.path,
+        selection.project.path,
+        provider=provider,
         config=config,
         scope_roots=scope_roots,
         scope_exempt=scope_exempt,
     )
+
+
+def find_shell() -> Optional[str]:
+    """Find the user's shell.
+
+    Linux, macOS and WSL set SHELL; Windows sets COMSPEC. A value naming a
+    program that cannot be found is skipped.
+
+    Returns:
+        The first of $SHELL, %COMSPEC% and /bin/sh that can be run, or None
+    """
+    for candidate in (os.environ.get("SHELL"), os.environ.get("COMSPEC"), "/bin/sh"):
+        if candidate and shutil.which(candidate):
+            return candidate
+    return None
+
+
+def launch_shell(project_path: Path, config: Optional[ConfigData] = None) -> None:
+    """Open the user's shell in the specified project directory.
+
+    Args:
+        project_path: Path to the project
+        config: Optional ConfigData, for the terminal title settings
+    """
+    # Verify directory exists
+    if not project_path.exists():
+        print(f"Error: Directory not found: {project_path}")
+        sys.exit(1)
+
+    shell = find_shell()
+    if shell is None:
+        print("Error: No shell found. Set SHELL, or COMSPEC on Windows.")
+        sys.exit(1)
+
+    ui = config.ui if config else UIConfig()
+    if ui.set_terminal_title:
+        set_terminal_title(
+            format_terminal_title(ui.terminal_title_format, project_path, "Shell")
+        )
+
+    # The path as listed, made absolute without resolving symlinks
+    listed_path = str(Path.cwd() / project_path)
+    print(f"AI Launcher: shell in {listed_path} (type 'exit' to leave)")
+    os.chdir(project_path)
+
+    # PWD keeps a symlinked manual project's own path in the prompt. Shells
+    # trust it only when it is absolute and names the current directory.
+    env = {**os.environ, "PWD": listed_path}
+
+    # Ctrl-C belongs to the shell while it runs. A handler, not SIG_IGN: an
+    # ignored signal would stay ignored in everything the shell starts.
+    previous = signal.signal(signal.SIGINT, lambda *_: None)
+    try:
+        completed = subprocess.run([shell], env=env, check=False)  # nosec B603
+    finally:
+        signal.signal(signal.SIGINT, previous)
+
+    # Pass the shell's exit status on, as the prototype's exec does
+    if completed.returncode:
+        sys.exit(completed.returncode)
 
 
 def launch_ai(

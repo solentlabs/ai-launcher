@@ -9,14 +9,12 @@ Updated: 2026-02-18 (Updated after consolidating claude_data.py into claude.py)
 Updated: 2026-03-03 (Cross-platform compatibility: mock_home fixture, os.sep)
 """
 
-import os
 from datetime import datetime
 
 import pytest
 
 from ai_launcher.providers.claude import (
     _analyze_permissions,
-    _encode_project_path,
     _get_claude_session_config,
     _get_global_context_summary,
     _get_memory_files,
@@ -27,6 +25,7 @@ from ai_launcher.providers.claude import (
     _get_session_stats,
     _get_skills,
 )
+from ai_launcher.utils.session import encode_project_path
 
 
 class TestPersonalContextFile:
@@ -129,27 +128,6 @@ class TestProjectContextFile:
         assert len(preview_lines) == 10
 
 
-class TestEncodeProjectPath:
-    """Tests for encode_project_path()."""
-
-    def test_encode_project_path(self, tmp_path):
-        """Test encoding a real path uses os.sep replacement."""
-        project_path = tmp_path / "my-app"
-        project_path.mkdir()
-        encoded = _encode_project_path(project_path)
-
-        # Should replace all separators with hyphens
-        expected = str(project_path).replace(os.sep, "-")
-        assert encoded == expected
-
-    def test_encode_relative_path(self, tmp_path):
-        """Test encoding converts to absolute path first."""
-        result = _encode_project_path(tmp_path)
-
-        # Should be absolute path with separators replaced
-        assert str(tmp_path).replace(os.sep, "-") == result
-
-
 class TestGetSessionDir:
     """Tests for get_session_dir()."""
 
@@ -159,7 +137,7 @@ class TestGetSessionDir:
         project_path = mock_home / "my-project"
         project_path.mkdir()
 
-        encoded = _encode_project_path(project_path)
+        encoded = encode_project_path(project_path)
         session_dir = mock_home / ".claude" / "projects" / encoded
         session_dir.mkdir(parents=True)
 
@@ -233,7 +211,7 @@ class TestGetSessionStats:
         project_path.mkdir()
 
         # Create session directory
-        encoded = _encode_project_path(project_path)
+        encoded = encode_project_path(project_path)
         session_dir = mock_home / ".claude" / "projects" / encoded
         session_dir.mkdir(parents=True)
 
@@ -273,7 +251,7 @@ class TestGetSessionStats:
         project_path.mkdir()
 
         # Create empty session directory
-        encoded = _encode_project_path(project_path)
+        encoded = encode_project_path(project_path)
         session_dir = mock_home / ".claude" / "projects" / encoded
         session_dir.mkdir(parents=True)
 
@@ -378,7 +356,7 @@ class TestGetMemoryInfo:
         project_path.mkdir()
 
         # Create project memory
-        encoded = _encode_project_path(project_path)
+        encoded = encode_project_path(project_path)
         memory_dir = mock_home / ".claude" / "projects" / encoded / "memory"
         memory_dir.mkdir(parents=True)
         memory_file = memory_dir / "MEMORY.md"
@@ -400,12 +378,12 @@ class TestGetMemoryInfo:
         assert result is None
 
     def test_memory_info_uses_dynamic_encoding(self, mock_home):
-        """Test that memory info uses _encode_project_path, not hardcoded paths."""
+        """Test that memory info uses encode_project_path, not hardcoded paths."""
         project_path = mock_home / "my-project"
         project_path.mkdir()
 
         # Verify encoding is dynamic by checking the encoded path
-        encoded = _encode_project_path(project_path)
+        encoded = encode_project_path(project_path)
         memory_dir = mock_home / ".claude" / "projects" / encoded / "memory"
         memory_dir.mkdir(parents=True)
         (memory_dir / "MEMORY.md").write_text("test")

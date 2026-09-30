@@ -21,6 +21,22 @@ def mock_home(tmp_path, monkeypatch):
 
 
 @pytest.fixture
+def make_symlink():
+    """Create a symlink, or skip the test where the account may not.
+
+    Windows needs administrator rights or Developer Mode to create one.
+    """
+
+    def _make(link: Path, target: Path, target_is_directory: bool = False) -> None:
+        try:
+            link.symlink_to(target, target_is_directory=target_is_directory)
+        except OSError:
+            pytest.skip("symlinks not permitted on this platform")
+
+    return _make
+
+
+@pytest.fixture
 def tmp_project_dir(tmp_path):
     """Create a temporary project directory structure."""
     # Create some git repos
