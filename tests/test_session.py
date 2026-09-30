@@ -9,6 +9,7 @@ import pytest
 
 from ai_launcher.utils.session import (
     count_sessions,
+    encode_path_string,
     encode_project_path,
     format_time_ago,
     get_claude_session_dir,
@@ -23,35 +24,49 @@ from ai_launcher.utils.session import (
 # ============================================================================
 
 
-def test_encode_project_path_absolute(tmp_path):
-    """Test encoding an absolute path."""
-    project = tmp_path / "my-project"
-    project.mkdir()
-    result = encode_project_path(project)
-    # Should replace / with - throughout
-    assert "/" not in result
-    assert "-" in result
-    assert "my-project" in result
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        pytest.param("/home/user/projects/foo", "-home-user-projects-foo", id="posix"),
+        pytest.param(
+            "/home/user/my-cool-project",
+            "-home-user-my-cool-project",
+            id="hyphens-kept",
+        ),
+        pytest.param("/home/user/my_project", "-home-user-my-project", id="underscore"),
+        pytest.param(
+            "/home/user/site.example.com",
+            "-home-user-site-example-com",
+            id="dots",
+        ),
+        pytest.param("/home/user/My Project", "-home-user-My-Project", id="space"),
+        pytest.param(
+            "/tmp/claude-1000/-home-user",
+            "-tmp-claude-1000--home-user",
+            id="separator-then-hyphen",
+        ),
+        pytest.param("/home/user/café", "-home-user-caf-", id="non-ascii"),
+        # The folder Claude Code made for this path on Windows.
+        pytest.param(
+            "C:\\Projects\\solentlabs\\network-monitoring\\cable_modem_monitor",
+            "C--Projects-solentlabs-network-monitoring-cable-modem-monitor",
+            id="windows",
+        ),
+    ],
+)
+def test_encode_path_string(path, expected):
+    """Every character that is not an ASCII letter or digit becomes a hyphen."""
+    assert encode_path_string(path) == expected
 
 
-def test_encode_project_path_preserves_hyphens(tmp_path):
-    """Test that existing hyphens in path are preserved."""
-    project = tmp_path / "my-cool-project"
-    project.mkdir()
-    result = encode_project_path(project)
-    assert "my-cool-project" in result
+def test_encode_project_path_makes_the_path_absolute(tmp_path, monkeypatch):
+    """A relative path is encoded as the absolute path it names."""
+    (tmp_path / "my_project").mkdir()
+    monkeypatch.chdir(tmp_path)
 
-
-def test_encode_project_path_uses_os_sep(tmp_path):
-    """Test that path separator replacement is OS-aware."""
-    project = tmp_path / "project"
-    project.mkdir()
-    result = encode_project_path(project)
-    # Result should have hyphens where separators were (no path separators remain)
-    import os
-
-    assert os.sep not in result
-    assert "-" in result
+    assert encode_project_path(Path("my_project")) == encode_path_string(
+        str(Path.cwd() / "my_project")
+    )
 
 
 # ============================================================================

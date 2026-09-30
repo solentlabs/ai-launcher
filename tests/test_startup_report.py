@@ -13,6 +13,7 @@ from ai_launcher.ui.startup_report import (
     _visual_length,
     generate_startup_report,
 )
+from ai_launcher.utils.session import encode_project_path
 
 
 class TestContextSource:
@@ -100,7 +101,7 @@ class TestStartupReport:
     def test_analyze_with_all_sources(self, temp_project, tmp_path):
         """Test analyze() with all context sources present."""
         # Create memory directory
-        encoded_path = str(temp_project.resolve()).replace("/", "-").replace("_", "-")
+        encoded_path = encode_project_path(temp_project.resolve())
         memory_dir = tmp_path / ".claude" / "projects" / encoded_path / "memory"
         memory_dir.mkdir(parents=True)
         memory_file = memory_dir / "MEMORY.md"
@@ -175,7 +176,7 @@ class TestStartupReport:
         project_dir.mkdir()
 
         # Create memory directory with correct encoding
-        encoded_path = str(project_dir.resolve()).replace("/", "-").replace("_", "-")
+        encoded_path = encode_project_path(project_dir.resolve())
         memory_dir = tmp_path / ".claude" / "projects" / encoded_path / "memory"
         memory_dir.mkdir(parents=True)
         memory_file = memory_dir / "MEMORY.md"
@@ -212,7 +213,7 @@ class TestStartupReport:
         project_dir = tmp_path / "test_project"
         project_dir.mkdir()
 
-        encoded_path = str(project_dir.resolve()).replace("/", "-").replace("_", "-")
+        encoded_path = encode_project_path(project_dir.resolve())
         memory_dir = tmp_path / ".claude" / "projects" / encoded_path / "memory"
         memory_dir.mkdir(parents=True)
         memory_file = memory_dir / "MEMORY.md"
@@ -231,7 +232,7 @@ class TestStartupReport:
         project_dir.mkdir()
 
         # Expected encoding: /tmp/test_project_name -> -tmp-test-project-name
-        encoded_path = str(project_dir.resolve()).replace("/", "-").replace("_", "-")
+        encoded_path = encode_project_path(project_dir.resolve())
         memory_dir = tmp_path / ".claude" / "projects" / encoded_path / "memory"
         memory_dir.mkdir(parents=True)
         memory_file = memory_dir / "MEMORY.md"
@@ -499,7 +500,7 @@ class TestIntegration:
         )
 
         # Memory
-        encoded_path = str(project_dir.resolve()).replace("/", "-").replace("_", "-")
+        encoded_path = encode_project_path(project_dir.resolve())
         memory_dir = tmp_path / ".claude" / "projects" / encoded_path / "memory"
         memory_dir.mkdir(parents=True)
         (memory_dir / "MEMORY.md").write_text("# Memory\n" * 50)

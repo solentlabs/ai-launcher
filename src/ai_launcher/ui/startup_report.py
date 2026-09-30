@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ai_launcher.providers.base import AIProvider
 
 from ai_launcher.utils.humanize import humanize_count
+from ai_launcher.utils.session import encode_project_path
 
 
 @dataclass
@@ -232,10 +233,8 @@ class StartupReport:
     def _check_auto_memory(self) -> None:
         """Check for auto memory files."""
         # Encode project path to match Claude's memory directory structure
-        # Convert absolute path to encoded format: /foo/bar_baz -> -foo-bar-baz
-        # Claude converts BOTH slashes (/) AND underscores (_) to dashes (-)
         abs_path = self.project_path.resolve()
-        encoded_path = str(abs_path).replace("/", "-").replace("_", "-")
+        encoded_path = encode_project_path(abs_path)
         memory_dir = Path.home() / ".claude" / "projects" / encoded_path / "memory"
         memory_file = memory_dir / "MEMORY.md"
 

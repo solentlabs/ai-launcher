@@ -44,12 +44,12 @@ def test_subdirectory_listing(capsys, tmp_path):
     assert "file.txt" in out
 
 
-def test_symlink_indicator(capsys, tmp_path):
+def test_symlink_indicator(capsys, tmp_path, make_symlink):
     """Test symlink directory shows resolve target."""
     real = tmp_path / "real"
     real.mkdir()
     link = tmp_path / "link"
-    link.symlink_to(real)
+    make_symlink(link, real)
 
     with patch("sys.argv", ["_browser_preview.py", str(tmp_path), "link@"]):
         main()

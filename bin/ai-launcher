@@ -597,9 +597,11 @@ human_size() {
 }
 
 # Function to encode project path for Claude session directory
+# Claude Code names a project's folder by turning every character that is not
+# a letter or digit into a hyphen
 encode_project_path() {
     local path="$1"
-    echo "$path" | sed 's|/|-|g'
+    echo "${path//[^a-zA-Z0-9]/-}"
 }
 
 # Handle parent folders (end with /)
@@ -1064,8 +1066,7 @@ main() {
         fi
 
         # Check project memory (encode path)
-        local encoded_path="${selected_path//\//-}"
-        encoded_path="${encoded_path//_/-}"
+        local encoded_path="${selected_path//[^a-zA-Z0-9]/-}"
         if [[ -f "$HOME/.claude/projects/${encoded_path}/memory/MEMORY.md" ]]; then
             local project_lines
             project_lines=$(wc -l < "$HOME/.claude/projects/${encoded_path}/memory/MEMORY.md" 2>/dev/null || echo "0")

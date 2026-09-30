@@ -30,6 +30,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tool, a named provider, or the shell), in place of a bare `Project`. Code calling it must read
   `selection.project`.
 
+### Fixed
+
+- **Memory and sessions are found for any project path** — Claude Code names a project's folder
+  under `~/.claude/projects` by turning every character that is not a letter or digit into `-`. AI
+  Launcher had three copies of that rule, none complete. The preview pane only replaced the path
+  separator, so a project with an underscore or a dot in its path (`cable_modem_monitor`) showed no
+  memory and no sessions. The launch report also replaced `_`, but on Windows it left the drive
+  colon and backslashes in place and never found the memory file. All three now use one function.
+  The bash prototype has the same rule.
+- **Symlink tests skip where symlinks cannot be created** — on a Windows account without
+  administrator rights or Developer Mode, three tests failed while setting up. They now skip, as the
+  scope guard's symlink test already did.
+
 ## [0.6.0] - 2026-09-29
 
 ### Added

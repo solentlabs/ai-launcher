@@ -55,9 +55,9 @@ class TestEndToEndIntegration:
         project_path.mkdir()
 
         # Create session directory
-        from ai_launcher.providers.claude import _encode_project_path
+        from ai_launcher.utils.session import encode_project_path
 
-        encoded = _encode_project_path(project_path)
+        encoded = encode_project_path(project_path)
         session_dir = mock_home / ".claude" / "projects" / encoded
         session_dir.mkdir(parents=True)
 
