@@ -323,6 +323,9 @@ exclusive to the bash script prototype.
 └─────────────────────────────────────────────────────────┘
 ```
 
+Enter on a project launches the default tool, as drawn. Ctrl-O opens the
+[Open With list](#open-with-list) first.
+
 ### Preview Pane Order
 
 **Critical: Always show in this order:**
@@ -703,6 +706,155 @@ python -m ai_launcher.core.scope_guard --project P --root R... [--exempt E...]
   This is noted in the changelog.
 - **Launching by name was considered and dropped.** The failure is not picking the wrong project in
   the selector. It is a session being given another project's work after launch.
+
+---
+
+## Open With List
+
+### Problem
+
+The tool is fixed when the launcher starts: `ai-launcher claude ~/projects` can only open a project
+in Claude Code. Opening the same project in another installed tool, or in a plain shell, meant
+leaving the launcher and finding the folder again.
+
+### Behaviour
+
+The picker header gains one hint line:
+
+```text
+14 projects in ~/projects/solentlabs
+Type to filter • Arrows to navigate
+Ctrl-O for other tools
+```
+
+| Where          | Key    | On                                       | Result                                 |
+| -------------- | ------ | ---------------------------------------- | -------------------------------------- |
+| Picker         | Enter  | a project                                | Launches the default tool, as before   |
+| Picker         | Ctrl-O | a project                                | Opens the Open With list for it        |
+| Picker         | Ctrl-O | a folder header or the Configuration row | Returns to the picker, as Enter does   |
+| Open With list | Enter  | the default tool's row                   | Same as Enter in the picker            |
+| Open With list | Enter  | another tool's row                       | Launches that tool in the project      |
+| Open With list | Enter  | the Shell row                            | Opens a shell in the project           |
+| Open With list | Esc    | anything                                 | Returns to the picker, nothing started |
+
+The list is a dialog: a small box centred over the picker, which stays on screen behind it as it was
+when Ctrl-O was pressed, greyed out where the terminal can do that. It has no preview pane. Its rows
+are the installed tools, the default first and marked, then Shell:
+
+```text
+│   ai-journal          ╭─────────── Open ai-launcher with ────────────╮            │ │
+│ > ai-launcher         │   Enter to open • Esc to go back             │            │ │
+│   cable_modem_monitor │ Open with:                                   │            │ │
+│   har-capture         │ > Claude Code   (default)                    │            │ │
+│                       │   Gemini CLI                                 │            │ │
+│   🔧 Configuration    │   Shell                                      │            │ │
+│                       ╰──────────────────────────────────────────────╯            │ │
+```
+
+The box is 50 columns wide, or wider for a long project name, and as tall as its rows. On a terminal
+smaller than the box it fills what there is.
+
+A tool chosen from the list launches with the flags this run was given: the same cleanup flags,
+launch box, terminal title and scope arguments, of which each tool uses what it supports. Only the
+`claude` and `gemini` subcommands take `--allow-writes`, so a run started from another subcommand
+has no exempt folders to pass on.
+
+The Shell row sets the terminal title, changes into the project and runs the first of `$SHELL`,
+`%COMSPEC%` and `/bin/sh` that can be found. It prints one line saying that `exit` leaves the shell,
+and nothing else: no cleanup, no launch box, no scope guard. If none of the three can be found it
+says so and exits with an error. When the shell exits, the launcher exits with the shell's status.
+
+### Where It Sits in the Stack
+
+```text
+select_project()                    picker: fzf --expect=ctrl-o
+   │ Enter            │ Ctrl-O on a project
+   │                  ↓
+   │               select_open_with()     second fzf, a box over the picker
+   │                  rows: registry.list_installed(), default first, then Shell
+   │                  Esc → back to the picker
+   ↓                  ↓
+Selection           project + what to open it with
+                    (the default, a provider name, or the shell)
+   ↓
+cli.py
+   default or a provider  → launch_ai(...)      cleanup, launch box, scope guard
+   shell                  → launch_shell(...)   title, cd, run the shell
+```
+
+`Selection` is a dataclass in `core/models.py`. `select_project()` returns it in place of a bare
+`Project`.
+
+### Decisions
+
+- **Enter is unchanged.** Launching the default tool is nearly every use, so it gains no step and no
+  prompt. Everything new is behind one key.
+- **A list, not a key per tool.** The rows come from `ProviderRegistry.list_installed()`, so a new
+  provider file appears in the list without touching the selector. A key per tool would put provider
+  names in the UI.
+- **The subcommand names the default, not the only tool.** `ai-launcher claude` still decides what
+  Enter launches and which tool's context the preview pane shows.
+- **Shell is a built-in row, not a provider.** It has no context files, permissions or cleanup to
+  report, so an `AIProvider` subclass would be empty methods. It would also show up in `--discover`
+  as an AI tool.
+- **The shell gets no scope guard.** The guard exists because a model can be handed another
+  project's work. In a shell the user types the commands.
+- **A nested shell, not a `cd` of the calling shell.** A child process cannot change its parent's
+  directory. Doing that needs a shell function in the user's rc file, which is setup the launcher
+  would have to explain and maintain. Leaving the shell ends the launcher, as leaving a tool does.
+- **One shell rule for every platform.** Linux, macOS and WSL set `$SHELL`; Windows sets
+  `%COMSPEC%`. Taking the first of `$SHELL`, `%COMSPEC%` and `/bin/sh` that can be found needs no
+  platform check, and skips a `$SHELL` that names a program the launcher cannot run. On Windows the
+  result is `cmd.exe` even when the launcher was started from PowerShell, because nothing in the
+  environment says which shell started it. A Windows user who has set `SHELL` to a program that can
+  be run gets that instead. `cmd.exe` cannot start in a UNC path, such as a network share or a WSL
+  folder reached as `\\wsl.localhost\...`: it says so and starts in the Windows directory.
+- **A symlinked manual project keeps its path.** The shell is started with `PWD` set to the
+  project's path as listed, made absolute, so a `--manual-paths` project that is a symlink shows its
+  own path in the prompt. Scanned projects are resolved during discovery, before the picker, so for
+  them the listed path is already the target's.
+- **The list is a dialog, drawn by a second fzf.** The picker runs with `--no-clear`, so its last
+  frame stays on screen when it exits. The list then runs in fzf's height mode, also with
+  `--no-clear`, which draws only inside its margins and leaves the rest of the screen alone. The
+  margins are computed from the terminal size to centre a box of fixed size. Checked on fzf 0.44.1
+  and 0.74.4.
+- **Height mode, not a second full-screen fzf with margins.** That also works in tmux, but a
+  full-screen fzf switches to the alternate screen again on start, and xterm defines that switch as
+  clearing the screen, so the picker behind the box would vanish in some terminals. Height mode
+  never switches screens.
+- **The picker sits one row down.** fzf clears the first row of its area when it starts, and the
+  list's area begins at the top of the screen. A one-row top margin on the picker keeps that row
+  empty, so nothing of the picker is lost.
+- **Where the frame does not survive, the box is drawn on an empty screen.** That is the fallback
+  where the picker is cleared on exit despite `--no-clear`, and it is what native Windows does: run
+  from PowerShell with fzf 0.70.0, the screen is empty once the picker exits, so the box has nothing
+  behind it and there is nothing to grey. The list works the same either way. The dialog over the
+  picker was seen on Linux and WSL; macOS has not been checked.
+- **The picker behind the dialog is greyed by the terminal, not redrawn.** The launcher does not
+  know what fzf drew, so it cannot repaint it. One escape sequence (DECCARA, "change attributes in
+  rectangular area") asks the terminal to give everything already on screen a grey foreground, just
+  before the box is drawn. Windows Terminal does it; a terminal without the feature, tmux among
+  them, ignores the sequence and the picker keeps its colours. Drawing the picker a second time in
+  grey was rejected: the preview pane and the typed filter would not survive it.
+- **The header names only the new key.** A line saying what Enter launches was tried and cut as
+  noise: Enter is the obvious key, and the subcommand already says which tool it starts. The list
+  pane is 30% of the terminal and fzf cuts a header line that does not fit, so the hint is short
+  enough to show in full at 100 columns.
+- **Rows are tools, not session modes.** A launch mode earns a row only if it cannot be reached from
+  inside a running session. Claude Code's resume, continue, remote control and teleport
+  (`/teleport`, `/tp`) are all available in a session, so none qualifies. Rows such as "Claude Code:
+  teleport…" were drafted and cut on that rule. It also spares every provider from declaring its own
+  modes.
+- **No passthrough of tool arguments.** `ai-launcher claude ~/projects -- --teleport <id>` was
+  considered for teleport and dropped with it. It would also let a passed `--settings` collide with
+  the one the scope guard sends.
+- **`--expect`, not a `print()` binding.** fzf's newer way to report a key is `print(...)+accept`.
+  fzf 0.44.1, the Ubuntu 24.04 package, rejects it as an unknown action and accepts `--expect`. The
+  current fzf release still documents `--expect`, so one flag covers old and new.
+- **Bash prototype has the same key, list and shell rule.** Three differences follow from what the
+  prototype already is. It launches only Claude, so its list has two rows, Claude Code and Shell. It
+  never sets a terminal title, for Claude or for the shell. It records the project in its
+  last-opened history when a shell is opened, as it does for Claude.
 
 ---
 

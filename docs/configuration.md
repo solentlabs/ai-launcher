@@ -42,6 +42,27 @@ ai-launcher aider ~/projects
 ai-launcher copilot ~/projects
 ```
 
+The subcommand sets the default tool: the one Enter launches, and the one whose context the preview
+pane shows.
+
+## Picker Keys
+
+| Key    | What it does                                                             |
+| ------ | ------------------------------------------------------------------------ |
+| Enter  | Opens the highlighted project with the default tool                      |
+| Ctrl-O | Lists your installed tools and a plain shell, to open the project with   |
+| Esc    | Leaves the launcher; in the Ctrl-O list, goes back to the project picker |
+
+A tool picked from the Ctrl-O list gets the same flags you passed (`--cleanup`, `--allow-writes` and
+so on) and uses the ones it supports. The Shell row runs your shell in the project with no cleanup
+and no [project scope](project-scope.md#other-tools) guard. Type `exit` to leave it; the launcher
+then exits with the shell's exit status.
+
+| Platform          | Shell the Shell row runs                                                                                                                                                      |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux, macOS, WSL | `$SHELL`, or `/bin/sh` if it is not set or cannot be run                                                                                                                      |
+| Windows           | `%COMSPEC%` (`cmd.exe`), also from PowerShell, unless `SHELL` names a program that can be run. For a project on a UNC path, `cmd.exe` starts in the Windows directory instead |
+
 ## Examples
 
 **Basic usage:**

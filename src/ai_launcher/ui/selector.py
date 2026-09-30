@@ -9,22 +9,146 @@ Last Modified: 2026-02-10 (Added settings menu item)
 """
 
 import os
+import shutil
 import subprocess  # nosec B404
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 # ConfigManager removed - using runtime config from CLI flags
-from ai_launcher.core.models import Project
+from ai_launcher.core.models import Project, ProviderConfig, Selection
+from ai_launcher.providers.registry import get_registry
 from ai_launcher.ui.preview import build_tree_view
 from ai_launcher.utils.paths import fzf_preview_cmd, is_relative_to
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import ConfigData
 
+# Key that opens the Open With list for the highlighted project
+OPEN_WITH_KEY = "ctrl-o"
+DEFAULT_MARK = "   (default)"
+SHELL_ROW = "Shell"
+
+# The Open With list is a box of this width, drawn over the picker
+DIALOG_WIDTH = 50
+# Border (2), header and prompt lines around the rows
+DIALOG_CHROME_LINES = 4
+
 
 def clear_screen() -> None:
-    """Clear the terminal screen using ANSI escape codes."""
-    print("\033[H\033[2J", end="", flush=True)
+    """Clear the terminal screen using ANSI escape codes.
+
+    Leaves the alternate screen first: the picker runs with --no-clear, so
+    fzf stays on that screen when it exits.
+    """
+    print("\033[?1049l\033[H\033[2J", end="", flush=True)
+
+
+def _grey_out_screen(size: os.terminal_size) -> None:
+    """Give everything already on screen a grey foreground.
+
+    DECCARA changes the attributes of a rectangle of cells that are already
+    drawn. A terminal without it ignores the sequence.
+    """
+    print(f"\033[1;1;{size.lines};{size.columns};38;5;240$r", end="", flush=True)
+
+
+def _dialog_geometry(
+    rows: int, label_width: int, size: os.terminal_size
+) -> Tuple[int, str]:
+    """Work out fzf's --height and --margin for a box centred on the screen.
+
+    The area is every line but the last, which keeps fzf in height mode. It
+    draws only inside the margins, so the picker's frame shows around the box.
+
+    Args:
+        rows: Number of rows the list shows
+        label_width: Width of the border label
+        size: Terminal size
+
+    Returns:
+        The height, and the margin as "top,right,bottom,left"
+    """
+    height = size.lines - 1
+    box_height = rows + DIALOG_CHROME_LINES
+    box_width = max(DIALOG_WIDTH, label_width + 4)
+
+    top = max(0, (height - box_height) // 2)
+    bottom = max(0, height - box_height - top)
+    left = max(0, (size.columns - box_width) // 2)
+    right = max(0, size.columns - box_width - left)
+    return height, f"{top},{right},{bottom},{left}"
+
+
+def _parse_picker_output(output: bytes) -> Tuple[str, str]:
+    """Split the picker's output into the key pressed and the selected row.
+
+    fzf --expect prints the key on the first line, empty for Enter, and the
+    selected row on the second.
+    """
+    # Split on newlines only: splitlines() also breaks on characters that a
+    # path may contain. strip() takes the \r that Windows leaves behind.
+    lines = output.decode("utf-8", errors="replace").split("\n")
+    key = lines[0].strip()
+    selected = lines[1].strip() if len(lines) > 1 else ""
+    return key, selected
+
+
+def select_open_with(project: Project, default_provider: str) -> Optional[Selection]:
+    """Show the Open With list for a project.
+
+    Rows are the installed providers, the default first, then a shell.
+
+    Args:
+        project: Project to open
+        default_provider: Name of the provider Enter launches in the picker
+
+    Returns:
+        What to open the project with, or None to go back to the picker
+    """
+    providers = sorted(
+        get_registry().list_installed(),
+        key=lambda provider: provider.metadata.name != default_provider,
+    )
+    rows: Dict[str, Selection] = {}
+    for provider in providers:
+        if provider.metadata.name == default_provider:
+            row = f"{provider.metadata.display_name}{DEFAULT_MARK}"
+            rows[row] = Selection(project)
+        else:
+            row = provider.metadata.display_name
+            rows[row] = Selection(project, provider=provider.metadata.name)
+    rows[SHELL_ROW] = Selection(project, use_shell=True)
+
+    # A dialog over the picker, whose last frame is still on screen. Height
+    # mode starts at the cursor's row, so start from the top of the screen.
+    label = f" Open {project.name} with "
+    size = shutil.get_terminal_size()
+    height, margin = _dialog_geometry(len(rows), len(label), size)
+    _grey_out_screen(size)
+    print("\033[H", end="", flush=True)
+    process = subprocess.Popen(  # nosec B603, B607
+        [
+            "fzf",
+            "--prompt=Open with: ",
+            f"--height={height}",
+            f"--margin={margin}",
+            "--no-clear",  # Leave the picker's frame around the box
+            "--layout=reverse",
+            "--border=rounded",
+            f"--border-label={label}",
+            "--header=Enter to open • Esc to go back",
+            "--header-first",
+            "--info=hidden",
+            "--no-separator",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+    stdout_bytes, _ = process.communicate(input="\n".join(rows).encode("utf-8"))
+    if process.returncode != 0:
+        return None
+
+    return rows.get(stdout_bytes.decode("utf-8", errors="replace").strip())
 
 
 def select_project(
@@ -33,7 +157,7 @@ def select_project(
     config: Optional["ConfigData"] = None,
     scan_paths: Optional[List[Path]] = None,
     manual_paths: Optional[List[str]] = None,
-) -> Optional[Project]:
+) -> Optional[Selection]:
     """Show interactive project selector with action support.
 
     Args:
@@ -44,8 +168,11 @@ def select_project(
         manual_paths: Manual project paths from CLI flags (optional)
 
     Returns:
-        Selected Project or None if cancelled
+        The selected project and what to open it with, or None if cancelled
     """
+    # Enter launches this provider; the Open With list marks it
+    default_provider = (config.provider if config else ProviderConfig()).default
+
     # Action loop - allows rescanning, adding, removing
     current_projects = projects
     while True:
@@ -94,6 +221,7 @@ def select_project(
 
 {project_count} project{"s" if project_count != 1 else ""} in {display_base}
 Type to filter • Arrows to navigate
+Ctrl-O for other tools
 ─────────────────────────────────────────
 """
 
@@ -129,6 +257,9 @@ Type to filter • Arrows to navigate
                 "--header-first",  # Display header before prompt
                 "--info=hidden",  # Hide match counter
                 "--ansi",  # Enable ANSI color codes
+                f"--expect={OPEN_WITH_KEY}",  # Report Ctrl-O instead of Enter
+                "--no-clear",  # Keep the frame for the Open With list to cover
+                "--margin=1,0,0,0",  # fzf clears row 1 when that list starts
             ]
 
             # Pass choices via stdin as raw UTF-8 bytes to avoid
@@ -156,9 +287,10 @@ Type to filter • Arrows to navigate
                 print(f"Error running fzf: exit code {result_code}")
                 return None
 
-            # Get selected line (decode from raw bytes)
-            selected = stdout_bytes.decode("utf-8", errors="replace").strip()
+            # Get the key and selected line (decode from raw bytes)
+            key, selected = _parse_picker_output(stdout_bytes)
             if not selected:
+                clear_screen()
                 return None
 
             # Handle action menu items
@@ -177,9 +309,16 @@ Type to filter • Arrows to navigate
             # Look up the project from the formatted line
             project = choice_to_project.get(selected)
             if project:
-                # Clear screen before launching Claude
+                selection: Optional[Selection] = Selection(project)
+                if key == OPEN_WITH_KEY:
+                    selection = select_open_with(project, default_provider)
+                    if selection is None:
+                        # Esc in the list - back to the picker
+                        continue
+
+                # Clear screen before launching
                 clear_screen()
-                return project
+                return selection
 
             # Not a project - check if it's a directory header or other non-selectable item
             # Extract path from formatted line to check
@@ -203,6 +342,7 @@ Type to filter • Arrows to navigate
             print("  macOS: brew install fzf")
             return None
         except Exception as e:
+            clear_screen()
             print(f"Error in project selector: {e}")
             import traceback
 

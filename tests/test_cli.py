@@ -3,13 +3,15 @@
 Author: Solent Labs™
 """
 
+import signal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
-from ai_launcher.cli import app, launch_ai
+from ai_launcher.cli import app, find_shell, launch_ai, launch_shell
+from ai_launcher.core.models import ConfigData, Selection, UIConfig
 
 runner = CliRunner()
 
@@ -179,7 +181,7 @@ def test_launch_passes_scope_roots(mock_fzf, mock_select, mock_launch, tmp_path)
     (scan / "proj" / ".git").mkdir(parents=True)
     manual = tmp_path / "manual-proj"
     manual.mkdir()
-    mock_select.side_effect = lambda projects, *args, **kwargs: projects[0]
+    mock_select.side_effect = lambda projects, *args, **kwargs: Selection(projects[0])
 
     result = runner.invoke(app, ["claude", str(scan), "--manual-paths", str(manual)])
 
@@ -200,7 +202,7 @@ def test_allow_writes_become_scope_exempt(
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     scan = tmp_path / "scan"
     (scan / "proj" / ".git").mkdir(parents=True)
-    mock_select.side_effect = lambda projects, *args, **kwargs: projects[0]
+    mock_select.side_effect = lambda projects, *args, **kwargs: Selection(projects[0])
 
     result = runner.invoke(
         app, [command, str(scan), "--allow-writes", "~/journal, /srv/notes ,"]
@@ -228,3 +230,207 @@ def test_launch_ai_forwards_scope_roots(mock_display, mock_get_provider, tmp_pat
     for call in (mock_display.call_args, mock_provider.launch_with_title.call_args):
         assert call.kwargs["scope_roots"] == roots
         assert call.kwargs["scope_exempt"] == exempt
+
+
+# --- Open With list: routing and the shell ------------------------------------
+
+
+@patch("ai_launcher.providers.registry.get_provider")
+@patch("ai_launcher.cli.launch_shell")
+@patch("ai_launcher.cli.launch_ai")
+@patch("ai_launcher.cli.select_project")
+@patch("ai_launcher.utils.fzf.ensure_fzf", return_value=True)
+@pytest.mark.parametrize(
+    "picked,expected",
+    [
+        pytest.param({}, "default", id="default-tool"),
+        pytest.param({"provider": "gemini"}, "provider", id="another-tool"),
+        pytest.param({"use_shell": True}, "shell", id="shell"),
+    ],
+)
+def test_selection_routes_to_launch(
+    mock_fzf,
+    mock_select,
+    mock_launch,
+    mock_shell,
+    mock_get_provider,
+    tmp_path,
+    picked,
+    expected,
+):
+    """What the picker returned decides what is launched, and with which guard."""
+    scan = tmp_path / "scan"
+    project = scan / "proj"
+    (project / ".git").mkdir(parents=True)
+    mock_select.side_effect = lambda projects, *args, **kwargs: Selection(
+        projects[0], **picked
+    )
+
+    result = runner.invoke(app, ["claude", str(scan), "--allow-writes", "/srv/notes"])
+
+    assert result.exit_code == 0, result.output
+    if expected == "shell":
+        mock_launch.assert_not_called()
+        assert mock_shell.call_args.args[0] == project.resolve()
+        return
+
+    mock_shell.assert_not_called()
+    assert mock_launch.call_args.args == (project.resolve(),)
+    launched = mock_launch.call_args.kwargs
+    # A tool from the list gets the same guard arguments as the default.
+    assert launched["scope_roots"] == [scan.resolve()]
+    assert launched["scope_exempt"] == [Path("/srv/notes")]
+    if expected == "default":
+        assert launched.get("provider") is None
+        mock_get_provider.assert_not_called()
+    else:
+        mock_get_provider.assert_called_once_with("gemini")
+        assert launched["provider"] is mock_get_provider.return_value
+
+
+@pytest.mark.parametrize(
+    "env,found,expected",
+    [
+        pytest.param(
+            {"SHELL": "/bin/zsh", "COMSPEC": "cmd.exe"},
+            {"/bin/zsh", "cmd.exe", "/bin/sh"},
+            "/bin/zsh",
+            id="shell-wins",
+        ),
+        pytest.param(
+            {"COMSPEC": "cmd.exe"}, {"cmd.exe"}, "cmd.exe", id="windows-comspec"
+        ),
+        pytest.param(
+            {"SHELL": "/usr/bin/bash", "COMSPEC": "cmd.exe"},
+            {"cmd.exe"},
+            "cmd.exe",
+            id="unrunnable-shell-is-skipped",
+        ),
+        pytest.param({}, {"/bin/sh"}, "/bin/sh", id="neither-set"),
+        pytest.param({"SHELL": ""}, {"/bin/sh"}, "/bin/sh", id="empty-shell"),
+        pytest.param({"SHELL": "/bin/zsh"}, set(), None, id="nothing-found"),
+    ],
+)
+def test_find_shell(monkeypatch, env, found, expected):
+    """The first of $SHELL, %COMSPEC% and /bin/sh that can be run is used."""
+    for name in ("SHELL", "COMSPEC"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+
+    with patch(
+        "ai_launcher.cli.shutil.which",
+        side_effect=lambda candidate: candidate if candidate in found else None,
+    ):
+        assert find_shell() == expected
+
+
+@pytest.fixture
+def shell_run(tmp_path, monkeypatch):
+    """launch_shell() with the shell, chdir and the terminal title mocked.
+
+    The working directory is tmp_path, set before chdir is mocked. The mocked
+    run records the SIGINT handler in force while the shell runs.
+    """
+    monkeypatch.chdir(tmp_path)
+    with patch("ai_launcher.cli.find_shell", return_value="/bin/zsh"), patch(
+        "ai_launcher.cli.subprocess.run"
+    ) as run, patch("ai_launcher.cli.os.chdir") as chdir, patch(
+        "ai_launcher.cli.set_terminal_title"
+    ) as title:
+        run.sigint_during = []
+
+        def fake_run(*args, **kwargs):
+            run.sigint_during.append(signal.getsignal(signal.SIGINT))
+            return MagicMock(returncode=run.exit_status)
+
+        run.exit_status = 0
+        run.side_effect = fake_run
+        yield MagicMock(run=run, chdir=chdir, title=title)
+
+
+@pytest.mark.parametrize(
+    "set_title,expected_titles",
+    [
+        pytest.param(True, ["proj → Shell"], id="title-set"),
+        pytest.param(False, [], id="title-off"),
+    ],
+)
+def test_launch_shell_runs_shell_in_project(
+    shell_run, tmp_path, capsys, set_title, expected_titles
+):
+    """The shell starts in the project, and Ctrl-C is the shell's while it runs."""
+    project = tmp_path / "proj"
+    project.mkdir()
+    before = signal.getsignal(signal.SIGINT)
+
+    launch_shell(project, ConfigData(ui=UIConfig(set_terminal_title=set_title)))
+
+    shell_run.chdir.assert_called_once_with(project)
+    assert shell_run.run.call_args.args == (["/bin/zsh"],)
+    assert [call.args[0] for call in shell_run.title.call_args_list] == expected_titles
+    assert "exit" in capsys.readouterr().out
+    assert shell_run.run.sigint_during[0] not in (
+        before,
+        signal.SIG_IGN,
+        signal.SIG_DFL,
+    )
+    assert signal.getsignal(signal.SIGINT) is before
+
+
+@pytest.mark.parametrize(
+    "as_relative",
+    [
+        pytest.param(False, id="absolute-path"),
+        pytest.param(True, id="relative-manual-path"),
+    ],
+)
+def test_launch_shell_pwd_is_the_listed_path(shell_run, tmp_path, capsys, as_relative):
+    """PWD is the project's path as listed, made absolute so shells accept it."""
+    (tmp_path / "proj").mkdir()
+    listed = str(Path.cwd() / "proj")
+
+    launch_shell(Path("proj") if as_relative else Path(listed))
+
+    assert shell_run.run.call_args.kwargs["env"]["PWD"] == listed
+    assert listed in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("status", [0, 7], ids=["clean-exit", "failed-exit"])
+def test_launch_shell_passes_on_exit_status(shell_run, tmp_path, status):
+    """The launcher exits with the shell's status, as the bash prototype does."""
+    shell_run.run.exit_status = status
+
+    if status == 0:
+        launch_shell(tmp_path)
+        return
+
+    with pytest.raises(SystemExit) as exit_info:
+        launch_shell(tmp_path)
+    assert exit_info.value.code == status
+
+
+@patch("ai_launcher.cli.subprocess.run")
+@pytest.mark.parametrize(
+    "project_exists,shell,expected_error",
+    [
+        pytest.param(False, "/bin/zsh", "Directory not found", id="missing-project"),
+        pytest.param(True, None, "No shell found", id="no-shell"),
+    ],
+)
+def test_launch_shell_errors(
+    mock_run, tmp_path, capsys, project_exists, shell, expected_error
+):
+    """A missing project or shell is reported and nothing is started."""
+    project = tmp_path / "proj"
+    if project_exists:
+        project.mkdir()
+
+    with patch("ai_launcher.cli.find_shell", return_value=shell), pytest.raises(
+        SystemExit
+    ) as exit_info:
+        launch_shell(project)
+
+    assert exit_info.value.code == 1
+    assert expected_error in capsys.readouterr().out
+    mock_run.assert_not_called()

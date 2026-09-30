@@ -85,6 +85,10 @@ except Gemini's `--allow-writes` folders (see [above](#allowing-shared-folders))
 | Aider            | Asks before editing any file not added to the chat, wherever it is               |
 | Cursor (`agent`) | Not documented for the CLI; not verified                                         |
 
+A tool picked from the Ctrl-O list is launched with the same guard arguments as the default tool, so
+Claude Code gets the guard there too, with whatever `--allow-writes` folders the run was given. The
+Shell row in that list has no guard: it is not an AI session, and you type the commands yourself.
+
 ## Bash Prototype
 
 `bin/ai-launcher` does not have the guard; it needs the Python package. See the
