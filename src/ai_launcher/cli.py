@@ -8,13 +8,14 @@ Author: Solent Labs™
 Last Modified: 2026-02-10 (Added cleanup config to provider calls)
 """
 
+import logging
 import os
 import shutil
 import signal
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, List, Optional, Sequence
 
 import typer
 
@@ -66,7 +67,6 @@ def _run_launcher(
     context: bool = False,
     cleanup: bool = False,
     clean_provider: bool = False,
-    clean_cache: bool = False,
     clean_npm: bool = False,
     global_files: Optional[str] = None,
     manual_paths: Optional[str] = None,
@@ -96,7 +96,7 @@ def _run_launcher(
         global_files_list = [f.strip() for f in global_files.split(",") if f.strip()]
 
     # Build cleanup config - each flag works independently
-    cleanup_enabled = cleanup or clean_provider or clean_cache or clean_npm
+    cleanup_enabled = cleanup or clean_provider or clean_npm
     config = ConfigData(
         scan=ScanConfig(
             paths=[],  # Will be set from CLI argument
@@ -112,7 +112,6 @@ def _run_launcher(
         cleanup=CleanupConfig(
             enabled=cleanup_enabled,
             clean_provider_files=cleanup or clean_provider,
-            clean_system_cache=clean_cache,
             clean_npm_cache=clean_npm,
         ),
         context=ContextConfig(
@@ -213,6 +212,10 @@ def _run_launcher(
     if manual_paths:
         manual_paths_list = [mp.strip() for mp in manual_paths.split(",") if mp.strip()]
 
+    # Refresh stale cache sizes while the picker is open, so the launch notice
+    # has numbers without ever walking a tree itself
+    start_size_refresh()
+
     # Interactive selection
     selection = select_project(
         all_projects, config.ui.show_git_status, config, scan_paths, manual_paths_list
@@ -312,6 +315,36 @@ def launch_shell(project_path: Path, config: Optional[ConfigData] = None) -> Non
         sys.exit(completed.returncode)
 
 
+def start_size_refresh() -> None:
+    """Start the background size refresh. Never raises: a launch comes first."""
+    try:
+        from ai_launcher.core.cache_notice import load_entries
+        from ai_launcher.core.cache_registry import load_registry
+        from ai_launcher.core.cache_scan import start_background_refresh
+
+        registry = load_registry()
+        if registry.notice.enabled:
+            start_background_refresh(load_entries(registry, {"sizes": {}}))
+    except Exception as error:
+        logging.getLogger("ai_launcher").debug(f"Size refresh not started: {error}")
+
+
+def prepare_scratch(project_path: Path) -> Optional[Path]:
+    """Make this session's scratch folder and name it in AI_SCRATCH_DIR.
+
+    Returns None, and sets nothing, if the folder cannot be made: a session
+    without scratch is better than no session.
+    """
+    from ai_launcher.core.scratch import ENV_VAR, create_session_dir
+
+    try:
+        path = create_session_dir(project_path.name)
+    except OSError:
+        return None
+    os.environ[ENV_VAR] = str(path)
+    return path
+
+
 def launch_ai(
     project_path: Path,
     provider: Optional["AIProvider"] = None,
@@ -370,6 +403,16 @@ def launch_ai(
     print()
     provider.cleanup_environment(verbose=True, cleanup_config=config.cleanup)
 
+    # The launch notice reads the size cache only; it never walks a tree
+    from ai_launcher.core.cache_notice import launch_notice
+
+    notice = launch_notice()
+
+    # A scratch folder for the session. The scope guard must not ask about it.
+    scratch_dir = prepare_scratch(project_path)
+    if scratch_dir is not None:
+        scope_exempt = [*scope_exempt, scratch_dir]
+
     # Display launch information and launch provider
     display_launch_info(
         project_path,
@@ -377,14 +420,22 @@ def launch_ai(
         verbose=True,
         scope_roots=scope_roots,
         scope_exempt=scope_exempt,
+        notice=notice,
+        scratch_dir=scratch_dir,
     )
-    provider.launch_with_title(
-        project_path,
-        set_title=config.ui.set_terminal_title,
-        title_format=config.ui.terminal_title_format,
-        scope_roots=scope_roots,
-        scope_exempt=scope_exempt,
-    )
+    try:
+        provider.launch_with_title(
+            project_path,
+            set_title=config.ui.set_terminal_title,
+            title_format=config.ui.terminal_title_format,
+            scope_roots=scope_roots,
+            scope_exempt=scope_exempt,
+        )
+    finally:
+        if scratch_dir is not None:
+            from ai_launcher.core.scratch import finish_session_dir
+
+            finish_session_dir(scratch_dir)
 
 
 @app.command()
@@ -415,9 +466,6 @@ def claude(
         "--clean-provider/--no-clean-provider",
         help="Clean AI assistant cache/logs",
     ),
-    clean_cache: bool = typer.Option(
-        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
-    ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
     ),
@@ -441,7 +489,7 @@ def claude(
     Examples:
         ai-launcher claude ~/projects/solentlabs
         ai-launcher claude ~/projects --global-files ~/.claude/RULES.md
-        ai-launcher claude ~/projects --cleanup --clean-cache
+        ai-launcher claude ~/projects --cleanup
         ai-launcher claude ~/projects --check-permissions
         ai-launcher claude ~/projects --allow-writes ~/projects/journal
     """
@@ -456,7 +504,6 @@ def claude(
         context,
         cleanup,
         clean_provider,
-        clean_cache,
         clean_npm,
         global_files,
         manual_paths,
@@ -488,9 +535,6 @@ def gemini(
         "--clean-provider/--no-clean-provider",
         help="Clean AI assistant cache/logs",
     ),
-    clean_cache: bool = typer.Option(
-        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
-    ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
     ),
@@ -514,7 +558,7 @@ def gemini(
     Examples:
         ai-launcher gemini ~/projects/external
         ai-launcher gemini ~/projects --global-files ~/.claude/RULES.md
-        ai-launcher gemini ~/projects --cleanup --clean-cache
+        ai-launcher gemini ~/projects --cleanup
         ai-launcher gemini ~/projects --allow-writes ~/projects/journal
     """
     # Just call main() with provider forced to gemini
@@ -528,7 +572,6 @@ def gemini(
         context,
         cleanup,
         clean_provider,
-        clean_cache,
         clean_npm,
         global_files,
         manual_paths,
@@ -559,9 +602,6 @@ def cursor(
         "--clean-provider/--no-clean-provider",
         help="Clean AI assistant cache/logs",
     ),
-    clean_cache: bool = typer.Option(
-        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
-    ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
     ),
@@ -590,7 +630,6 @@ def cursor(
         context,
         cleanup,
         clean_provider,
-        clean_cache,
         clean_npm,
         global_files,
         manual_paths,
@@ -620,9 +659,6 @@ def aider(
         "--clean-provider/--no-clean-provider",
         help="Clean AI assistant cache/logs",
     ),
-    clean_cache: bool = typer.Option(
-        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
-    ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
     ),
@@ -651,7 +687,6 @@ def aider(
         context,
         cleanup,
         clean_provider,
-        clean_cache,
         clean_npm,
         global_files,
         manual_paths,
@@ -681,9 +716,6 @@ def copilot(
         "--clean-provider/--no-clean-provider",
         help="Clean AI assistant cache/logs",
     ),
-    clean_cache: bool = typer.Option(
-        False, "--clean-cache/--no-clean-cache", help="Clean system cache (~/.cache)"
-    ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
     ),
@@ -712,11 +744,120 @@ def copilot(
         context,
         cleanup,
         clean_provider,
-        clean_cache,
         clean_npm,
         global_files,
         manual_paths,
     )
+
+
+def _project_paths(
+    paths: Optional[List[Path]], manual_paths: Optional[str]
+) -> List[Path]:
+    """Every project under the scan paths and manual paths: the folders never deleted."""
+    from ai_launcher.core.models import Project
+
+    manual = []
+    for mp in (manual_paths or "").split(","):
+        mp_path = Path(mp.strip()).expanduser()
+        if mp.strip() and mp_path.exists():
+            manual.append(Project.from_path(mp_path, is_manual=True))
+    scan = [p.resolve() for p in (paths or [])]
+    projects = get_all_projects(
+        scan, 5, ["node_modules", ".cache", "venv", ".git"], manual
+    )
+    return [p.path for p in projects]
+
+
+@app.command()
+def cache(
+    paths: Optional[List[Path]] = typer.Argument(
+        None,
+        help="Scan folders, so projects are never offered for deletion",
+        exists=True,
+    ),
+    manual_paths: Optional[str] = typer.Option(
+        None, "--manual-paths", help="Comma-separated non-git projects to protect"
+    ),
+    list_only: bool = typer.Option(
+        False, "--list", help="Print the table as plain text; nothing can be deleted"
+    ),
+) -> None:
+    """See and clear the disk space AI sessions leave behind.
+
+    Lists known cache and scratch locations with size, age and a safety class.
+    Only locations in the registry can be deleted, after a confirm step.
+
+    Example:
+        ai-launcher cache ~/projects
+    """
+    from ai_launcher.ui.cache_page import list_command, run_cache_page
+    from ai_launcher.utils.terminal import ensure_utf8_output
+
+    ensure_utf8_output()
+    projects = _project_paths(paths, manual_paths)
+    if list_only:
+        list_command(projects)
+        return
+
+    from ai_launcher.utils.fzf import ensure_fzf
+
+    if not ensure_fzf():
+        sys.exit(1)
+    run_cache_page(projects)
+
+
+@app.command()
+def update(
+    check: bool = typer.Option(
+        False, "--check", help="Say whether a newer release exists; change nothing"
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", help="Do not ask (needed without a terminal)"
+    ),
+) -> None:
+    """Update AI Launcher to the latest release on PyPI.
+
+    Contacts PyPI only when you run this. Shows the command first and asks.
+
+    Example:
+        ai-launcher update --check
+    """
+    from ai_launcher.ui.update import update_command
+    from ai_launcher.utils.terminal import ensure_utf8_output
+
+    ensure_utf8_output()
+    raise typer.Exit(update_command(check=check, yes=yes))
+
+
+scratch_app = typer.Typer(help="Per-session scratch folders", add_completion=False)
+app.add_typer(scratch_app, name="scratch")
+
+
+@scratch_app.command("prune")
+def scratch_prune(
+    older_than: str = typer.Option(
+        ...,
+        "--older-than",
+        help="Remove session folders last written longer ago: 14d, 36h, 2w",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List them, remove nothing"),
+    yes: bool = typer.Option(
+        False, "--yes", help="Do not ask (needed without a terminal)"
+    ),
+) -> None:
+    """Remove old session scratch folders made by AI Launcher.
+
+    Only the launcher's own scratch folder is touched. Sessions still running
+    are never removed.
+
+    Example:
+        ai-launcher scratch prune --older-than 14d --dry-run
+    """
+    from ai_launcher.ui.cache_page import prune_command
+    from ai_launcher.utils.terminal import ensure_utf8_output
+
+    ensure_utf8_output()
+    raise typer.Exit(prune_command(older_than, dry_run=dry_run, yes=yes))
 
 
 if __name__ == "__main__":

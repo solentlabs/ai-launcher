@@ -1,0 +1,122 @@
+# Default registry of cache and scratch locations. See docs/cache-and-scratch.md.
+#
+# class:  clean  = regenerable, safe to remove
+#         review = mixed contents, look inside before removing
+#         report = shown, never removed
+# clean:  the tool's own clean command (argv list, never run through a shell)
+# remove: allow removing the folder when there is no clean command, or the tool
+#         is not installed
+# {cache} is XDG_CACHE_HOME or ~/.cache on Linux and WSL, the platform cache
+# folder elsewhere. {scratch} is the launcher's own scratch folder.
+# paths.wsl falls back to paths.linux. macOS and Windows paths follow each
+# tool's documentation and are checked before release.
+
+[[location]]
+id = "ai-launcher-scratch"
+name = "Session scratch"
+group = "scratch"
+class = "review"
+remove = true
+note = "Per-session scratch the launcher created (AI_SCRATCH_DIR)."
+paths.linux = ["{scratch}/*/*"]
+paths.macos = ["{scratch}/*/*"]
+paths.windows = ["{scratch}/*/*"]
+
+[[location]]
+id = "playwright"
+name = "Playwright browsers"
+group = "browser"
+class = "clean"
+remove = true
+note = "Downloaded browsers; Playwright fetches them again when needed."
+paths.linux = ["{cache}/ms-playwright"]
+paths.macos = ["~/Library/Caches/ms-playwright"]
+paths.windows = ["%LOCALAPPDATA%\\ms-playwright"]
+
+[[location]]
+id = "puppeteer"
+name = "Puppeteer browsers"
+group = "browser"
+class = "clean"
+remove = true
+note = "Downloaded browsers; Puppeteer fetches them again when needed."
+paths.linux = ["~/.cache/puppeteer"]
+paths.macos = ["~/.cache/puppeteer"]
+paths.windows = ["%USERPROFILE%\\.cache\\puppeteer"]
+
+[[location]]
+id = "npm-cache"
+name = "npm cache"
+group = "package-cache"
+class = "clean"
+clean = ["npm", "cache", "clean", "--force"]
+remove = true
+note = "Package tarballs; npm downloads them again."
+paths.linux = ["~/.npm/_cacache"]
+paths.macos = ["~/.npm/_cacache"]
+paths.windows = ["%LOCALAPPDATA%\\npm-cache\\_cacache"]
+
+[[location]]
+id = "npm-npx"
+name = "npx cache"
+group = "package-cache"
+class = "clean"
+remove = true
+note = "Packages run with npx; npx downloads them again."
+paths.linux = ["~/.npm/_npx"]
+paths.macos = ["~/.npm/_npx"]
+paths.windows = ["%LOCALAPPDATA%\\npm-cache\\_npx"]
+
+[[location]]
+id = "pip"
+name = "pip cache"
+group = "package-cache"
+class = "clean"
+clean = ["pip", "cache", "purge"]
+remove = true
+note = "Wheels and HTTP cache; pip downloads them again."
+paths.linux = ["{cache}/pip"]
+paths.macos = ["~/Library/Caches/pip"]
+paths.windows = ["%LOCALAPPDATA%\\pip\\Cache"]
+
+[[location]]
+id = "uv"
+name = "uv cache"
+group = "package-cache"
+class = "clean"
+clean = ["uv", "cache", "clean"]
+remove = true
+note = "Packages and builds; uv downloads them again."
+paths.linux = ["{cache}/uv"]
+paths.macos = ["~/Library/Caches/uv"]
+paths.windows = ["%LOCALAPPDATA%\\uv\\cache"]
+
+[[location]]
+id = "pre-commit"
+name = "pre-commit cache"
+group = "package-cache"
+class = "clean"
+clean = ["pre-commit", "clean"]
+remove = true
+note = "Hook environments; pre-commit rebuilds them on the next run."
+paths.linux = ["{cache}/pre-commit"]
+paths.macos = ["~/.cache/pre-commit"]
+paths.windows = ["%USERPROFILE%\\.cache\\pre-commit"]
+
+[[location]]
+id = "vscode-server"
+name = "VS Code server"
+group = "editor"
+class = "report"
+note = "Removing it reinstalls the server and every extension on the next connect."
+paths.linux = ["~/.vscode-server"]
+
+[[location]]
+id = "claude-home"
+name = "Claude Code data"
+group = "ai-tool"
+class = "report"
+note = "Session transcripts, history, settings. Claude prunes transcripts itself."
+paths.linux = ["~/.claude"]
+paths.macos = ["~/.claude"]
+paths.windows = ["%USERPROFILE%\\.claude"]

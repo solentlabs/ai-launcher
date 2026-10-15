@@ -140,14 +140,12 @@ class CleanupConfig:
     Attributes:
         enabled: Whether to run any cleanup before launch (default: False)
         clean_provider_files: Clean provider-specific files (backups, debug logs, old versions)
-        clean_system_cache: Clean entire ~/.cache directory (WARNING: affects all apps)
         clean_npm_cache: Clean npm cache using npm CLI (WARNING: affects npm installs)
         debug_logs_max_age_days: Maximum age of debug logs to keep (default: 7 days)
     """
 
     enabled: bool = False
     clean_provider_files: bool = True
-    clean_system_cache: bool = False
     clean_npm_cache: bool = False
     debug_logs_max_age_days: int = 7
 

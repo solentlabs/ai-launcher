@@ -56,6 +56,12 @@ class PreviewFormatter:
         """
         self.max_preview_lines = max_preview_lines
 
+    def paint(self, text: str, *codes: str) -> str:
+        """Wrap text in ANSI codes (BOLD, DIM, RED...) and reset after it."""
+        if not codes or not text:
+            return text
+        return "".join(codes) + text + self.RESET
+
     # ===== Top-level Formatters =====
 
     def format_complete_preview(

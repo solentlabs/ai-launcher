@@ -20,6 +20,7 @@ session:
 | write Claude's own files (`~/.claude`: memory, plans)     | Goes ahead, even if you scan `~` |
 | write inside a folder passed to `--allow-writes`          | Goes ahead                       |
 | write anywhere outside `~/projects` (`/tmp`, `~/.bashrc`) | Goes ahead                       |
+| write inside the session's `AI_SCRATCH_DIR`               | Goes ahead, even if you scan `~` |
 
 "Under `~/projects`" means under any folder you passed to scan, plus any `--manual-paths` project.
 
@@ -67,6 +68,9 @@ File edits name their target, so those are exact. Shell commands are judged from
 | copying _into_ it: `cp local.txt ../angel-captain/`                       | copying _out of_ it: `cp ../angel-captain/f ./`      |
 | git changing it: `cd ../angel-captain && git commit`, `git -C … add`      | `git status`, `log`, `diff`, `show`, `blame`         |
 | running any other command inside it: `cd ../angel-captain && make`        |                                                      |
+
+Disk use is a separate matter: [Cache and Scratch](cache-and-scratch.md) reports what sessions leave
+behind, which this guard does not look at.
 
 This is a check for accidents, not a sandbox. A script, a variable the session sets, or a program
 that writes on its own can change another project without the command text saying so.
