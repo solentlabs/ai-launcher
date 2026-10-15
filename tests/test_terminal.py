@@ -268,7 +268,7 @@ class TestEnsureUtf8Output:
         from ai_launcher.utils.terminal import ensure_utf8_output
 
         raw = io.BytesIO()
-        stream = io.TextIOWrapper(raw, encoding="cp1252", errors="strict")
+        stream = io.TextIOWrapper(raw, encoding="cp1252", errors="strict", newline="\n")
         monkeypatch.setattr("sys.platform", "win32")
         monkeypatch.setattr("sys.stdout", stream)
         monkeypatch.setattr(

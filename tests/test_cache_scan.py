@@ -37,6 +37,9 @@ def test_scan_tree_totals_and_times(tmp_path):
     assert (time.time() - info.newest_mtime) / 86400 == pytest.approx(2, abs=0.1)
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="Windows directory entries carry no link count or inode"
+)
 def test_scan_tree_counts_hard_links_once(tmp_path):
     first = make_file(tmp_path / "one", 8192)
     os.link(first, tmp_path / "two")
@@ -114,7 +117,7 @@ def test_newer_scan_wins(tmp_path):
     scan.record_size(path, Path("/x"), SizeInfo(size_bytes=2, scanned_at=20.0))
     scan.record_size(path, Path("/x"), SizeInfo(size_bytes=1, scanned_at=10.0))
 
-    assert scan.load_size_cache(path)["sizes"]["/x"]["size"] == 2
+    assert scan.load_size_cache(path)["sizes"][str(Path("/x"))]["size"] == 2
 
 
 def test_refresh_walks_only_stale_entries(tmp_path):

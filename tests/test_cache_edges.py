@@ -162,6 +162,9 @@ def test_a_failed_cache_write_leaves_no_temp_file_and_raises(tmp_path, monkeypat
     assert list(path.parent.iterdir()) == []
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="Windows directory entries carry no link count or inode"
+)
 def test_peek_counts_a_hard_link_once(tmp_path):
     first = tmp_path / "d" / "one.log"
     first.parent.mkdir()
@@ -312,7 +315,7 @@ def test_wsl_labels_the_home_disk_so_it_is_not_mistaken_for_the_windows_drive(
     cache_home, monkeypatch, tmp_path
 ):
     from ai_launcher.core.cache_data import NoticeConfig
-    from ai_launcher.core.cache_summary import WSL_DISK, read_disks
+    from ai_launcher.core.cache_summary import WSL_DISK, _disk_label, read_disks
 
     config = NoticeConfig(extra_disk_paths=[str(tmp_path)])
     monkeypatch.setattr(reg, "current_platform", lambda: "wsl")
@@ -321,7 +324,8 @@ def test_wsl_labels_the_home_disk_so_it_is_not_mistaken_for_the_windows_drive(
     on_linux = read_disks(config)
 
     assert on_wsl[0].label == WSL_DISK
-    assert on_wsl[1].label == str(tmp_path)  # extra disks keep their own names
+    # extra disks keep their own names (a drive letter on Windows)
+    assert on_wsl[1].label == _disk_label(str(tmp_path))
     assert on_linux[0].label == Path.home().anchor or "/"
 
 

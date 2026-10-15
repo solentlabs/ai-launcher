@@ -206,7 +206,9 @@ One function, used by the page, the refresh and the preview:
 
 - Iterative `os.scandir`; never follows symlinks (a symlink counts as the link).
 - Disk use is `st_blocks * 512` on POSIX and `st_size` on Windows. Hard links are counted once, by
-  `(st_dev, st_ino)`, because npm, uv and pnpm caches are full of them.
+  `(st_dev, st_ino)`, because npm, uv and pnpm caches are full of them. On Windows, `os.scandir`
+  entries carry no link count or inode, so a hard-linked file counts once per link there: a size can
+  read high, never low.
 - Newest modification time is taken from every file seen, so the age of a folder is its newest file,
   not the folder's own mtime (which only changes when a direct child is added or removed).
 - A time budget per location (10 s). A walk that runs out reports what it has, marked "≥ 12 GB" and

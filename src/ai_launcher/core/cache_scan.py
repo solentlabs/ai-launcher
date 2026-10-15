@@ -75,6 +75,9 @@ def scan_tree(
                 if is_dir:
                     stack.append(entry.path)
                     continue
+                # Hard links count once. Not on Windows: os.scandir entries carry
+                # no link count or inode there, so a hard-linked file counts per
+                # link and a size can read high, never low.
                 if stat.st_nlink > 1:
                     key = (stat.st_dev, stat.st_ino)
                     if key in seen_links:
