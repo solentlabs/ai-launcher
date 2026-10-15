@@ -10,6 +10,8 @@
 | [windows-terminal.md](windows-terminal.md)         | Windows Terminal profile setup for WSL                |
 | [context-transparency.md](context-transparency.md) | What context Claude Code loads and how to optimize it |
 | [project-scope.md](project-scope.md)               | Why writes to other projects ask first                |
+| [cache-and-scratch.md](cache-and-scratch.md)       | Finding and clearing the disk space AI sessions use   |
+| [updating.md](updating.md)                         | `ai-launcher update`: check for and install updates   |
 
 ## For Contributors
 

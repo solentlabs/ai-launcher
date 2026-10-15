@@ -3,7 +3,11 @@
 .. deprecated:: 0.1.0
     Provider-specific cleanup has been moved to individual provider classes.
     This module is kept for backward compatibility with system-wide cleanup
-    (cache, npm) but provider-specific logic should use provider.cleanup_environment().
+    (npm) but provider-specific logic should use provider.cleanup_environment().
+
+The ~/.cache sweep that used to live here (--clean-cache) was removed: it deleted every
+child of ~/.cache with no list and no confirmation. Use `ai-launcher cache` instead
+(see docs/cache-and-scratch.md).
 
 This module provides cleanup functions to maintain a clean development environment
 before launching AI assistants.
@@ -15,7 +19,7 @@ setting (default: 30 days) that ONLY cleans session transcripts in
 
 NOTE: As of February 2026, provider-specific cleanup (Claude backup files, debug logs,
 old versions) has been moved to ClaudeProvider.cleanup_environment(). This module now
-only handles system-wide cleanup (cache, npm) which is unrelated to specific providers.
+only handles system-wide cleanup (npm) which is unrelated to specific providers.
 
 What Claude cleans automatically:
   - Session transcripts older than cleanupPeriodDays (default: 30 days)
@@ -28,35 +32,29 @@ What this module cleans (Claude does NOT clean these):
   - Debug logs (~/.claude/debug/)
   - Old CLI versions (~/.local/share/claude/versions/)
   - Backup files (~/.claude.json.backup.*) - bug workaround
-  - System caches (~/.cache/)
   - npm cache (~/.npm/)
 
 This module addresses known issues and common pain points:
 
-1. Cache Accumulation (General Issue)
-   - Many applications write to ~/.cache indefinitely without cleanup
-   - Can grow to several GB over time
-   - Safe to clear as applications regenerate cache as needed
-
-2. NPM Cache Accumulation (General Issue)
+1. NPM Cache Accumulation (General Issue)
    - npm stores packages in ~/.npm which can reach 800MB+
    - Cleaned via official `npm cache clean --force` command
    - Safe to clear as npm re-downloads packages when needed
 
-3. Claude Code Backup File Bug (Known Issue)
+2. Claude Code Backup File Bug (Known Issue)
    - GitHub Issue: https://github.com/anthropics/claude-code/issues/21429
    - Bug: Claude creates multiple .claude.json.backup.* files on startup
    - Files created within milliseconds but never cleaned up
    - Causes clutter in home directory (~/ instead of ~/.claude/)
    - **TODO: Remove this cleanup when issue is fixed**
 
-4. Claude Debug Logs Accumulation (General Issue)
+3. Claude Debug Logs Accumulation (General Issue)
    - Debug logs in ~/.claude/debug/ accumulate indefinitely
    - Can reach 500MB+ with 600+ files over time
    - Keeps last 7 days for troubleshooting, removes older logs
    - Safe to clean as logs are for debugging, not critical data
 
-5. Old Claude CLI Versions Accumulation (General Issue)
+4. Old Claude CLI Versions Accumulation (General Issue)
    - Claude auto-updates and leaves old versions behind
    - Stored in ~/.local/share/claude/versions/
    - Each version is ~212MB, can accumulate to 600MB+
@@ -96,9 +94,7 @@ def cleanup_environment(
        - Old timestamped .claude.json.backup.* files (bug workaround)
        - Claude debug logs older than debug_logs_max_age_days
        - Old Claude CLI versions, keeps only current
-    2. System-wide cache (if clean_system_cache=True):
-       - Clears ~/.cache directory contents (WARNING: affects all apps)
-    3. npm cache (if clean_npm_cache=True):
+    2. npm cache (if clean_npm_cache=True):
        - Cleans npm cache (WARNING: affects npm installs)
 
     Args:
@@ -123,23 +119,6 @@ def cleanup_environment(
 
     if verbose:
         print("Pre-launch cleanup:")
-
-    # Clean .cache directory (OPTIONAL - system-wide)
-    # WARNING: This affects ALL applications, not just AI providers
-    if cleanup_config.clean_system_cache:
-        if verbose:
-            print("  → Clearing ~/.cache directory (system-wide)")
-        cache_dir = home / ".cache"
-        if cache_dir.exists() and cache_dir.is_dir():
-            try:
-                for item in cache_dir.iterdir():
-                    if item.is_dir():
-                        shutil.rmtree(item, ignore_errors=True)
-                    else:
-                        item.unlink(missing_ok=True)
-                logger.debug("Cleaned ~/.cache directory")
-            except (OSError, PermissionError) as e:
-                logger.debug(f"Could not clean cache directory: {e}")
 
     # Clean npm cache (OPTIONAL - unrelated to AI providers)
     # WARNING: Can slow down future npm install operations

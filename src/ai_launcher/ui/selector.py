@@ -23,6 +23,9 @@ from ai_launcher.utils.paths import fzf_preview_cmd, is_relative_to
 if TYPE_CHECKING:
     from ai_launcher.core.models import ConfigData
 
+# The picker row that opens the cache and scratch page
+CACHE_ROW = "💾 Cache and scratch"
+
 # Key that opens the Open With list for the highlighted project
 OPEN_WITH_KEY = "ctrl-o"
 DEFAULT_MARK = "   (default)"
@@ -32,6 +35,21 @@ SHELL_ROW = "Shell"
 DIALOG_WIDTH = 50
 # Border (2), header and prompt lines around the rows
 DIALOG_CHROME_LINES = 4
+
+
+def cache_row_label() -> str:
+    """The cache row's text, with the worst severity's symbol when it matters.
+
+    Reads the size cache only. Any failure leaves the row plain.
+    """
+    from ai_launcher.core.cache_data import SEVERITY_ATTENTION
+    from ai_launcher.core.cache_notice import worst_severity
+    from ai_launcher.ui.cache_page import severity_symbol
+
+    severity = worst_severity()
+    if severity >= SEVERITY_ATTENTION:
+        return f"{CACHE_ROW}  {severity_symbol(severity)}"
+    return CACHE_ROW
 
 
 def clear_screen() -> None:
@@ -202,6 +220,7 @@ def select_project(
         # Add action menu items at the bottom
         choices.append("__ACTION__\t\t")
         choices.append("__ACTION__\t\t🔧 Configuration")
+        choices.append(f"__ACTION__\t\t{cache_row_label()}")
 
         # Build header with project info
         project_count = len(current_projects)
@@ -296,6 +315,13 @@ Ctrl-O for other tools
             # Handle action menu items
             if selected == "__ACTION__\t\t🔧 Configuration":
                 # Configuration preview is shown in right pane, just loop back
+                continue
+
+            # The cache page runs inside the picker, then the picker comes back
+            if selected.startswith(f"__ACTION__\t\t{CACHE_ROW}"):
+                from ai_launcher.ui.cache_page import run_cache_page
+
+                run_cache_page([p.path for p in current_projects])
                 continue
 
             # Handle empty line action item (just loop back)

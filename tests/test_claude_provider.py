@@ -32,7 +32,6 @@ class TestClaudeCleanup:
         return CleanupConfig(
             enabled=True,
             clean_provider_files=True,
-            clean_system_cache=False,
             clean_npm_cache=False,
             debug_logs_max_age_days=7,
         )

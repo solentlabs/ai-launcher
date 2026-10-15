@@ -229,7 +229,12 @@ def test_launch_ai_forwards_scope_roots(mock_display, mock_get_provider, tmp_pat
 
     for call in (mock_display.call_args, mock_provider.launch_with_title.call_args):
         assert call.kwargs["scope_roots"] == roots
-        assert call.kwargs["scope_exempt"] == exempt
+        # the session's own scratch folder is exempt too, after the user's folders
+        assert call.kwargs["scope_exempt"][:-1] == exempt
+        assert (
+            call.kwargs["scope_exempt"][-1]
+            == mock_display.call_args.kwargs["scratch_dir"]
+        )
 
 
 # --- Open With list: routing and the shell ------------------------------------

@@ -141,6 +141,18 @@ the project with another installed tool, or in a plain shell.
 
 See [Project Scope](https://github.com/solentlabs/ai-launcher/blob/main/docs/project-scope.md).
 
+### Cache and Scratch
+
+- 💾 **One-line notice** - A launch notice when scratch or cache use, or free disk, needs attention
+- 🧹 **Cache page** - Sizes, ages and safety classes for agent scratch, browsers, package caches and
+  editor servers, ranked, with summary rows you can clear in one key
+- ✅ **Allowlist only** - Only locations in the launcher's registry can be deleted, each tool's own
+  clean command first, and a confirm step lists exactly what goes
+- 📂 **Per-session scratch** - `AI_SCRATCH_DIR` gives each session one folder to prune later
+
+See
+[Cache and Scratch](https://github.com/solentlabs/ai-launcher/blob/main/docs/cache-and-scratch.md).
+
 ### Terminal Window Title
 
 - 📺 **Auto title setting** - Terminal shows "project → provider" for easy window identification
@@ -184,6 +196,7 @@ Your code and context should stay on your machine. AI Launcher:
 - [Installation Guide](https://github.com/solentlabs/ai-launcher/blob/main/docs/installation.md)
 - [Configuration](https://github.com/solentlabs/ai-launcher/blob/main/docs/configuration.md)
 - [Project Scope](https://github.com/solentlabs/ai-launcher/blob/main/docs/project-scope.md)
+- [Cache and Scratch](https://github.com/solentlabs/ai-launcher/blob/main/docs/cache-and-scratch.md)
 - [Windows Terminal Setup](https://github.com/solentlabs/ai-launcher/blob/main/docs/windows-terminal.md)
 - [Troubleshooting](https://github.com/solentlabs/ai-launcher/blob/main/docs/troubleshooting.md)
 

@@ -257,3 +257,50 @@ class TestGetTerminalInfo:
 
         assert info["tmux"] is True
         assert info["wt_session"] == "wt-id"
+
+
+class TestEnsureUtf8Output:
+    """Piped output on Windows is cp1252, which cannot encode the page's symbols."""
+
+    def test_piped_cp1252_output_can_print_symbols_on_windows(self, monkeypatch):
+        import io
+
+        from ai_launcher.utils.terminal import ensure_utf8_output
+
+        raw = io.BytesIO()
+        stream = io.TextIOWrapper(raw, encoding="cp1252", errors="strict")
+        monkeypatch.setattr("sys.platform", "win32")
+        monkeypatch.setattr("sys.stdout", stream)
+        monkeypatch.setattr(
+            "sys.stderr", io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        )
+        with pytest.raises(UnicodeEncodeError):
+            io.TextIOWrapper(io.BytesIO(), encoding="cp1252").write("🔴")
+
+        ensure_utf8_output()
+        print("🔴 DISK")
+        stream.flush()
+
+        assert raw.getvalue().decode("utf-8") == "🔴 DISK\n"
+
+    def test_other_platforms_are_left_alone(self, monkeypatch):
+        import io
+
+        from ai_launcher.utils.terminal import ensure_utf8_output
+
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        monkeypatch.setattr("sys.platform", "linux")
+        monkeypatch.setattr("sys.stdout", stream)
+
+        ensure_utf8_output()
+
+        assert stream.encoding == "cp1252"
+
+    def test_a_stream_that_cannot_be_reconfigured_is_skipped(self, monkeypatch):
+        from ai_launcher.utils.terminal import ensure_utf8_output
+
+        monkeypatch.setattr("sys.platform", "win32")
+        monkeypatch.setattr("sys.stdout", object())
+        monkeypatch.setattr("sys.stderr", object())
+
+        ensure_utf8_output()

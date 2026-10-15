@@ -19,7 +19,6 @@ def cleanup_config():
     return CleanupConfig(
         enabled=True,
         clean_provider_files=True,
-        clean_system_cache=True,
         clean_npm_cache=True,
         debug_logs_max_age_days=7,
     )
@@ -46,42 +45,27 @@ class TestCleanupGuards:
             assert backup.exists()
 
 
-class TestCacheCleanup:
-    """Tests for system cache cleanup."""
+class TestCacheFolderIsNeverSwept:
+    """--clean-cache was removed: nothing under ~/.cache is deleted by cleanup."""
 
-    def test_cleans_cache_directory(self, tmp_path, monkeypatch, cleanup_config):
+    def test_cleanup_leaves_the_cache_folder_alone(
+        self, tmp_path, monkeypatch, cleanup_config
+    ):
         monkeypatch.setenv("HOME", str(tmp_path))
-        # Disable npm/provider cleanup to isolate cache test from system tools
         cleanup_config.clean_npm_cache = False
-        cleanup_config.clean_provider_files = False
         with patch("pathlib.Path.home", return_value=tmp_path):
             cache_dir = tmp_path / ".cache"
-            cache_dir.mkdir()
-            (cache_dir / "subdir").mkdir()
+            (cache_dir / "subdir").mkdir(parents=True)
             (cache_dir / "file.txt").write_text("cache")
 
-            cleanup_environment(verbose=False, cleanup_config=cleanup_config)
+            with patch("shutil.which", return_value=None):
+                cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
-            assert not (cache_dir / "subdir").exists()
-            assert not (cache_dir / "file.txt").exists()
-            # Cache dir itself should remain
-            assert cache_dir.exists()
+            assert (cache_dir / "subdir").exists()
+            assert (cache_dir / "file.txt").exists()
 
-    def test_cache_cleanup_skipped_when_disabled(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HOME", str(tmp_path))
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            config = CleanupConfig(
-                enabled=True,
-                clean_system_cache=False,
-                clean_provider_files=False,
-                clean_npm_cache=False,
-            )
-            cache_dir = tmp_path / ".cache"
-            cache_dir.mkdir()
-            (cache_dir / "keep.txt").write_text("keep")
-
-            cleanup_environment(verbose=False, cleanup_config=config)
-            assert (cache_dir / "keep.txt").exists()
+    def test_the_config_has_no_system_cache_switch(self):
+        assert not hasattr(CleanupConfig(), "clean_system_cache")
 
 
 class TestNpmCleanup:
@@ -124,7 +108,6 @@ class TestProviderFileCleanup:
 
             # Disable npm to avoid mock complexity, no claude binary
             cleanup_config.clean_npm_cache = False
-            cleanup_config.clean_system_cache = False
             with patch("shutil.which", return_value=None):
                 cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
@@ -146,7 +129,6 @@ class TestProviderFileCleanup:
             recent_log.write_text("recent")
 
             cleanup_config.clean_npm_cache = False
-            cleanup_config.clean_system_cache = False
             with patch("shutil.which", return_value=None):
                 cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
@@ -164,7 +146,6 @@ class TestProviderFileCleanup:
             (versions_dir / "2.1.35").write_text("older")
 
             cleanup_config.clean_npm_cache = False
-            cleanup_config.clean_system_cache = False
             with patch("shutil.which", return_value="/usr/bin/claude"):
                 with patch("subprocess.run") as mock_run:
                     mock_run.return_value = MagicMock(
@@ -193,7 +174,7 @@ class TestVerboseOutput:
         assert "Pre-launch cleanup:" in captured.out
         assert "Cleanup complete" in captured.out
 
-    def test_verbose_shows_cache_message(
+    def test_verbose_no_longer_mentions_the_cache_folder(
         self, tmp_path, monkeypatch, cleanup_config, capsys
     ):
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -203,4 +184,4 @@ class TestVerboseOutput:
                 cleanup_environment(verbose=True, cleanup_config=cleanup_config)
 
         captured = capsys.readouterr()
-        assert "~/.cache" in captured.out
+        assert "~/.cache" not in captured.out

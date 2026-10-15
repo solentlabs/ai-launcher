@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Sequence
 
 if TYPE_CHECKING:
+    from ai_launcher.core.cache_data import CacheNotice
     from ai_launcher.providers.base import AIProvider
 
 from ai_launcher.utils.humanize import humanize_count
@@ -565,12 +566,43 @@ def _tilde(path: Path) -> str:
         return str(path)
 
 
+def _fit(text: str, room: int, keep_end: bool = False) -> str:
+    """Shorten text to a visual width, with an ellipsis."""
+    if _visual_length(text) <= room:
+        return text
+    return "…" + text[-(room - 1) :] if keep_end else text[: room - 1] + "…"
+
+
+def _cache_notice_line(notice: "CacheNotice", width: int) -> str:
+    """The one-line cache notice, red when critical. Padded on its plain text."""
+    from ai_launcher.core.cache_data import SEVERITY_CRITICAL
+    from ai_launcher.ui.cache_page import fmt, notice_text, severity_symbol
+
+    prefix = "│ 💾 Cache:    "
+    text = _fit(notice_text(notice), width - 2 - _visual_length(prefix))
+    plain = _pad_line(prefix + text, width)
+    if notice.severity < SEVERITY_CRITICAL:
+        return plain
+    return plain.replace(text, fmt.paint(text, fmt.RED), 1).replace(
+        "💾", severity_symbol(notice.severity), 1
+    )
+
+
+def _scratch_line(scratch_dir: Path, width: int) -> str:
+    """Where the session was asked to put its scratch files."""
+    prefix = "│ 📂 Scratch:  $AI_SCRATCH_DIR → "
+    text = _fit(_tilde(scratch_dir), width - 2 - _visual_length(prefix), True)
+    return _pad_line(prefix + text, width)
+
+
 def display_launch_info(
     project_path: Path,
     provider: "AIProvider",
     verbose: bool = True,
     scope_roots: Sequence[Path] = (),
     scope_exempt: Sequence[Path] = (),
+    notice: Optional["CacheNotice"] = None,
+    scratch_dir: Optional[Path] = None,
 ) -> None:
     """Display launch information before starting the AI provider.
 
@@ -583,6 +615,8 @@ def display_launch_info(
         verbose: Whether to show full details (default: True)
         scope_roots: Directories holding other projects that the launch guards
         scope_exempt: Directories the guard lets the session write to freely
+        notice: A cache and scratch notice to show, if one is due
+        scratch_dir: The session's scratch folder, if one was made
     """
     if not verbose:
         # Minimal output - just launching message
@@ -632,6 +666,10 @@ def display_launch_info(
                 # Keep the end: the folder name says what is allowed.
                 shown = "..." + shown[len(shown) - room + 3 :]
             print(_pad_line(prefix + shown, width))
+    if notice is not None:
+        print(_cache_notice_line(notice, width))
+    if scratch_dir is not None:
+        print(_scratch_line(scratch_dir, width))
     print(_pad_line("│", width))
 
     # Context sources summary (from provider data)

@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-15
+
+### Added
+
+- **Cache page: see and clear what AI sessions leave behind** — `ai-launcher cache`, and a row below
+  Configuration in the picker. Lists known locations (agent scratch, Playwright and puppeteer
+  browsers, npm, pip, uv and pre-commit caches, editor servers) with size, age and a safety class.
+  Summary rows (disk, scratch, stale, caches) are coloured by severity and clear a whole group with
+  one key. Only locations in the registry can be deleted, each tool's own clean command is used
+  first, `~/.claude` and every project are report-only, and a confirm step lists exactly what goes.
+  `cache --list` prints the table without deleting.
+- **Launch notice** — one line in the launch box when free disk is low, scratch folders add up,
+  scratch is stale, or unregistered cache folders are large. Quiet otherwise, at most once a day per
+  rule.
+- **Per-session scratch folder** — `AI_SCRATCH_DIR` is set for every tool, and Claude Code is asked
+  to keep `.bak` files, patches and logs there. `ai-launcher scratch prune --older-than 14d` removes
+  old ones. It can be asked for, not enforced.
+- **Optional `caches.toml`** in the config folder: your own registry entries and notice thresholds.
+
+- **`ai-launcher update`** — upgrades AI Launcher from PyPI, only when you run it (nothing checks in
+  the background or at launch). It works out how it was installed (pipx, `pip --user`, a virtual
+  environment, or an editable checkout), shows the command, and asks first. `--check` only reports.
+  On Windows, started from `ai-launcher.exe`, it prints the command instead of running it, since
+  Windows will not replace a running `.exe`. Versions before this one need a manual upgrade first.
+
+### Removed
+
+- **`--clean-cache`** — it deleted every child of `~/.cache` before launch, with no list and no
+  confirmation. Use `ai-launcher cache`.
+
+### Notes
+
+- **Bash prototype diverges** — `bin/ai-launcher` has none of this; it needs the Python package.
+
 ## [0.7.0] - 2026-09-30
 
 ### Added

@@ -709,6 +709,33 @@ python -m ai_launcher.core.scope_guard --project P --root R... [--exempt E...]
 
 ---
 
+## Cache and Scratch
+
+The full specification, with the decisions and their reasons, is
+[cache-and-scratch.md](cache-and-scratch.md). In the stack:
+
+```text
+core/cache_data.py      CacheLocation, CacheEntry, Plan: dataclasses, no display text
+core/cache_registry.py  data/caches.toml + the user's caches.toml -> CacheLocation list
+core/cache_scan.py      size walk, size cache file, in-use check
+core/cache_clean.py     protected set, plan, guards, delete
+core/cache_notice.py    launch notice rules -> CacheNotice (data)
+core/cache_summary.py   summary rows and severity, shared by the notice and the page
+core/scratch.py         per-session scratch folder, AI_SCRATCH_DIR, prune
+ui/cache_page.py        fzf page, confirm step; colour through PreviewFormatter
+```
+
+- **The launch path reads one small file and never walks a tree.** A thread refreshes sizes while
+  the picker is open.
+- **Safety rules live in `cache_clean.py`**, not in the registry, so a wrong entry cannot weaken
+  them.
+- **`--clean-cache` was removed.** It deleted every child of `~/.cache` with no list and no
+  confirmation, which contradicts the allowlist rule.
+- **The bash prototype has none of it.** It needs TOML, the size cache and a process check; the
+  scope guard is Python-only for the same reason. Noted in the changelog.
+
+---
+
 ## Open With List
 
 ### Problem

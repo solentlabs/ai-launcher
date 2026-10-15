@@ -1,6 +1,7 @@
 # Configuration
 
-AI Launcher is configured entirely through CLI flags. There is no config file.
+AI Launcher is configured through CLI flags. The one file it reads is an optional `caches.toml` for
+the [cache page](cache-and-scratch.md#registry); nothing needs it.
 
 ## CLI Options
 
@@ -23,12 +24,35 @@ ai-launcher claude [OPTIONS] [PATH]
 | `--debug`           | Enable debug mode                                      |                                          |
 | `--cleanup`         | Clean AI assistant cache/logs before launch            |                                          |
 | `--clean-provider`  | Clean provider-specific files only                     |                                          |
-| `--clean-cache`     | Clean system cache                                     |                                          |
 | `--clean-npm`       | Clean npm cache                                        |                                          |
 
 (\*) `claude` and `gemini` only: folders exempt from the
 [project scope](project-scope.md#allowing-shared-folders) guard (for Gemini, added to its
 workspace), such as a journal every project writes to.
+
+## Cache and Scratch Commands
+
+| Command                                      | What it does                                              |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `ai-launcher cache [PATH...]`                | The [cache page](cache-and-scratch.md#the-page)           |
+| `ai-launcher cache --list [PATH...]`         | The same table as plain text; nothing can be deleted      |
+| `ai-launcher scratch prune --older-than 14d` | Remove old session scratch folders (`--dry-run`, `--yes`) |
+
+`PATH` is a scan folder, as for a provider subcommand; `--manual-paths` works too. They tell the
+page which folders are projects, so it never offers one for deletion. The optional file is
+`caches.toml` in the config folder (`~/.config/ai-launcher/` on Linux and WSL); see
+[Registry](cache-and-scratch.md#registry). Sessions also get a scratch folder, named in the
+`AI_SCRATCH_DIR` environment variable; see
+[Scratch Directory](cache-and-scratch.md#scratch-directory).
+
+## Update Command
+
+| Command                      | What it does                                                      |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `ai-launcher update --check` | Says whether a newer release exists on PyPI; changes nothing      |
+| `ai-launcher update`         | Shows the upgrade command for how you installed it, asks, runs it |
+
+It contacts PyPI only when you run it. See [Updating](updating.md).
 
 ## Available Providers
 

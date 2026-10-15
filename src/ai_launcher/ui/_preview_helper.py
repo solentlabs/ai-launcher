@@ -140,7 +140,6 @@ def show_configuration_preview() -> None:
     print()
     print("   \033[1mCleanup (opt-in):\033[0m")
     print("     --cleanup                     Clean AI assistant cache/logs")
-    print("     --clean-cache                 Clean ~/.cache")
     print("     --clean-npm                   Clean npm cache")
     print()
     print("   \033[1mInformation:\033[0m")
@@ -246,6 +245,11 @@ def main() -> None:
         if parts[0] == "__ACTION__" and "Configuration" in parts[1]:
             # Configuration action - show configuration preview
             show_configuration_preview()
+            return
+        if parts[0] == "__ACTION__" and "Cache and scratch" in parts[1]:
+            from ai_launcher.ui.cache_page import render_summary_preview
+
+            print(render_summary_preview())
             return
         if parts[0] in ("__SPACE__", "__ACTION__"):
             # Other action items or spacing - show nothing

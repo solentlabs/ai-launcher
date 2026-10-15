@@ -32,6 +32,8 @@ from ai_launcher.core.provider_data import (
     SkillInfo,
 )
 from ai_launcher.core.scope_guard import GUARDED_TOOLS
+from ai_launcher.core.scratch import ENV_VAR as SCRATCH_ENV_VAR
+from ai_launcher.core.scratch import SCRATCH_STATEMENT
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 from ai_launcher.utils.session import encode_project_path
 
@@ -146,11 +148,12 @@ class ClaudeProvider(AIProvider):
         # Change to project directory
         os.chdir(project_path)
 
-        cmd = [
-            "claude",
-            "--append-system-prompt",
-            SCOPE_STATEMENT.format(name=project_path.name, path=project_path),
-        ]
+        statement = SCOPE_STATEMENT.format(name=project_path.name, path=project_path)
+        scratch_dir = os.environ.get(SCRATCH_ENV_VAR)
+        if scratch_dir:
+            # Ask, not enforce: the session may still write elsewhere
+            statement += " " + SCRATCH_STATEMENT.format(path=scratch_dir)
+        cmd = ["claude", "--append-system-prompt", statement]
         if scope_roots:
             settings = scope_guard_settings(project_path, scope_roots, scope_exempt)
             cmd += ["--settings", json.dumps(settings)]

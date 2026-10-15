@@ -21,6 +21,20 @@ from ai_launcher.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def ensure_utf8_output() -> None:
+    """On Windows, print UTF-8 even when output is piped (the codepage is cp1252).
+
+    The symbols the cache page draws cannot be encoded in cp1252, which makes
+    `print` raise when stdout is not a console. Characters that still cannot be
+    written are replaced rather than raised.
+    """
+    if sys.platform != "win32":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def set_terminal_title(title: str) -> bool:
     """Set the terminal window title.
 
