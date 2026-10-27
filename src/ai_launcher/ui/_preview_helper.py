@@ -251,6 +251,11 @@ def main() -> None:
 
             print(render_summary_preview())
             return
+        if parts[0] == "__ACTION__" and "About" in parts[1]:
+            from ai_launcher.ui.about import render_about_preview
+
+            print(render_about_preview())
+            return
         if parts[0] in ("__SPACE__", "__ACTION__"):
             # Other action items or spacing - show nothing
             return

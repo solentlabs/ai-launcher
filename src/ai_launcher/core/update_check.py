@@ -58,17 +58,20 @@ def is_due(data: Dict[str, Any], now: float) -> bool:
 
 
 def _save(data: Dict[str, Any], path: Path) -> None:
-    """Write the answer atomically, readable by the owner only."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handle, temp = tempfile.mkstemp(dir=str(path.parent), prefix=".update-")
+    """Write the answer atomically, readable by the owner only. Never raises."""
+    temp = None
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle, temp = tempfile.mkstemp(dir=str(path.parent), prefix=".update-")
         with os.fdopen(handle, "w", encoding="utf-8") as out:
             json.dump(data, out)
         Path(temp).chmod(0o600)
         Path(temp).replace(path)
-    except OSError:
-        with contextlib.suppress(OSError):
-            Path(temp).unlink()
+    except OSError as error:
+        logger.debug(f"Update check not saved: {error}")
+        if temp:
+            with contextlib.suppress(OSError):
+                Path(temp).unlink()
 
 
 def check_now(

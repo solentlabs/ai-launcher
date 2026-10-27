@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 # ConfigManager removed - using runtime config from CLI flags
 from ai_launcher.core.models import Project, ProviderConfig, Selection
 from ai_launcher.providers.registry import get_registry
+from ai_launcher.ui.about import ABOUT_ROW, about_row_label
 from ai_launcher.ui.preview import build_tree_view
 from ai_launcher.utils.paths import fzf_preview_cmd, is_relative_to
 
@@ -50,6 +51,17 @@ def cache_row_label() -> str:
     if severity >= SEVERITY_ATTENTION:
         return f"{CACHE_ROW}  {severity_symbol(severity)}"
     return CACHE_ROW
+
+
+def about_row_label_now() -> str:
+    """The About row's text. Reads saved data only; any failure leaves it plain."""
+    try:
+        from ai_launcher import __version__
+        from ai_launcher.core.cache_registry import load_registry
+
+        return about_row_label(load_registry().update_check, __version__)
+    except Exception:
+        return ABOUT_ROW
 
 
 def clear_screen() -> None:
@@ -221,6 +233,7 @@ def select_project(
         choices.append("__ACTION__\t\t")
         choices.append("__ACTION__\t\t🔧 Configuration")
         choices.append(f"__ACTION__\t\t{cache_row_label()}")
+        choices.append(f"__ACTION__\t\t{about_row_label_now()}")
 
         # Build header with project info
         project_count = len(current_projects)
@@ -322,6 +335,13 @@ Ctrl-O for other tools
                 from ai_launcher.ui.cache_page import run_cache_page
 
                 run_cache_page([p.path for p in current_projects])
+                continue
+
+            # A manual update, in place, then back to the picker
+            if selected.startswith(f"__ACTION__\t\t{ABOUT_ROW}"):
+                from ai_launcher.ui import about
+
+                about.run_about()
                 continue
 
             # Handle empty line action item (just loop back)

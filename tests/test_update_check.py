@@ -225,3 +225,65 @@ def test_launch_passes_the_update_notice_to_the_box(cache_home, monkeypatch, tmp
     launch_ai(tmp_path, provider=provider, config=ConfigData())
 
     assert display.call_args.kwargs["update_notice"] is notice
+
+
+# ------------------------------------------------------- defaults and failures
+
+
+def test_state_path_is_beside_the_size_cache(cache_home):
+    from ai_launcher.core.cache_scan import size_cache_path
+
+    assert uc.state_path() == size_cache_path().parent / "update-check.json"
+
+
+def test_an_unwritable_state_folder_is_swallowed(state, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(uc.tempfile, "mkstemp", refuse)
+
+    assert uc.check_now(lambda: "0.9.0", state, now=1.0) == "0.9.0"  # no raise
+    assert not state.exists()
+
+
+def test_a_failed_replace_cleans_up_its_temp_file(state, monkeypatch):
+    def refuse(self, target):
+        raise OSError("busy")
+
+    monkeypatch.setattr(uc.Path, "replace", refuse)
+
+    uc.check_now(lambda: "0.9.0", state, now=1.0)
+
+    assert not list(state.parent.glob(".update-*"))
+
+
+@pytest.mark.parametrize(
+    ("enabled", "saved", "expected"),
+    [(True, {"latest": "0.9.0"}, "0.9.0"), (False, {"latest": "0.9.0"}, None)],
+    ids=["opted-in", "opted-out"],
+)
+def test_current_update_notice_follows_the_setting(
+    cache_home, monkeypatch, enabled, saved, expected
+):
+    from ai_launcher.cli import current_update_notice
+
+    registry = reg.load_registry(platform="linux", user_file=cache_home / "none")
+    registry.update_check = enabled
+    monkeypatch.setattr(reg, "load_registry", lambda: registry)
+    uc.state_path().parent.mkdir(parents=True, exist_ok=True)
+    uc.state_path().write_text(json.dumps(saved), encoding="utf-8")
+    monkeypatch.setattr("ai_launcher.cli.__version__", "0.8.0")
+
+    notice = current_update_notice()
+
+    assert (notice.latest if notice else None) == expected
+
+
+def test_current_update_notice_never_raises(monkeypatch):
+    from ai_launcher.cli import current_update_notice
+
+    monkeypatch.setattr(
+        reg, "load_registry", lambda: (_ for _ in ()).throw(RuntimeError("x"))
+    )
+
+    assert current_update_notice() is None

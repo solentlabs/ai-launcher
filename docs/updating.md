@@ -59,6 +59,24 @@ Decisions:
 - **Last result** is kept in `update-check.json` in the state folder, beside `cache-sizes.json`.
   Deleting it only means the next launch checks again.
 
+## The About Row
+
+The project picker has an `📦 About` row under Configuration and Cache and scratch. It works whether
+or not you opted in to the automatic check.
+
+- **The preview pane** shows the version you are running, how AI Launcher was installed (pipx,
+  `pip --user`, a virtual environment, or an editable or source checkout), and the update status:
+  the newest release the automatic check has seen and when, `not checked yet`, or `off` with the
+  setting to add. It reads saved data only and makes no network call.
+- **Enter on the row** runs `ai-launcher update` in place: it asks PyPI, shows the command, asks
+  `Update now? [y/N]`, and runs it. This is the only moment the row contacts PyPI. When it finishes,
+  press Enter to go back to the picker. The new version is used the next time you start AI Launcher.
+- **A 🆕 after the row's name** means the saved check found a newer release, so you can see it
+  without opening the row.
+
+It is the same flow, with the same install detection, as the command: an editable install is told to
+`git pull`, and on Windows, started from `ai-launcher.exe`, the command is shown, not run.
+
 ## Windows
 
 Windows will not replace an `.exe` that is running. When you start `ai-launcher.exe` itself, the

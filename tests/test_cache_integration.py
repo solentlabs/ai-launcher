@@ -380,8 +380,8 @@ def test_picker_has_a_cache_row_below_configuration(tmp_path, cache_home):
     result, _, procs, project = run_picker(tmp_path, [None])
 
     sent = procs[0].communicate.call_args.kwargs["input"].decode().splitlines()
-    assert sent[-2].endswith("🔧 Configuration")
-    assert sent[-1].startswith("__ACTION__\t\t💾 Cache and scratch")
+    assert sent[-3].endswith("🔧 Configuration")
+    assert sent[-2].startswith("__ACTION__\t\t💾 Cache and scratch")
     assert result == Selection(project)
 
 
