@@ -225,8 +225,10 @@ These rules keep a compromised branch name, action or dispatch from publishing o
   appear in a branch whose name contains `origin/main`.
 - **Actions are pinned to commit SHAs**, with the version in a trailing comment, because a tag or
   branch such as `@v4` or `@release/v1` can be moved. `publish.yml` holds `id-token: write`, so an
-  unpinned publish action could mint a PyPI token. Dependabot (`.github/dependabot.yml`) opens a PR
-  when a pinned action has a new release.
+  unpinned publish action could mint a PyPI token. Pins do not update themselves: to move one,
+  resolve the new tag to its commit
+  (`gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha`; an annotated tag has one more
+  hop, through `git/tags/<sha>`) and change the SHA and the version comment together.
 - **Every workflow declares `permissions:`** at the top, `contents: read` unless a job needs more.
   `tests/test_workflows.py` checks the last three rules.
 
@@ -245,7 +247,6 @@ Use the script for normal releases. Hand-edit only when:
 - `.github/workflows/ci.yml` — runs on PRs and pushes to main
 - `.github/workflows/tag-protection.yml` — gates tag pushes
 - `.github/workflows/publish.yml` — builds and uploads to PyPI
-- `.github/dependabot.yml` — keeps the pinned action SHAs current
 - `tests/test_workflows.py` — checks the workflow safety rules above
 - `pyproject.toml` — version source (alongside `__init__.py`)
 - `src/ai_launcher/__init__.py` — version source (alongside `pyproject.toml`)

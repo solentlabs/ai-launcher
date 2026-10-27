@@ -77,10 +77,10 @@ def test_preview_content(state, plan, enabled, saved, expected):
 
 @pytest.mark.parametrize(
     "checked_at",
-    [1e20, -1e20, float("inf"), float("nan")],
-    ids=["huge", "negative-huge", "infinite", "nan"],
+    [1e20, -1e20, float("inf"), float("nan"), "yesterday", None, True],
+    ids=["huge", "negative-huge", "infinite", "nan", "text", "none", "bool"],
 )
-def test_preview_survives_a_corrupt_checked_at(state, checked_at):
+def test_preview_omits_a_date_that_makes_no_sense(state, checked_at):
     state.write_text(
         json.dumps({"checked_at": checked_at, "latest": "0.9.0"}), encoding="utf-8"
     )
@@ -193,19 +193,6 @@ def test_the_about_label_is_read_once_per_picker(tmp_path, cache_home, monkeypat
     run_picker(tmp_path, [ABOUT_LINE, ABOUT_LINE, None])
 
     assert len(calls) == 1
-
-
-@pytest.mark.parametrize(
-    "checked_at", ["yesterday", None, True], ids=["text", "none", "bool"]
-)
-def test_preview_omits_a_date_that_is_not_a_number(state, checked_at):
-    state.write_text(
-        json.dumps({"checked_at": checked_at, "latest": "0.9.0"}), encoding="utf-8"
-    )
-
-    text = preview(enabled=True, state_file=state)
-
-    assert "0.9.0 is available" in text and "checked" not in text
 
 
 def test_the_row_label_stays_plain_when_the_setting_cannot_be_read(monkeypatch):
