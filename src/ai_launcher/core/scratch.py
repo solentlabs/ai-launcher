@@ -105,7 +105,10 @@ def prune_candidates(
             info = scan_tree(session, now=now)
             newest = info.newest_mtime
             if newest is None:
-                newest = session.stat().st_mtime
+                try:
+                    newest = session.stat().st_mtime
+                except OSError:  # vanished since it was listed
+                    continue
             if now - newest < older_than_seconds:
                 continue
             entries.append(

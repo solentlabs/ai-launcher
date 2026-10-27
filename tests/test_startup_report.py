@@ -640,3 +640,23 @@ class TestStartupReportWithProvider:
 
         output = generate_startup_report(project_dir, provider=provider)
         assert "Test Provider Startup Context Report" in output
+
+
+def test_auto_memory_is_looked_up_under_the_listed_path(tmp_path, make_symlink):
+    """Claude keys memory on the path the session starts in: the link, not its target."""
+    real = tmp_path / "real" / "proj"
+    real.mkdir(parents=True)
+    link = tmp_path / "projects" / "proj"
+    link.parent.mkdir()
+    make_symlink(link, real, target_is_directory=True)
+    memory_dir = (
+        tmp_path / ".claude" / "projects" / encode_project_path(link) / "memory"
+    )
+    memory_dir.mkdir(parents=True)
+    (memory_dir / "MEMORY.md").write_text("# Memory\n")
+    report = StartupReport(link)
+
+    with patch("ai_launcher.ui.startup_report.Path.home", return_value=tmp_path):
+        report._check_auto_memory()
+
+    assert report.sources[-1].status == "loaded"

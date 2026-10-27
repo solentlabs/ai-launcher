@@ -173,7 +173,7 @@ def _picked(row, key=""):
 def test_select_project_generic_exception(
     mock_clear, mock_tree, mock_popen, tmp_path, capsys
 ):
-    """Generic exception during Popen returns None and prints error."""
+    """A crash prints the error and exits 1: it is not "no project selected"."""
     from ai_launcher.ui.selector import select_project
 
     project = Project.from_path(tmp_path / "p", is_manual=False)
@@ -181,9 +181,10 @@ def test_select_project_generic_exception(
     mock_tree.return_value = ([choice_str], {choice_str: project})
     mock_popen.side_effect = RuntimeError("unexpected")
 
-    result = select_project([project])
+    with pytest.raises(SystemExit) as stopped:
+        select_project([project])
 
-    assert result is None
+    assert stopped.value.code == 1
     assert "Error" in capsys.readouterr().out
     # Cleared before fzf and again on the way out: fzf may have left its screen up.
     assert mock_clear.call_count == 2

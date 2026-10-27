@@ -840,10 +840,15 @@ cli.py
   environment says which shell started it. A Windows user who has set `SHELL` to a program that can
   be run gets that instead. `cmd.exe` cannot start in a UNC path, such as a network share or a WSL
   folder reached as `\\wsl.localhost\...`: it says so and starts in the Windows directory.
-- **A symlinked manual project keeps its path.** The shell is started with `PWD` set to the
-  project's path as listed, made absolute, so a `--manual-paths` project that is a symlink shows its
-  own path in the prompt. Scanned projects are resolved during discovery, before the picker, so for
-  them the listed path is already the target's.
+- **Every project keeps its path as listed.** Nothing is resolved to a real path, scanned or manual:
+  a symlinked scan folder (`~/projects -> /mnt/d/projects`) lists its projects under `~/projects/…`,
+  the session starts in that path, and Claude Code's history and memory (keyed on the path the
+  session starts in) are the ones you already have. The shell is started with `PWD` set to the path
+  as listed, made absolute, so the prompt shows it too. Duplicates are found by **real path**: a
+  project reachable twice appears once. Folders are walked in name order with symlinks last, so the
+  real folder wins over a link to it in the same parent, and a manual project wins over a scanned
+  one. This used to resolve scanned projects "to avoid duplicates", which the invariant in
+  [CLAUDE.md](../CLAUDE.md) forbids and which broke the history match for symlinked scan folders.
 - **The list is a dialog, drawn by a second fzf.** The picker runs with `--no-clear`, so its last
   frame stays on screen when it exits. The list then runs in fzf's height mode, also with
   `--no-clear`, which draws only inside its margins and leaves the rest of the screen alone. The

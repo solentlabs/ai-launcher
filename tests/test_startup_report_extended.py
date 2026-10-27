@@ -123,6 +123,27 @@ class TestPadLine:
         result = _pad_line("│" + "x" * 100, 10)
         assert result.endswith("│")
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "│ " + "x" * 200,
+            "│ 📁 Project:  " + "~/deep/" * 40,
+            "│ " + "界" * 80,  # wide characters take two columns each
+            "│ " + "📂" * 60,
+        ],
+        ids=["ascii", "path", "wide-cjk", "emoji"],
+    )
+    def test_a_long_line_is_cut_to_the_box_not_pushed_out(self, text):
+        result = _pad_line(text, 85)
+
+        assert _visual_length(result) == 85
+        assert "…" in result and result.endswith("│")
+
+    def test_a_line_that_just_fits_is_unchanged(self):
+        text = "│ " + "x" * 82  # 84 columns, plus the closing border = 85
+
+        assert _pad_line(text, 85) == text + "│"
+
 
 class TestDisplayLaunchInfo:
     """Tests for display_launch_info()."""

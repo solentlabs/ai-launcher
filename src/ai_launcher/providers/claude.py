@@ -37,6 +37,7 @@ from ai_launcher.core.scratch import ENV_VAR as SCRATCH_ENV_VAR
 from ai_launcher.core.scratch import SCRATCH_STATEMENT
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 from ai_launcher.utils.cleanup import prune_claude_backups, prune_claude_versions
+from ai_launcher.utils.jsonfile import as_dict, read_json_object, string_list
 from ai_launcher.utils.session import encode_project_path
 
 if TYPE_CHECKING:
@@ -866,33 +867,29 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     Returns:
         SessionConfig instance or None if no config exists
     """
-    import json
-
     config = SessionConfig()
 
     # Layer 1: Project-level permissions (the ones that accumulate)
     project_settings = project_path / ".claude" / "settings.local.json"
     if project_settings.exists():
         config.config_file_path = str(project_settings)
-        try:
-            settings = json.loads(project_settings.read_text())
+        settings = read_json_object(project_settings) or {}
 
-            # Permissions
-            if "permissions" in settings and "allow" in settings["permissions"]:
-                config.permissions = settings["permissions"]["allow"]
-                config.permissions_count = len(config.permissions)
+        # Permissions
+        allow = as_dict(settings.get("permissions")).get("allow")
+        if isinstance(allow, list):
+            config.permissions = string_list(allow)
+            config.permissions_count = len(config.permissions)
 
-            # MCP servers (project-level)
-            if "mcpServers" in settings:
-                config.mcp_servers = list(settings["mcpServers"].keys())
+        # MCP servers (project-level)
+        servers = settings.get("mcpServers")
+        if isinstance(servers, dict):
+            config.mcp_servers = list(servers.keys())
 
-            # Hooks (project-level)
-            if "hooks" in settings:
-                config.hooks_configured = any(
-                    hook_config for hook_config in settings["hooks"].values()
-                )
-        except (json.JSONDecodeError, KeyError):
-            pass
+        # Hooks (project-level)
+        hooks = settings.get("hooks")
+        if isinstance(hooks, dict):
+            config.hooks_configured = any(hook_config for hook_config in hooks.values())
 
     # Layer 2: Global settings.json — shared allow/deny/ask + model
     global_settings = Path.home() / ".claude" / "settings.json"
@@ -900,38 +897,30 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     global_deny: List[str] = []
     global_ask: List[str] = []
     if global_settings.exists():
-        try:
-            settings = json.loads(global_settings.read_text())
-            config.model = settings.get("model")
+        settings = read_json_object(global_settings) or {}
+        model = settings.get("model")
+        config.model = model if isinstance(model, str) else None
 
-            # Global permissions
-            if "permissions" in settings:
-                perms = settings["permissions"]
-                global_allow.extend(perms.get("allow", []))
-                global_deny.extend(perms.get("deny", []))
-                global_ask.extend(perms.get("ask", []))
-        except json.JSONDecodeError:
-            pass
+        # Global permissions
+        perms = as_dict(settings.get("permissions"))
+        global_allow.extend(string_list(perms.get("allow")))
+        global_deny.extend(string_list(perms.get("deny")))
+        global_ask.extend(string_list(perms.get("ask")))
 
     # Layer 3: Global settings.local.json — merged with settings.json (union)
     global_local_settings = Path.home() / ".claude" / "settings.local.json"
     if global_local_settings.exists():
         config.global_config_file_path = str(global_local_settings)
-        try:
-            settings = json.loads(global_local_settings.read_text())
-            if "permissions" in settings:
-                perms = settings["permissions"]
-                for perm in perms.get("allow", []):
-                    if perm not in global_allow:
-                        global_allow.append(perm)
-                for perm in perms.get("deny", []):
-                    if perm not in global_deny:
-                        global_deny.append(perm)
-                for perm in perms.get("ask", []):
-                    if perm not in global_ask:
-                        global_ask.append(perm)
-        except json.JSONDecodeError:
-            pass
+        settings = read_json_object(global_local_settings) or {}
+        perms = as_dict(settings.get("permissions"))
+        for target, key in (
+            (global_allow, "allow"),
+            (global_deny, "deny"),
+            (global_ask, "ask"),
+        ):
+            for perm in string_list(perms.get(key)):
+                if perm not in target:
+                    target.append(perm)
     elif global_settings.exists():
         config.global_config_file_path = str(global_settings)
 
@@ -954,16 +943,12 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     # Check global MCP servers
     mcp_config = Path.home() / ".claude" / "mcp.json"
     if mcp_config.exists():
-        try:
-            mcp_data = json.loads(mcp_config.read_text())
-            if "mcpServers" in mcp_data:
-                # Merge with project-level MCP servers (avoid duplicates)
-                global_servers = list(mcp_data["mcpServers"].keys())
-                for server in global_servers:
-                    if server not in config.mcp_servers:
-                        config.mcp_servers.append(server)
-        except (json.JSONDecodeError, KeyError):
-            pass
+        servers = as_dict(read_json_object(mcp_config)).get("mcpServers")
+        if isinstance(servers, dict):
+            # Merge with project-level MCP servers (avoid duplicates)
+            for server in servers:
+                if server not in config.mcp_servers:
+                    config.mcp_servers.append(server)
 
     # Check global hooks
     hooks_config = Path.home() / ".claude" / "hooks.json"

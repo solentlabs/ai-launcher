@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ai_launcher.providers.base import AIProvider
 
 from ai_launcher.utils.humanize import humanize_count
+from ai_launcher.utils.paths import listed_path
 from ai_launcher.utils.session import encode_project_path
 
 
@@ -235,7 +236,8 @@ class StartupReport:
     def _check_auto_memory(self) -> None:
         """Check for auto memory files."""
         # Encode project path to match Claude's memory directory structure
-        abs_path = self.project_path.resolve()
+        # Claude keys memory on the path the session starts in: symlinks are kept
+        abs_path = listed_path(self.project_path)
         encoded_path = encode_project_path(abs_path)
         memory_dir = Path.home() / ".claude" / "projects" / encoded_path / "memory"
         memory_file = memory_dir / "MEMORY.md"
@@ -514,8 +516,23 @@ def _visual_length(text: str) -> int:
     return length
 
 
+def _cut_to_width(text: str, limit: int) -> str:
+    """Shorten text to at most `limit` visual columns, ending in an ellipsis."""
+    if _visual_length(text) <= limit:
+        return text
+    kept = ""
+    for char in text:
+        if _visual_length(kept + char) > limit - 1:
+            break
+        kept += char
+    return kept + "…"
+
+
 def _pad_line(text: str, width: int) -> str:
     """Pad line to exact width accounting for emoji characters.
+
+    A line too long for the box is cut with an ellipsis: letting it run on
+    would push the right border out and wrap the row.
 
     Args:
         text: Text to pad (should start with │)
@@ -524,11 +541,9 @@ def _pad_line(text: str, width: int) -> str:
     Returns:
         Padded string
     """
-    visual_len = _visual_length(text)
-    padding_needed = width - visual_len - 1  # -1 for closing │
-    if padding_needed > 0:
-        return text + " " * padding_needed + "│"
-    return text + "│"
+    text = _cut_to_width(text, width - 1)  # -1 for the closing │
+    padding_needed = width - _visual_length(text) - 1
+    return text + " " * padding_needed + "│"
 
 
 def _check_sibling_projects(project_path: Path) -> dict:
@@ -547,14 +562,16 @@ def _check_sibling_projects(project_path: Path) -> dict:
 
     # Check for sibling directories
     parent = project_path.parent
-    if parent.exists():
+    try:
         siblings = [
             d
             for d in parent.iterdir()
             if d.is_dir() and d != project_path and not d.name.startswith(".")
         ]
-        info["sibling_count"] = len(siblings)
-        info["sibling_names"] = [s.name for s in siblings[:6]]  # Limit to 6
+    except OSError:  # missing or unreadable parent: just no sibling lines
+        return info
+    info["sibling_count"] = len(siblings)
+    info["sibling_names"] = [s.name for s in siblings[:6]]  # Limit to 6
 
     return info
 

@@ -240,7 +240,9 @@ def ensure_fzf() -> bool:
                 return True
             print("  Error: fzf was downloaded but could not be found on PATH.")
             return False
-        except RuntimeError as e:
+        except Exception as e:  # a download convenience: never a traceback
+            # RuntimeError is ours; the rest are a damaged archive (tarfile,
+            # zipfile), bad JSON from the API, a full disk or a failed move
             print(f"  Error: {e}")
             _print_manual_instructions()
             return False

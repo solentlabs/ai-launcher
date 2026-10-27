@@ -601,3 +601,30 @@ class TestEnsureFzf:
             assert str(install_dir) in os.environ["PATH"]
         finally:
             os.environ["PATH"] = original_path
+
+
+class TestEnsureFzfFailures:
+    """A bad download must end in the manual instructions, not a traceback."""
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("no release"),
+            OSError("disk full"),
+            ValueError("bad json"),
+            KeyError("assets"),
+            tarfile.TarError("damaged"),
+            zipfile.BadZipFile("damaged"),
+        ],
+        ids=["runtime", "os", "value", "key", "tar", "zip"],
+    )
+    def test_returns_false_and_prints_instructions(self, error, tmp_path, capsys):
+        with patch("ai_launcher.utils.fzf.is_fzf_installed", return_value=False), patch(
+            "ai_launcher.utils.fzf.get_fzf_install_dir", return_value=tmp_path
+        ), patch("builtins.input", return_value="y"), patch(
+            "ai_launcher.utils.fzf.download_fzf", side_effect=error
+        ):
+            assert ensure_fzf() is False
+
+        out = capsys.readouterr().out
+        assert "Error" in out and "fzf" in out

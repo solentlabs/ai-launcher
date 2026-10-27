@@ -45,6 +45,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tag-on-main check is an ancestor test, actions are pinned to commit SHAs with Dependabot to update
   them, and every workflow declares `permissions:`.
 
+- **A hand-edited Claude settings file broke the preview** — `"allow": null`, a top-level list, a
+  non-UTF-8 file or an unreadable one raised out of the preview, the launch box and
+  `--check-permissions`. Such files and fields are now skipped. The permission report's box border
+  was also one column short on two lines.
+- **A crash in the picker looked like "No project selected"** — every `FileNotFoundError` anywhere
+  in the picker was reported as "fzf not found", and any other error exited with status 0. Only a
+  missing fzf says that now, and an unexpected error exits with status 1.
+- **A launch error could leak the session's scratch folder** — the cleanup started after the launch
+  box was drawn. An unreadable parent folder also crashed the "sibling projects" lines. A scratch
+  folder that cannot be made no longer leaves an inherited `AI_SCRATCH_DIR` pointing at a stale one.
+- **`ensure_fzf` and `scratch prune` leaked tracebacks** — a bad download (a damaged archive, a full
+  disk) and a session folder that vanished mid-prune are now handled.
+- **`format_terminal_title` raised more than `ValueError`** for a bad format such as `{}`; the
+  format is not user-settable today, so this only fixes the function's contract.
+
+- **Scanned projects were listed under their resolved path** — with `~/projects` linked to
+  `/mnt/d/projects`, every project, the launched session and the previews used `/mnt/d/…`, so Claude
+  Code's history and memory (keyed on the path) did not match the ones from a manual launch.
+  Projects now keep the path as listed, and duplicates are found by real path. The preview's memory
+  lookup uses the listed path too.
+
+- **The preview could fight your own git commands** — it ran `git status` on every cursor move and
+  that refreshes the index, which can collide with a `git add` or commit in another terminal
+  (`index.lock exists`). It now runs `git --no-optional-locks status`, in the context preview too.
+  The status lines also kept only one column, so a staged and an unstaged change looked alike; both
+  columns are kept.
+- **A long path or name pushed the launch box's right border out** — lines are now cut to the box
+  with an ellipsis.
+- **Raw escape codes were spread through the UI** (`_preview_helper`, `_context_preview`, `preview`,
+  `selector`, `cache_page`), against the project invariant. Styling goes through `PreviewFormatter`
+  and terminal control (clear screen, grey-out) lives in `utils/terminal.py`.
+  `tests/test_ansi_invariant.py` fails if a raw escape code appears anywhere else.
+
 ### Notes
 
 - **Bash prototype diverges** — `bin/ai-launcher` has no update command, so it has no check or About

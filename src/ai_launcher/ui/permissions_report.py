@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import List
 
 from ai_launcher.core.models import Project
+from ai_launcher.utils.jsonfile import as_dict, read_json_object, string_list
 
 
 def check_project_permissions(
@@ -45,8 +46,8 @@ def check_project_permissions(
 
     print()
     print("┌─────────────────────────────────────────────────────────────────┐")
-    print("│  Claude Code Permission Health Check                           │")
-    print("│  Scans projects for accumulated permission patterns            │")
+    print("│  Claude Code Permission Health Check                            │")
+    print("│  Scans projects for accumulated permission patterns             │")
     print("└─────────────────────────────────────────────────────────────────┘")
     print()
 
@@ -111,8 +112,6 @@ def check_project_permissions(
 
 def _print_global_settings() -> None:
     """Print global Claude Code permission settings."""
-    import json
-
     home = Path.home()
 
     print("Global Settings:")
@@ -120,12 +119,14 @@ def _print_global_settings() -> None:
     # settings.json
     settings_file = home / ".claude" / "settings.json"
     if settings_file.exists():
-        try:
-            settings = json.loads(settings_file.read_text())
-            perms = settings.get("permissions", {})
-            allow = perms.get("allow", [])
-            deny = perms.get("deny", [])
-            ask = perms.get("ask", [])
+        settings = read_json_object(settings_file)
+        if settings is None:
+            print(f"  ⚠ {settings_file} has invalid JSON")
+        else:
+            perms = as_dict(settings.get("permissions"))
+            allow = string_list(perms.get("allow"))
+            deny = string_list(perms.get("deny"))
+            ask = string_list(perms.get("ask"))
 
             if allow:
                 print(f"  ✓ Allow: {', '.join(allow[:6])}")
@@ -143,22 +144,20 @@ def _print_global_settings() -> None:
                     else:
                         ask_labels.append(pattern)
                 print(f"  🚫 Ask before: {', '.join(ask_labels)}")
-        except json.JSONDecodeError:
-            print(f"  ⚠ {settings_file} has invalid JSON")
     else:
         print("  ○ No ~/.claude/settings.json")
 
     # settings.local.json
     local_file = home / ".claude" / "settings.local.json"
     if local_file.exists():
-        try:
-            settings = json.loads(local_file.read_text())
-            allow = settings.get("permissions", {}).get("allow", [])
+        local = read_json_object(local_file)
+        if local is None:
+            print(f"  ⚠ {local_file} has invalid JSON")
+        else:
+            allow = string_list(as_dict(local.get("permissions")).get("allow"))
             if allow:
                 print(f"  ✓ Local allow: {', '.join(allow[:6])}")
                 if len(allow) > 6:
                     print(f"    ...and {len(allow) - 6} more")
-        except json.JSONDecodeError:
-            print(f"  ⚠ {local_file} has invalid JSON")
     else:
         print("  ○ No ~/.claude/settings.local.json")

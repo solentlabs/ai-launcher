@@ -5,10 +5,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from ai_launcher.core.models import Project
+from ai_launcher.ui.formatter import PreviewFormatter
 from ai_launcher.utils.paths import is_relative_to
 
 if TYPE_CHECKING:
     from ai_launcher.core.provider_data import DirectoryListing, GitStatus
+
+
+fmt = PreviewFormatter()
 
 
 def build_tree_view(
@@ -105,7 +109,7 @@ def build_tree_view(
                 # Can't make relative - show full path
                 dir_name = str(dir_path)
 
-            dir_display = f"\033[2m{prefix}{connector}📁 {dir_name}/\033[0m"
+            dir_display = fmt.paint(f"{prefix}{connector}📁 {dir_name}/", fmt.DIM)
             formatted_lines.append(f"{dir_path}\t\t{dir_display}")
 
             # Update prefix for children
@@ -123,7 +127,7 @@ def build_tree_view(
                     if is_relative_to(base, home)
                     else str(base)
                 )
-                dir_display = f"\033[2m📁 {display_base}/\033[0m"
+                dir_display = fmt.paint(f"📁 {display_base}/", fmt.DIM)
                 formatted_lines.append(f"{base}\t\t{dir_display}")
             child_prefix = ""
 
@@ -228,7 +232,9 @@ def _get_git_status(project_path: Path) -> Optional["GitStatus"]:
 
         # Get status
         result = subprocess.run(
-            ["git", "status", "-s"],
+            # --no-optional-locks: a preview must never take .git/index.lock,
+            # which would fight a git command running in another terminal
+            ["git", "--no-optional-locks", "status", "-s"],
             cwd=project_path,
             capture_output=True,
             text=True,
@@ -236,10 +242,10 @@ def _get_git_status(project_path: Path) -> Optional["GitStatus"]:
         )  # nosec B603, B607
 
         if result.returncode == 0:
+            # Keep the two status columns (" M" unstaged, "M " staged): only the
+            # end is trimmed, so the first column's blank is not lost
             changed_files = [
-                line.strip()
-                for line in result.stdout.strip().split("\n")
-                if line.strip()
+                line.rstrip() for line in result.stdout.splitlines() if line.strip()
             ]
             return GitStatus(
                 is_repo=True,

@@ -10,7 +10,11 @@ if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+from ai_launcher.ui.formatter import PreviewFormatter
 from ai_launcher.ui.preview import generate_provider_preview
+from ai_launcher.utils.paths import listed_path
+
+fmt = PreviewFormatter()
 
 
 def show_configuration_preview() -> None:
@@ -19,17 +23,17 @@ def show_configuration_preview() -> None:
     print("│            Configuration                │")
     print("╰─────────────────────────────────────────╯")
     print()
-    print("\033[2mConfiguration is passed via CLI flags.\033[0m")
-    print("\033[2mRun 'ai-launcher --help' to see all options.\033[0m")
+    print(fmt.paint("Configuration is passed via CLI flags.", fmt.DIM))
+    print(fmt.paint("Run 'ai-launcher --help' to see all options.", fmt.DIM))
     print()
 
     # Provider
     provider_name = os.environ.get("AI_LAUNCHER_PROVIDER", "claude-code")
-    print(f"\033[1m🤖 Provider:\033[0m {provider_name}")
+    print(f"{fmt.paint('🤖 Provider:', fmt.BOLD)} {provider_name}")
     print()
 
     # Project Paths
-    print("\033[1m📁 Project Paths\033[0m")
+    print(fmt.paint("📁 Project Paths", fmt.BOLD))
     scan_paths_env = os.environ.get("AI_LAUNCHER_SCAN_PATHS", "")
     if scan_paths_env:
         scan_paths = scan_paths_env.split(os.pathsep)
@@ -42,7 +46,7 @@ def show_configuration_preview() -> None:
                 rel = sp
             print(f"     • {rel}")
     else:
-        print("   \033[2mNo scan paths specified\033[0m")
+        print("   " + fmt.paint("No scan paths specified", fmt.DIM))
 
     # Manual Paths
     manual_paths_env = os.environ.get("AI_LAUNCHER_MANUAL_PATHS", "")
@@ -60,7 +64,7 @@ def show_configuration_preview() -> None:
     print()
 
     # Global Files
-    print("\033[1m🌐 Global Files\033[0m")
+    print(fmt.paint("🌐 Global Files", fmt.BOLD))
     global_files_env = os.environ.get("AI_LAUNCHER_GLOBAL_FILES", "")
     if global_files_env:
         global_files = [gf.strip() for gf in global_files_env.split(",") if gf.strip()]
@@ -75,13 +79,13 @@ def show_configuration_preview() -> None:
             print(f"     • {rel}")
         if len(global_files) > 10:
             remaining = len(global_files) - 10
-            print(f"     \033[2m...and {remaining} more\033[0m")
+            print("     " + fmt.paint(f"...and {remaining} more", fmt.DIM))
     else:
-        print("   \033[2mNo global files configured\033[0m")
+        print("   " + fmt.paint("No global files configured", fmt.DIM))
     print()
 
     # Build actual command from environment variables (multi-line format)
-    print("\033[2mCurrent command:\033[0m")
+    print(fmt.paint("Current command:", fmt.DIM))
 
     # Get provider name and map to command name
     provider_env = os.environ.get("AI_LAUNCHER_PROVIDER", "claude-code")
@@ -100,54 +104,56 @@ def show_configuration_preview() -> None:
                 rel = scan_paths[0]
             base_cmd += f" {rel}"
 
-    print(f"\033[2m{base_cmd}\033[0m")
+    print(fmt.paint(f"{base_cmd}", fmt.DIM))
 
     # Add global files - each on separate line
     if global_files_env:
         global_files = [gf.strip() for gf in global_files_env.split(",") if gf.strip()]
         if global_files:
-            print("\033[2m    --global-files\033[0m")
+            print(fmt.paint("    --global-files", fmt.DIM))
             for gf in global_files:
                 gf_path = Path(gf).expanduser()
                 try:
                     rel = f"~/{gf_path.relative_to(Path.home())}"
                 except ValueError:
                     rel = gf
-                print(f"\033[2m      {rel}\033[0m")
+                print(fmt.paint(f"      {rel}", fmt.DIM))
 
     # Add manual paths - each on separate line
     if manual_paths_env:
         manual_paths = [mp.strip() for mp in manual_paths_env.split(",") if mp.strip()]
         if manual_paths:
-            print("\033[2m    --manual-paths\033[0m")
+            print(fmt.paint("    --manual-paths", fmt.DIM))
             for mp in manual_paths:
                 mp_path = Path(mp).expanduser()
                 try:
                     rel = f"~/{mp_path.relative_to(Path.home())}"
                 except ValueError:
                     rel = mp
-                print(f"\033[2m      {rel}\033[0m")
+                print(fmt.paint(f"      {rel}", fmt.DIM))
     print()
 
     # Available Options
     print(
-        "\033[1m🔧 Available Options\033[0m \033[2m(All options work independently)\033[0m"
+        fmt.paint("🔧 Available Options", fmt.BOLD)
+        + " "
+        + fmt.paint("(All options work independently)", fmt.DIM)
     )
     print()
-    print("   \033[1mContext:\033[0m")
+    print("   " + fmt.paint("Context:", fmt.BOLD))
     print("     --global-files FILE1,FILE2    Load files for all projects")
     print("     --manual-paths PATH1,PATH2    Add projects manually")
     print()
-    print("   \033[1mCleanup (opt-in):\033[0m")
+    print("   " + fmt.paint("Cleanup (opt-in):", fmt.BOLD))
     print("     --cleanup                     Clean AI assistant cache/logs")
     print("     --clean-npm                   Clean npm cache")
     print()
-    print("   \033[1mInformation:\033[0m")
+    print("   " + fmt.paint("Information:", fmt.BOLD))
     print("     --list                        List all projects")
     print("     --discover, -d                Show discovery report")
     print("     --context, -c                 Show context viewer")
     print()
-    print("   \033[1mDebug:\033[0m")
+    print("   " + fmt.paint("Debug:", fmt.BOLD))
     print("     --verbose                     Enable verbose logging")
     print("     --debug                       Enable debug mode")
     print()
@@ -155,7 +161,7 @@ def show_configuration_preview() -> None:
     # Version
     from ai_launcher import __version__
 
-    print(f"\033[2mai-launcher v{__version__}\033[0m")
+    print(fmt.paint(f"ai-launcher v{__version__}", fmt.DIM))
 
 
 def build_tree_structure(file_paths):
@@ -266,7 +272,8 @@ def main() -> None:
         return
 
     try:
-        path = Path(path_str).expanduser().resolve()
+        # Symlinks are preserved: the path is shown and previewed as listed
+        path = listed_path(Path(path_str).expanduser())
 
         # Show full path at top with divider
         print(f"{path}")

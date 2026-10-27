@@ -457,3 +457,68 @@ def test_cache_preview_helper_dispatches_by_row_kind(cache_home, monkeypatch, ca
     monkeypatch.setattr("sys.argv", ["helper"])
     helper.main()
     assert capsys.readouterr().out == ""
+
+
+def test_a_launch_error_before_the_session_starts_still_cleans_the_scratch_folder(
+    cache_home, provider, monkeypatch, tmp_path
+):
+    project = tmp_path / "proj"
+    project.mkdir()
+    seen = {}
+
+    def boom(*args, **kwargs):
+        seen["dir"] = Path(os.environ["AI_SCRATCH_DIR"])
+        raise RuntimeError("box failed")
+
+    monkeypatch.setattr(cli, "display_launch_info", boom)
+
+    with pytest.raises(RuntimeError, match="box failed"):
+        launch_ai(project, provider=provider, config=ConfigData())
+
+    assert not seen["dir"].exists()  # finished, and an empty folder is removed
+
+
+def test_sibling_lines_survive_an_unreadable_parent_folder(tmp_path, monkeypatch):
+    from ai_launcher.ui.startup_report import _check_sibling_projects
+
+    def refuse(self):
+        raise PermissionError("no")
+
+    monkeypatch.setattr(Path, "iterdir", refuse)
+
+    info = _check_sibling_projects(tmp_path / "proj")
+
+    assert info["sibling_count"] == 0 and info["sibling_names"] == []
+
+
+def test_a_failed_scratch_folder_does_not_leave_an_inherited_one_in_place(
+    cache_home, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("AI_SCRATCH_DIR", str(tmp_path / "an-older-session"))
+    monkeypatch.setattr(
+        scratch,
+        "create_session_dir",
+        lambda name: (_ for _ in ()).throw(OSError("full")),
+    )
+
+    assert prepare_scratch(tmp_path / "proj") is None
+
+    assert "AI_SCRATCH_DIR" not in os.environ
+
+
+def test_a_file_not_found_from_the_cache_page_is_not_reported_as_a_missing_fzf(
+    tmp_path, cache_home, monkeypatch, capsys
+):
+    monkeypatch.setattr(
+        cache_page,
+        "run_cache_page",
+        lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("a scratch file")),
+    )
+
+    with pytest.raises(SystemExit) as stopped:
+        run_picker(tmp_path, ["__ACTION__\t\t💾 Cache and scratch", None])
+
+    assert stopped.value.code == 1
+    out = capsys.readouterr().out
+    assert "Error in project selector: a scratch file" in out
+    assert "install fzf" not in out.lower()

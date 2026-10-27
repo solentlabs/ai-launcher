@@ -11,6 +11,7 @@ Author: Solent Labs™
 Created: 2026-02-12
 """
 
+import re
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,14 @@ from ai_launcher.utils.paths import is_relative_to
 
 if TYPE_CHECKING:
     from ai_launcher.core.provider_data import GlobalFiles, SessionConfig
+
+
+_ANSI_STYLE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def strip_ansi(text: str) -> str:
+    """The text without ANSI style codes (for measuring or plain output)."""
+    return _ANSI_STYLE.sub("", text)
 
 
 class PreviewFormatter:

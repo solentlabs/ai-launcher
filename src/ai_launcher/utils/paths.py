@@ -100,3 +100,12 @@ def get_relative_path(path: Path, base: Path) -> Path:
         return path.relative_to(base)
     except ValueError:
         return path
+
+
+def listed_path(path: Path) -> Path:
+    """A path made absolute and normalised, without resolving symlinks.
+
+    Projects keep the path as listed: Claude Code keys its history and memory
+    on the path a session starts in, so a symlinked folder must stay as typed.
+    """
+    return Path(os.path.abspath(path))  # noqa: PTH100 - resolve() would follow links

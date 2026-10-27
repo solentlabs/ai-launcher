@@ -25,6 +25,7 @@ from ai_launcher.core.models import ConfigData, UIConfig
 from ai_launcher.ui.selector import select_project, show_project_list
 from ai_launcher.ui.startup_report import display_launch_info
 from ai_launcher.utils.logging import setup_logging
+from ai_launcher.utils.paths import listed_path
 from ai_launcher.utils.terminal import format_terminal_title, set_terminal_title
 
 if TYPE_CHECKING:
@@ -126,7 +127,7 @@ def _run_launcher(
 
     # Determine scan paths: CLI argument takes precedence
     if path:
-        scan_paths = [path.resolve()]
+        scan_paths = [listed_path(path)]  # symlinks are preserved
     else:
         # Only error if we need scan paths for the operation
         if not (discover or context):
@@ -363,6 +364,8 @@ def prepare_scratch(project_path: Path) -> Optional[Path]:
     try:
         path = create_session_dir(project_path.name)
     except OSError:
+        # An inherited value would name another session's folder: remove it
+        os.environ.pop(ENV_VAR, None)
         return None
     os.environ[ENV_VAR] = str(path)
     return path
@@ -437,18 +440,19 @@ def launch_ai(
     if scratch_dir is not None:
         scope_exempt = [*scope_exempt, scratch_dir]
 
-    # Display launch information and launch provider
-    display_launch_info(
-        project_path,
-        provider,
-        verbose=True,
-        scope_roots=scope_roots,
-        scope_exempt=scope_exempt,
-        notice=notice,
-        scratch_dir=scratch_dir,
-        update_notice=update_notice,
-    )
+    # The folder is finished however the launch ends, the launch box included
     try:
+        # Display launch information and launch provider
+        display_launch_info(
+            project_path,
+            provider,
+            verbose=True,
+            scope_roots=scope_roots,
+            scope_exempt=scope_exempt,
+            notice=notice,
+            scratch_dir=scratch_dir,
+            update_notice=update_notice,
+        )
         provider.launch_with_title(
             project_path,
             set_title=config.ui.set_terminal_title,
@@ -786,7 +790,7 @@ def _project_paths(
         mp_path = Path(mp.strip()).expanduser()
         if mp.strip() and mp_path.exists():
             manual.append(Project.from_path(mp_path, is_manual=True))
-    scan = [p.resolve() for p in (paths or [])]
+    scan = [listed_path(p) for p in (paths or [])]
     projects = get_all_projects(
         scan, 5, ["node_modules", ".cache", "venv", ".git"], manual
     )

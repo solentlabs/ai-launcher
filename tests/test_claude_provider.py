@@ -328,3 +328,91 @@ class TestClaudeProviderBasics:
         assert "logs" in categories
         assert "memory" in categories
         assert "cache" in categories
+
+
+class TestOddSettingsFiles:
+    """A hand-edited settings file must never break the preview or the launch box."""
+
+    ODD = [
+        b'{"permissions": {"allow": null}}',
+        b'{"permissions": {"allow": "Bash(*)"}}',
+        b'{"permissions": []}',
+        b'{"permissions": {"allow": ["Bash(*)", 3, null]}}',
+        b"[]",
+        b'"just a string"',
+        b"null",
+        b'{"mcpServers": []}',
+        b'{"mcpServers": 3}',
+        b'{"hooks": []}',
+        b'{"hooks": 3}',
+        b'{"model": {"x": 1}}',
+        b"\xff\xfe\x00not utf-8",
+        b"{not json",
+        b"",
+    ]
+    IDS = [
+        "allow-null",
+        "allow-string",
+        "permissions-list",
+        "allow-mixed",
+        "top-level-list",
+        "top-level-string",
+        "top-level-null",
+        "mcp-list",
+        "mcp-number",
+        "hooks-list",
+        "hooks-number",
+        "model-object",
+        "not-utf8",
+        "not-json",
+        "empty",
+    ]
+
+    @pytest.fixture
+    def project(self, mock_home):
+        project = mock_home / "proj"
+        (project / ".claude").mkdir(parents=True)
+        (mock_home / ".claude").mkdir()
+        return project
+
+    @pytest.mark.parametrize("content", ODD, ids=IDS)
+    @pytest.mark.parametrize(
+        "where",
+        [
+            ("proj", ".claude", "settings.local.json"),
+            (".claude", "settings.json"),
+            (".claude", "settings.local.json"),
+            (".claude", "mcp.json"),
+        ],
+        ids=["project-local", "global", "global-local", "mcp"],
+    )
+    def test_never_raises(self, mock_home, project, content, where):
+        from ai_launcher.providers.claude import _get_claude_session_config
+
+        target = mock_home.joinpath(*where)
+        target.write_bytes(content)
+
+        _get_claude_session_config(project)  # must not raise
+
+    def test_a_bad_file_does_not_hide_a_good_one(self, mock_home, project):
+        from ai_launcher.providers.claude import _get_claude_session_config
+
+        (project / ".claude" / "settings.local.json").write_bytes(
+            b'{"permissions": {"allow": null}}'
+        )
+        (mock_home / ".claude" / "settings.json").write_text(
+            json.dumps({"permissions": {"allow": ["Bash(*)", 3]}, "model": "opus"})
+        )
+
+        config = _get_claude_session_config(project)
+
+        assert config.global_permissions == ["Bash(*)"]  # the non-string is dropped
+        assert config.model == "opus"
+        assert config.permissions_count == 0
+
+    def test_a_directory_in_place_of_a_file_is_skipped(self, mock_home, project):
+        from ai_launcher.providers.claude import _get_claude_session_config
+
+        (mock_home / ".claude" / "settings.json").mkdir()
+
+        _get_claude_session_config(project)  # IsADirectoryError is an OSError

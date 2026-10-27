@@ -100,6 +100,11 @@ Reads all three layers sequentially:
 Stores everything in a `SessionConfig` dataclass and calls `_analyze_permissions()` before
 returning.
 
+A hand-edited file never breaks the preview or the launch box. A file that is not valid JSON, is not
+an object, or cannot be read (a permission error, a non-UTF-8 byte) is skipped. A field of the wrong
+type (`"allow": null`, `"mcpServers": []`) is ignored, and non-string entries in a list are dropped.
+`--check-permissions` says `has invalid JSON` for the two global files in the same cases.
+
 ### Detection Heuristics (`_analyze_permissions`)
 
 Location: `src/ai_launcher/providers/claude.py:724`

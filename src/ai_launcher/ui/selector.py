@@ -21,6 +21,7 @@ from ai_launcher.providers.registry import get_registry
 from ai_launcher.ui.about import ABOUT_ROW, about_row_label
 from ai_launcher.ui.preview import build_tree_view
 from ai_launcher.utils.paths import fzf_preview_cmd, is_relative_to
+from ai_launcher.utils.terminal import clear_screen, cursor_home, grey_out_screen
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import ConfigData
@@ -65,22 +66,9 @@ def about_row_label_now() -> str:
         return ABOUT_ROW
 
 
-def clear_screen() -> None:
-    """Clear the terminal screen using ANSI escape codes.
-
-    Leaves the alternate screen first: the picker runs with --no-clear, so
-    fzf stays on that screen when it exits.
-    """
-    print("\033[?1049l\033[H\033[2J", end="", flush=True)
-
-
 def _grey_out_screen(size: os.terminal_size) -> None:
-    """Give everything already on screen a grey foreground.
-
-    DECCARA changes the attributes of a rectangle of cells that are already
-    drawn. A terminal without it ignores the sequence.
-    """
-    print(f"\033[1;1;{size.lines};{size.columns};38;5;240$r", end="", flush=True)
+    """Give everything already on screen a grey foreground (see utils.terminal)."""
+    grey_out_screen(size.lines, size.columns)
 
 
 def _dialog_geometry(
@@ -156,7 +144,7 @@ def select_open_with(project: Project, default_provider: str) -> Optional[Select
     size = shutil.get_terminal_size()
     height, margin = _dialog_geometry(len(rows), len(label), size)
     _grey_out_screen(size)
-    print("\033[H", end="", flush=True)
+    cursor_home()
     process = subprocess.Popen(  # nosec B603, B607
         [
             "fzf",
@@ -302,12 +290,20 @@ Ctrl-O for other tools
             input_data = "\n".join(choices)
             input_bytes = input_data.encode("utf-8")
 
-            process = subprocess.Popen(  # nosec B603
-                fzf_cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                env=env,
-            )
+            try:
+                process = subprocess.Popen(  # nosec B603
+                    fzf_cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    env=env,
+                )
+            except FileNotFoundError:
+                # Only this call can mean fzf is missing; a FileNotFoundError
+                # from anywhere else in the loop is a bug and falls through.
+                print("Error: fzf not found. Please install fzf:")
+                print("  Ubuntu/Debian: sudo apt install fzf")
+                print("  macOS: brew install fzf")
+                return None
 
             stdout_bytes, _ = process.communicate(input=input_bytes)
             result_code = process.returncode
@@ -386,18 +382,13 @@ Ctrl-O for other tools
             # If we get here, it's an unknown selection - just loop back instead of closing
             continue
 
-        except FileNotFoundError:
-            print("Error: fzf not found. Please install fzf:")
-            print("  Ubuntu/Debian: sudo apt install fzf")
-            print("  macOS: brew install fzf")
-            return None
         except Exception as e:
             clear_screen()
             print(f"Error in project selector: {e}")
             import traceback
 
             traceback.print_exc()
-            return None
+            sys.exit(1)  # a crash is not "no project selected"
 
 
 def show_project_list(projects: List[Project]) -> None:

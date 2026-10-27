@@ -7,7 +7,6 @@ All colour goes through ``PreviewFormatter``.
 Author: Solent Labs™
 """
 
-import re
 import shutil
 import subprocess  # nosec B404
 import sys
@@ -54,15 +53,15 @@ from ai_launcher.core.scratch import (
     prune_candidates,
     tidy_empty_projects,
 )
-from ai_launcher.ui.formatter import PreviewFormatter
+from ai_launcher.ui.formatter import PreviewFormatter, strip_ansi
 from ai_launcher.utils.humanize import humanize_size
 from ai_launcher.utils.paths import fzf_preview_cmd
+from ai_launcher.utils.terminal import clear_page as _clear
 
 SYMBOLS = {3: "🔴", 2: "🟡", 1: "🟢", 0: "⚪"}
 UNREGISTERED_ROWS_SHOWN = 10
 UNREGISTERED_MIN_BYTES = 100 * 1024 * 1024
 SEPARATOR = "─" * 77
-ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 fmt = PreviewFormatter()
 
@@ -78,11 +77,6 @@ def _severity_color(severity: int) -> Tuple[str, ...]:
         SEVERITY_ATTENTION: (fmt.YELLOW,),
         SEVERITY_FINE: (fmt.GREEN,),
     }.get(severity, (fmt.DIM,))
-
-
-def strip_ansi(text: str) -> str:
-    """Remove colour codes, for output that is not a terminal."""
-    return ANSI.sub("", text)
 
 
 def format_age(days: Optional[float]) -> str:
@@ -462,10 +456,6 @@ def render_summary_preview(registry: Optional[Registry] = None) -> str:
 
 
 # ------------------------------------------------------------------- the page
-
-
-def _clear() -> None:
-    print("\033[H\033[2J", end="", flush=True)
 
 
 def _run_fzf(choices: List[str], header: str, preview_cmd: str) -> Optional[List[str]]:
