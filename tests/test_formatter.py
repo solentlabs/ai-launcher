@@ -488,7 +488,7 @@ class TestHelperMethods:
 
 
 class TestProviderContextSection:
-    """Tests for _format_provider_context_section with dynamic provider name."""
+    """Tests for format_provider_context_section with dynamic provider name."""
 
     @pytest.fixture
     def formatter(self):
@@ -506,7 +506,7 @@ class TestProviderContextSection:
             },
         )
 
-        result = formatter._format_provider_context_section(provider_context, "Gemini")
+        result = formatter.format_provider_context_section(provider_context, "Gemini")
 
         assert "Gemini Context" in result
         assert "Claude Context" not in result
@@ -523,7 +523,7 @@ class TestProviderContextSection:
             },
         )
 
-        result = formatter._format_provider_context_section(provider_context)
+        result = formatter.format_provider_context_section(provider_context)
 
         assert "Provider Context" in result
 
@@ -539,7 +539,7 @@ class TestProviderContextSection:
             },
         )
 
-        result = formatter._format_provider_context_section(
+        result = formatter.format_provider_context_section(
             provider_context, "Claude Code"
         )
 
@@ -547,7 +547,7 @@ class TestProviderContextSection:
 
 
 class TestPluginsSection:
-    """Tests for _format_plugins_section marketplace plugin summary."""
+    """Tests for format_plugins_section marketplace plugin summary."""
 
     @pytest.fixture
     def formatter(self):
@@ -581,7 +581,7 @@ class TestPluginsSection:
             ],
         )
 
-        result = formatter._format_plugins_section(marketplace)
+        result = formatter.format_plugins_section(marketplace)
 
         assert "Plugins:" in result
         assert "hookify" in result
@@ -603,7 +603,7 @@ class TestPluginsSection:
             ],
         )
 
-        result = formatter._format_plugins_section(marketplace)
+        result = formatter.format_plugins_section(marketplace)
 
         assert "alpha" in result
         assert "beta" in result
@@ -624,7 +624,7 @@ class TestPluginsSection:
             ],
         )
 
-        result = formatter._format_plugins_section(marketplace)
+        result = formatter.format_plugins_section(marketplace)
 
         assert "Plugins:" in result
         assert "simple-plugin" in result
@@ -637,7 +637,7 @@ class TestPluginsSection:
             plugins=[],
         )
 
-        result = formatter._format_plugins_section(marketplace)
+        result = formatter.format_plugins_section(marketplace)
 
         assert result == ""
 
@@ -691,7 +691,7 @@ class TestPluginsSection:
             ],
         )
 
-        result = formatter._format_plugins_section(marketplace)
+        result = formatter.format_plugins_section(marketplace)
 
         assert "github" in result
         assert "slack" in result
@@ -707,7 +707,7 @@ class TestPluginsSection:
             ],
         )
 
-        result = formatter._format_plugins_section(marketplace)
+        result = formatter.format_plugins_section(marketplace)
 
         assert "/plugin to browse" in result
         assert "https://code.claude.com/docs/en/discover-plugins" in result

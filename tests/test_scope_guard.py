@@ -304,6 +304,8 @@ class TestWrappedAndAttachedPaths:
             ("bash -c 'cat {other}/x'", False),
             ("bash -c 'touch local.txt'", False),
             ("bash script.sh", False),
+            ("bash -c", False),
+            ("bash -x", False),
             # inline code in an interpreter
             ('python3 -c \'open("{other}/x", "w")\'', True),
             ('node -e \'fs.writeFileSync("{other}/x", "")\'', True),
@@ -352,6 +354,8 @@ class TestWrappedAndAttachedPaths:
             "bash-c-read",
             "bash-c-local",
             "bash-script",
+            "bash-c-without-a-command",
+            "bash-options-only",
             "python-c-write",
             "node-e-write",
             "perl-e-write",

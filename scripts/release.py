@@ -162,6 +162,38 @@ def tag_exists_remote(version: str) -> bool:
     return bool(result.stdout.strip())
 
 
+def remote_tag_commit(version: str) -> str | None:
+    """The commit the remote tag points at, or None if the remote has no such tag.
+
+    An annotated tag lists twice: the tag object, and the commit it points at on
+    the ``^{}`` line. The commit is the one that matters.
+    """
+    result = run(
+        ["git", "ls-remote", "--tags", "origin", f"refs/tags/v{version}*"],
+        capture=True,
+        check=False,
+    )
+    commit: str | None = None
+    for line in str(result.stdout).splitlines():
+        sha, _, ref = line.partition("\t")
+        if ref == f"refs/tags/v{version}" and commit is None:
+            commit = sha
+        elif ref == f"refs/tags/v{version}^{{}}":
+            return sha
+    return commit
+
+
+def check_remote_tag_matches_head(version: str) -> None:
+    """A tag already on the remote only resumes this release if it is this commit."""
+    tagged = remote_tag_commit(version)
+    head = run(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    if tagged is not None and tagged != head:
+        fatal(
+            f"Remote tag v{version} points at {tagged[:8]}, which is not HEAD "
+            f"({head[:8]}). Check out the released commit, or release a new version."
+        )
+
+
 def release_exists(version: str) -> bool:
     result = run_gh(
         ["release", "view", f"v{version}", "--json", "tagName"],
@@ -397,11 +429,15 @@ def check_git_clean() -> None:
 
 
 def check_on_main() -> None:
+    """Stop unless on main: the release branch is cut from the current branch,
+    so any other one would put its unrelated commits into the release PR."""
     branch = get_current_branch()
     if branch not in ("main", "master"):
-        warn(
-            f"On branch '{branch}' \u2014 release branches are typically created from main"
+        fatal(
+            f"On branch '{branch}'. Check out main first: the release branch is "
+            "cut from the current branch, and would carry its unrelated commits."
         )
+    success(f"On {branch}")
 
 
 def check_tag_not_exists(version: str) -> None:
@@ -502,8 +538,12 @@ def update_init_version(version: str) -> None:
     success(f"Updated __init__.py to {version}")
 
 
-def create_release_branch(version: str, no_push: bool, dry_run: bool) -> int | None:
-    """Create release branch, commit, push, and open PR. Returns PR number or None."""
+def checkout_release_branch(version: str, dry_run: bool) -> None:
+    """Switch to release/vX.Y.Z, creating it if needed.
+
+    Done before any file is edited: checking out an existing branch over a tree
+    that already has the version bump in it fails or drags the edit along.
+    """
     branch = f"release/v{version}"
 
     # Idempotent: check if branch already exists
@@ -519,6 +559,15 @@ def create_release_branch(version: str, no_push: bool, dry_run: bool) -> int | N
             info(f"Creating branch {branch}...")
             run(["git", "checkout", "-b", branch])
             success(f"Created branch {branch}")
+
+
+def create_release_branch(version: str, no_push: bool, dry_run: bool) -> int | None:
+    """Commit the version bump on the release branch, push, and open the PR.
+
+    Returns the PR number or None. The branch itself is checked out earlier, by
+    checkout_release_branch, before the version files are edited.
+    """
+    branch = f"release/v{version}"
 
     if dry_run:
         dry("Would stage and commit version bump")
@@ -725,6 +774,7 @@ def main() -> None:
     # idempotent. Without this, a release interrupted after tagging could only be
     # finished by hand.
     if not dry_run and not args.no_push and tag_exists_remote(version):
+        check_remote_tag_matches_head(version)
         info(f"Tag v{version} is already on the remote — resuming at phase 8")
         header("Phase 8: Tag + Release")
         create_tag_and_release(version, dry_run)
@@ -742,8 +792,9 @@ def main() -> None:
     header("Phase 3: Changelog")
     check_changelog(version)
 
-    # Phase 4: Update versions
+    # Phase 4: Cut the release branch, then update versions on it
     header("Phase 4: Update Versions")
+    checkout_release_branch(version, dry_run)
     if dry_run:
         dry(f"Would update pyproject.toml version to {version}")
         dry(f"Would update __init__.py version to {version}")

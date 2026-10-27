@@ -12,8 +12,9 @@ handles version bumps, the release PR, tagging, and triggering the PyPI publish 
 │  1. Validation       version format, clean tree, tag available  │
 │  2. Quality          ruff format check + pytest                 │
 │  3. Changelog        verify entry exists for X.Y.Z              │
-│  4. Update           bump pyproject.toml + __init__.py          │
-│  5. Git              branch, commit, push, open PR              │
+│  4. Update           cut release/vX.Y.Z, then bump the version  │
+│                      in pyproject.toml + __init__.py            │
+│  5. Git              commit, push, open PR                      │
 │  6. Merge            wait for PR CI, squash-merge               │
 │  7. CI on main       wait for post-merge CI to pass             │
 │  8. Tag + Release    push tag, wait for tag-protection,         │
@@ -34,7 +35,9 @@ handles version bumps, the release PR, tagging, and triggering the PyPI publish 
    git pull --ff-only
    ```
 
-2. Ensure the working tree is clean — the script refuses to run with uncommitted changes.
+2. Ensure the working tree is clean — the script refuses to run with uncommitted changes — and that
+   you are on `main` (or `master`). **It stops on any other branch**: the release branch is cut from
+   where you are, so a feature branch would put its unrelated commits into the release PR.
 3. Confirm `gh` CLI is installed and authenticated (`gh auth status`). Phases 6–8 require it.
 
 ## Step 1: Update the Changelog
@@ -191,6 +194,9 @@ recovery paths:
 - **Phase 7 fails (main CI red after merge)**: investigate immediately. Tag has not been pushed yet,
   so PyPI is unaffected. Once main is green again, re-run the script with the same version to resume
   from phase 7.
+- **Re-running after the tag was pushed** resumes at phase 8, but first checks that the remote tag
+  points at your `HEAD`. A tag on any other commit is a conflict and stops the script: check out the
+  released commit (the merge on `main`) and run it again.
 - **Phase 8 fails (tag-protection)**: the tag is already pushed. Investigate the failing check; do
   not delete the tag without understanding why protection failed.
 
@@ -208,6 +214,10 @@ These rules keep a compromised branch name, action or dispatch from publishing o
 - **A skipped test job is not a pass.** `scripts/gate_checks.py ci-status` needs at least one
   `test (…)` run that succeeded, and a failed `Lint` fails the gate. If lint fails, the test matrix
   is skipped, and an all-skipped matrix once read as success.
+- **The local pre-push check and the CI gate agree.** `scripts/verify-tag-ci.sh` (the pre-push hook)
+  asks `gate_checks.py ci-status`, the same decision as the CI gate, over up to 100 check runs. It
+  is advisory: with no `gh`, or `gh` not signed in, it says so and lets the push through, and the
+  server-side gate (`tag-protection.yml`) still decides.
 - **The tag must be an ancestor of `origin/main`** (`git merge-base --is-ancestor`), not merely
   appear in a branch whose name contains `origin/main`.
 - **Actions are pinned to commit SHAs**, with the version in a trailing comment, because a tag or

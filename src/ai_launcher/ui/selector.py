@@ -348,10 +348,7 @@ Ctrl-O for other tools
             if selected == "__ACTION__\t\t" or selected.startswith("__SPACE__"):
                 continue
 
-            # Regular project selection
-            if not selected:
-                return None
-
+            # Regular project selection (an empty selection returned above)
             # Look up the project from the formatted line
             project = choice_to_project.get(selected)
             if project:
@@ -366,20 +363,8 @@ Ctrl-O for other tools
                 clear_screen()
                 return selection
 
-            # Not a project - check if it's a directory header or other non-selectable item
-            # Extract path from formatted line to check
-            parts = selected.split("\t\t", 1)
-            if len(parts) == 2:
-                path_str = parts[0]
-                try:
-                    path = Path(path_str).expanduser().resolve()
-                    # If it's a directory (folder header), just loop back
-                    if path.is_dir() and not (path / ".git").exists():
-                        continue
-                except Exception:
-                    pass
-
-            # If we get here, it's an unknown selection - just loop back instead of closing
+            # Not a project: a folder header or another non-selectable row. Back to
+            # the picker rather than closing it.
             continue
 
         except Exception as e:

@@ -235,3 +235,26 @@ class TestMain:
             main()
         captured = capsys.readouterr()
         assert "Unknown item type" in captured.out
+
+
+def test_project_data_pattern_is_shown_when_the_provider_has_one(capsys):
+    from ai_launcher.core.models import ProviderContext, ProviderInfo
+
+    context = ProviderContext(
+        name="Test",
+        version="1.0.0",
+        installed=True,
+        global_config=[],
+        file_count=0,
+        total_size=0,
+        project_data_pattern="~/.test/projects/<encoded-path>/",
+    )
+    provider = ProviderInfo(name="Test Provider", command="testcmd", context=context)
+    with patch("ai_launcher.ui._context_preview.ProviderDiscovery") as MockDiscovery:
+        MockDiscovery.return_value.get_provider_by_name.return_value = provider
+
+        show_provider_context("test")
+
+    out = capsys.readouterr().out
+    assert "PROJECT DATA PATTERN" in out
+    assert "~/.test/projects/<encoded-path>/" in out

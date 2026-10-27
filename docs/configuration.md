@@ -25,7 +25,12 @@ ai-launcher claude [OPTIONS] [PATH]
 | `--debug`           | Enable debug mode                                      |                                          |
 | `--cleanup`         | Clean AI assistant cache/logs before launch            |                                          |
 | `--clean-provider`  | Clean provider-specific files only                     |                                          |
-| `--clean-npm`       | Clean npm cache                                        |                                          |
+| `--clean-npm`       | Run `npm cache clean --force` before launch            |                                          |
+
+`--clean-npm` works with every provider and needs `npm` on `PATH`; it skips quietly if it is not. It
+runs before the launch box is drawn and gives up after 10 seconds. `--cleanup` and
+`--clean-provider` act on Claude Code's own files (old backups, debug logs, old CLI versions) and do
+nothing for the other tools.
 
 (\*) `claude` and `gemini` only: folders exempt from the
 [project scope](project-scope.md#allowing-shared-folders) guard (for Gemini, added to its

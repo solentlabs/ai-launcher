@@ -264,7 +264,7 @@ def remove_path(path: Path) -> None:
         return
     if sys.version_info >= (3, 12):
         shutil.rmtree(path, onexc=_make_writable_and_retry)
-    else:
+    else:  # pragma: no cover - exercised on 3.8 to 3.11 only
         shutil.rmtree(path, onerror=_make_writable_and_retry)
 
 

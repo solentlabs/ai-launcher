@@ -522,3 +522,26 @@ def test_a_file_not_found_from_the_cache_page_is_not_reported_as_a_missing_fzf(
     out = capsys.readouterr().out
     assert "Error in project selector: a scratch file" in out
     assert "install fzf" not in out.lower()
+
+
+@pytest.mark.parametrize(
+    ("enabled", "npm", "expected"),
+    [(True, True, 1), (True, False, 0), (False, True, 0)],
+    ids=["asked-for", "flag-off", "cleanup-disabled"],
+)
+def test_clean_npm_runs_only_when_asked(
+    cache_home, provider, monkeypatch, tmp_path, enabled, npm, expected
+):
+    from ai_launcher.core.models import CleanupConfig
+    from ai_launcher.utils import cleanup
+
+    calls = []
+    monkeypatch.setattr(cleanup, "clean_npm_cache", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(cli, "display_launch_info", MagicMock())
+    project = tmp_path / "proj"
+    project.mkdir()
+    config = ConfigData(cleanup=CleanupConfig(enabled=enabled, clean_npm_cache=npm))
+
+    launch_ai(project, provider=provider, config=config)
+
+    assert len(calls) == expected

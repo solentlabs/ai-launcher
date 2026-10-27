@@ -208,6 +208,13 @@ walk was cut short.
   number still raises a notice. Only the page insists on fresh numbers.
 - Missing or unreadable cache file: no size-based notice. The free-disk rule still works, since it
   needs no walk.
+- **No lock, on purpose.** The launch notice (which records when it last spoke) and the background
+  refresh (which records sizes) each read the file, change it and write it back, so one can
+  overwrite the other's update. The loss heals itself: sizes are measured again at the next refresh,
+  and the worst case for the notice is that it speaks once more. A refresh thread that is killed
+  between creating its temporary file and replacing the cache leaves a small `.sizes-*` file in the
+  state folder, which is safe to delete. A lock would cost more (a stale lock file can block every
+  launch) than either failure does.
 
 ### The walk
 

@@ -20,6 +20,17 @@ from ai_launcher.utils.humanize import (
 )
 
 
+def claude_config_dir() -> Path:
+    """Claude Code's own folder: ``CLAUDE_CONFIG_DIR`` if set, else ``~/.claude``.
+
+    Settings, memory, sessions and skills all live under it, so every reader of
+    them goes through here. (The scope guard has its own copy: it runs by file
+    path and imports nothing from this package.)
+    """
+    configured = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(configured).expanduser() if configured else Path.home() / ".claude"
+
+
 def encode_path_string(path_str: str) -> str:
     """Encode a path the way Claude Code names its per-project directories.
 
@@ -79,7 +90,7 @@ def get_claude_session_dir(project_path: Path) -> Optional[Path]:
         Path('/home/user/.claude/projects/-home-user-projects-foo')
     """
     encoded_name = encode_project_path(project_path)
-    session_dir = Path.home() / ".claude" / "projects" / encoded_name
+    session_dir = claude_config_dir() / "projects" / encoded_name
 
     return session_dir if session_dir.exists() else None
 

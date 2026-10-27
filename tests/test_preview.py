@@ -139,3 +139,19 @@ def test_the_context_preview_never_takes_the_index_lock(tmp_path, monkeypatch, c
     _context_preview.show_project_context(tmp_path)
 
     assert any(a[:2] == ["git", "--no-optional-locks"] for a in seen)
+
+
+def test_build_tree_view_shows_a_dimmed_folder_row_for_a_nested_project(tmp_path):
+    from ai_launcher.core.models import Project
+
+    base = tmp_path / "projects"
+    repo = base / "org" / "repo"
+    repo.mkdir(parents=True)
+    project = Project(repo, "repo", repo.parent, True, False)
+
+    lines, mapping = build_tree_view([project], base)
+
+    folder = next(line for line in lines if "org" in line and "repo" not in line)
+    assert folder.startswith(f"{base / 'org'}\t\t")
+    assert "\033[2m" in folder and "📁 org/" in folder  # a dimmed folder row
+    assert any(p is project for p in mapping.values())

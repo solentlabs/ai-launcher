@@ -18,6 +18,7 @@ from typing import List
 
 from ai_launcher.core.models import Project
 from ai_launcher.utils.jsonfile import as_dict, read_json_object, string_list
+from ai_launcher.utils.session import claude_config_dir
 
 
 def check_project_permissions(
@@ -41,7 +42,7 @@ def check_project_permissions(
         sys.exit(0)
 
     from ai_launcher.providers.claude import (
-        _get_claude_session_config,
+        get_claude_session_config,
     )
 
     print()
@@ -60,7 +61,7 @@ def check_project_permissions(
     projects_checked = 0
 
     for project in projects:
-        config = _get_claude_session_config(project.path)
+        config = get_claude_session_config(project.path)
         if config is None:
             continue
 
@@ -117,7 +118,7 @@ def _print_global_settings() -> None:
     print("Global Settings:")
 
     # settings.json
-    settings_file = home / ".claude" / "settings.json"
+    settings_file = claude_config_dir() / "settings.json"
     if settings_file.exists():
         settings = read_json_object(settings_file)
         if settings is None:
@@ -148,7 +149,7 @@ def _print_global_settings() -> None:
         print("  ○ No ~/.claude/settings.json")
 
     # settings.local.json
-    local_file = home / ".claude" / "settings.local.json"
+    local_file = claude_config_dir() / "settings.local.json"
     if local_file.exists():
         local = read_json_object(local_file)
         if local is None:

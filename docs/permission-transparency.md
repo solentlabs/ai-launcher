@@ -74,7 +74,7 @@ the system is broken — when the real fix is replacing all of these with `Bash(
 Settings files                    Analysis                      Display
 ─────────────                    ────────                      ───────
 
-<project>/.claude/               _get_claude_session_config()
+<project>/.claude/               get_claude_session_config()
   settings.local.json ──┐                                     Preview pane
                         ├──→ reads all 3 files ──→ SessionConfig ──→ formatter.py
 ~/.claude/              │        │                    │
@@ -87,7 +87,7 @@ Settings files                    Analysis                      Display
                         has_broad_bash
 ```
 
-### Settings File Reading (`_get_claude_session_config`)
+### Settings File Reading (`get_claude_session_config`)
 
 Location: `src/ai_launcher/providers/claude.py:824`
 
@@ -204,7 +204,7 @@ rather than verbose explanations.
 
 The feature follows the existing provider → data → formatter architecture:
 
-- **Data collection**: `_get_claude_session_config()` and `_analyze_permissions()` live in
+- **Data collection**: `get_claude_session_config()` and `_analyze_permissions()` live in
   `claude.py` (provider-specific)
 - **Data transport**: `SessionConfig` dataclass in `provider_data.py` carries both data and
   diagnostics
@@ -215,12 +215,12 @@ The feature follows the existing provider → data → formatter architecture:
 
 **If key names change** (e.g., `permissions` → `allowList`):
 
-- Update `_get_claude_session_config()` in `claude.py` (JSON key references)
+- Update `get_claude_session_config()` in `claude.py` (JSON key references)
 - No changes needed in formatter, startup report, or permissions report
 
 **If file locations change** (e.g., settings move out of `~/.claude/`):
 
-- Update the three file path variables in `_get_claude_session_config()`
+- Update the three file path variables in `get_claude_session_config()`
 - Update `_print_global_settings()` in `permissions_report.py`
 
 **If new tool types are added** (e.g., `Agent()`, `mcp__`):
@@ -265,7 +265,7 @@ Update this document when:
 Code references to verify:
 
 - `_analyze_permissions()`: `src/ai_launcher/providers/claude.py:724`
-- `_get_claude_session_config()`: `src/ai_launcher/providers/claude.py:824`
+- `get_claude_session_config()`: `src/ai_launcher/providers/claude.py:824`
 - `SessionConfig`: `src/ai_launcher/core/provider_data.py:245`
 - `_format_session_config_section()`: `src/ai_launcher/ui/formatter.py:603`
 - `display_launch_info()`: `src/ai_launcher/ui/startup_report.py:561`

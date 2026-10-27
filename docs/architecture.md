@@ -604,7 +604,7 @@ permission prompts. Users have no visibility into their effective permissions ac
 ### Data Flow
 
 ```text
-Settings files → _get_claude_session_config() → _analyze_permissions()
+Settings files → get_claude_session_config() → _analyze_permissions()
                                                        │
                                                        ↓
                                                  SessionConfig
@@ -625,7 +625,7 @@ Settings files → _get_claude_session_config() → _analyze_permissions()
 - **Diagnostics**: `permission_warnings`, `permission_recommendations`, `has_broad_bash`
 - **Provenance**: `config_file_path`, `global_config_file_path`
 
-The analysis runs once in `_get_claude_session_config()`. Presentation layers read the pre-computed
+The analysis runs once in `get_claude_session_config()`. Presentation layers read the pre-computed
 diagnostics — they never re-analyze.
 
 ### Why the Analysis Lives in `claude.py`
@@ -893,6 +893,22 @@ cli.py
   last-opened history when a shell is opened, as it does for Claude.
 
 ---
+
+## Removed Code
+
+Recorded so nobody rebuilds it by accident. All of it was unreachable from the launcher (nothing in
+`src/` imported it; only its own tests did):
+
+- **`ui/browser.py`, `ui/_browser_preview.py`, `ui/_file_preview.py`** — an interactive directory
+  browser from the bash prototype's `--add`. It built `fzf --preview` commands with a path in double
+  quotes, which a POSIX shell still expands (`$(…)`, backticks). If a browser is wanted again, pass
+  the path as one argument that fzf quotes (`{}`), as the picker and the cache page do.
+- **`StartupReport`, `generate_startup_report`** in `ui/startup_report.py` — a text report of what a
+  session loads, superseded by the launch box (`display_launch_info`) and the provider's own preview
+  data. The launch box stays.
+- **`utils/cleanup.cleanup_environment`** — a copy of the Claude provider's cleanup that had drifted
+  from it. Its npm step was the only live behaviour left in it, and nothing called that, so
+  `--clean-npm` silently did nothing; it is now `clean_npm_cache()`, called from `launch_ai`.
 
 ## Future Architecture
 

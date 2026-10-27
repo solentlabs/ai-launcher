@@ -164,76 +164,6 @@ def show_configuration_preview() -> None:
     print(fmt.paint(f"ai-launcher v{__version__}", fmt.DIM))
 
 
-def build_tree_structure(file_paths):
-    """Build a nested tree structure from file paths.
-
-    Args:
-        file_paths: List of path strings
-
-    Returns:
-        Nested dict representing the tree
-    """
-    tree = {}
-    for path in file_paths:
-        parts = path.split("/")
-        current = tree
-        for part in parts:
-            if part not in current:
-                current[part] = {}
-            current = current[part]
-    return tree
-
-
-def print_tree(tree, indent="", is_last_list=None):
-    """Print tree structure with proper connectors.
-
-    Args:
-        tree: Nested dict tree structure
-        indent: Current indentation prefix
-        is_last_list: List of booleans indicating if each level is last
-    """
-    if is_last_list is None:
-        is_last_list = []
-
-    items = sorted(tree.items())
-    for idx, (name, subtree) in enumerate(items):
-        is_last = idx == len(items) - 1
-
-        # Build connector
-        if indent == "":
-            # Root level - no connector
-            prefix = "  "
-        else:
-            # Build prefix based on parent levels
-            prefix_parts = []
-            for is_parent_last in is_last_list:
-                if is_parent_last:
-                    prefix_parts.append("  ")
-                else:
-                    prefix_parts.append("│ ")
-            prefix = "".join(prefix_parts)
-
-        # Add current level connector
-        if indent != "":
-            connector = "└─" if is_last else "├─"
-            line = f"{indent}{prefix}{connector} {name}"
-        else:
-            line = f"{indent}{prefix}{name}"
-
-        # Check if this is a file (no children) or directory
-        if subtree:
-            # Directory - show with /
-            if not line.endswith("/"):
-                line += "/"
-            print(line)
-            # Recurse into subdirectory
-            new_is_last_list = is_last_list + [is_last]
-            print_tree(subtree, indent + "  ", new_is_last_list)
-        else:
-            # File - show without /
-            print(line)
-
-
 def main() -> None:
     """Generate preview from fzf selection line."""
     if len(sys.argv) < 2:
@@ -361,7 +291,7 @@ def main() -> None:
                             # User-configured global files
                             if preview_data.global_files:
                                 print(
-                                    formatter._format_global_files_section(
+                                    formatter.format_global_files_section(
                                         preview_data.global_files
                                     )
                                 )
@@ -371,7 +301,7 @@ def main() -> None:
                             # Auto-discovered provider context files
                             if preview_data.provider_context:
                                 print(
-                                    formatter._format_provider_context_section(
+                                    formatter.format_provider_context_section(
                                         preview_data.provider_context,
                                         preview_data.provider_name,
                                     )
@@ -382,7 +312,7 @@ def main() -> None:
                             # Marketplace plugins
                             if preview_data.marketplace_plugins:
                                 print(
-                                    formatter._format_plugins_section(
+                                    formatter.format_plugins_section(
                                         preview_data.marketplace_plugins
                                     )
                                 )

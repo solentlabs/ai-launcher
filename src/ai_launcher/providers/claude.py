@@ -38,7 +38,7 @@ from ai_launcher.core.scratch import SCRATCH_STATEMENT
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
 from ai_launcher.utils.cleanup import prune_claude_backups, prune_claude_versions
 from ai_launcher.utils.jsonfile import as_dict, read_json_object, string_list
-from ai_launcher.utils.session import encode_project_path
+from ai_launcher.utils.session import claude_config_dir, encode_project_path
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import CleanupConfig
@@ -222,7 +222,7 @@ class ClaudeProvider(AIProvider):
         if verbose:
             print(f"    → Removing debug logs older than {max_age_days} days")
 
-        claude_debug_dir = home / ".claude" / "debug"
+        claude_debug_dir = claude_config_dir() / "debug"
         if claude_debug_dir.exists() and claude_debug_dir.is_dir():
             try:
                 import time
@@ -296,7 +296,7 @@ class ClaudeProvider(AIProvider):
         global_paths = self.get_global_context_paths()
 
         # Session configuration (permissions, MCP, hooks, model)
-        session_config = _get_claude_session_config(project_path)
+        session_config = get_claude_session_config(project_path)
 
         # Memory info (personal + project memory)
         memory_info = _get_memory_info(project_path)
@@ -339,7 +339,7 @@ class ClaudeProvider(AIProvider):
     def get_global_context_paths(self) -> List[Path]:
         """Get paths to Claude's global configuration."""
         return [
-            Path.home() / ".claude",
+            claude_config_dir(),
             Path.home() / ".claude.json",
         ]
 
@@ -374,7 +374,7 @@ def _get_personal_context_file() -> Optional[ContextFile]:
     home = Path.home()
     candidates = [
         home / "CLAUDE.md",
-        home / ".claude" / "CLAUDE.md",
+        claude_config_dir() / "CLAUDE.md",
     ]
 
     for path in candidates:
@@ -463,7 +463,7 @@ def _get_session_dir(project_path: Path) -> Optional[Path]:
         Path to session directory if it exists, None otherwise
     """
     encoded_name = encode_project_path(project_path)
-    session_dir = Path.home() / ".claude" / "projects" / encoded_name
+    session_dir = claude_config_dir() / "projects" / encoded_name
     return session_dir if session_dir.exists() else None
 
 
@@ -699,7 +699,7 @@ def _discover_claude_context_files() -> Optional["GlobalFiles"]:
 
     from ai_launcher.core.provider_data import GlobalFiles
 
-    claude_dir = Path.home() / ".claude"
+    claude_dir = claude_config_dir()
     if not claude_dir.exists():
         return None
 
@@ -841,7 +841,7 @@ def _analyze_permissions(
     return warnings, recommendations, has_broad_bash
 
 
-def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
+def get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     """Get Claude Code session configuration.
 
     Claude Code resolves permissions from three layers (highest priority first):
@@ -892,7 +892,7 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
             config.hooks_configured = any(hook_config for hook_config in hooks.values())
 
     # Layer 2: Global settings.json — shared allow/deny/ask + model
-    global_settings = Path.home() / ".claude" / "settings.json"
+    global_settings = claude_config_dir() / "settings.json"
     global_allow: List[str] = []
     global_deny: List[str] = []
     global_ask: List[str] = []
@@ -908,7 +908,7 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
         global_ask.extend(string_list(perms.get("ask")))
 
     # Layer 3: Global settings.local.json — merged with settings.json (union)
-    global_local_settings = Path.home() / ".claude" / "settings.local.json"
+    global_local_settings = claude_config_dir() / "settings.local.json"
     if global_local_settings.exists():
         config.global_config_file_path = str(global_local_settings)
         settings = read_json_object(global_local_settings) or {}
@@ -941,7 +941,7 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     )
 
     # Check global MCP servers
-    mcp_config = Path.home() / ".claude" / "mcp.json"
+    mcp_config = claude_config_dir() / "mcp.json"
     if mcp_config.exists():
         servers = as_dict(read_json_object(mcp_config)).get("mcpServers")
         if isinstance(servers, dict):
@@ -951,7 +951,7 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
                     config.mcp_servers.append(server)
 
     # Check global hooks
-    hooks_config = Path.home() / ".claude" / "hooks.json"
+    hooks_config = claude_config_dir() / "hooks.json"
     if hooks_config.exists() and not config.hooks_configured:
         config.hooks_configured = True
 
@@ -987,7 +987,7 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
     home = Path.home()
     personal_encoded = encode_project_path(home)
     personal_mem = (
-        home / ".claude" / "projects" / personal_encoded / "memory" / "MEMORY.md"
+        claude_config_dir() / "projects" / personal_encoded / "memory" / "MEMORY.md"
     )
     if personal_mem.exists():
         info.personal_memory = personal_mem
@@ -1000,7 +1000,7 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
     # Project memory - encode project path
     project_encoded = encode_project_path(project_path)
     project_mem = (
-        home / ".claude" / "projects" / project_encoded / "memory" / "MEMORY.md"
+        claude_config_dir() / "projects" / project_encoded / "memory" / "MEMORY.md"
     )
     if project_mem.exists():
         info.project_memory = project_mem
@@ -1022,7 +1022,7 @@ def _get_skills() -> List[SkillInfo]:
         List of SkillInfo instances
     """
     skills: List[SkillInfo] = []
-    skills_dir = Path.home() / ".claude" / "skills"
+    skills_dir = claude_config_dir() / "skills"
 
     if not skills_dir.exists():
         return skills
@@ -1047,7 +1047,7 @@ def _get_global_context_summary() -> Optional[GlobalContextSummary]:
     Returns:
         GlobalContextSummary instance or None if no files found
     """
-    claude_dir = Path.home() / ".claude"
+    claude_dir = claude_config_dir()
     if not claude_dir.exists():
         return None
 
@@ -1109,7 +1109,7 @@ def _discover_marketplace_plugins() -> Optional[MarketplaceInfo]:
         MarketplaceInfo instance or None if no marketplace plugins found
     """
 
-    marketplaces_dir = Path.home() / ".claude" / "plugins" / "marketplaces"
+    marketplaces_dir = claude_config_dir() / "plugins" / "marketplaces"
     if not marketplaces_dir.exists():
         return None
 

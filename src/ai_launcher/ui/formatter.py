@@ -454,7 +454,7 @@ class PreviewFormatter:
 
         return "\n".join(lines)
 
-    def _format_global_files_section(self, global_files: "GlobalFiles") -> str:
+    def format_global_files_section(self, global_files: "GlobalFiles") -> str:
         """Format global files section grouped by category.
 
         Args:
@@ -587,7 +587,7 @@ class PreviewFormatter:
 
         return "\n".join(lines)
 
-    def _format_provider_context_section(
+    def format_provider_context_section(
         self, provider_context: "GlobalFiles", provider_name: str = "Provider"
     ) -> str:
         """Format auto-discovered provider context files.
@@ -603,7 +603,7 @@ class PreviewFormatter:
             Formatted section
         """
         # Reuse the global files formatting logic but with different header
-        result = self._format_global_files_section(provider_context)
+        result = self.format_global_files_section(provider_context)
 
         # Replace the header to indicate these are auto-discovered
         if provider_context.common_root:
@@ -780,7 +780,7 @@ class PreviewFormatter:
 
         return "\n".join(lines)
 
-    def _format_plugins_section(self, marketplace: MarketplaceInfo) -> str:
+    def format_plugins_section(self, marketplace: MarketplaceInfo) -> str:
         """Format marketplace plugins as a compact 2-line summary.
 
         Shows top plugin names with a count, plus a hint for browsing more.
