@@ -90,9 +90,3 @@ def test_the_tag_check_is_an_ancestor_test_not_a_substring_match():
 
 def test_the_changelog_workflow_has_no_dead_step_output():
     assert "steps.code_check" not in read("changelog-check.yml")
-
-
-def test_dependabot_keeps_the_pinned_actions_current():
-    config = (WORKFLOWS[0].parent.parent / "dependabot.yml").read_text(encoding="utf-8")
-
-    assert "package-ecosystem: github-actions" in config

@@ -188,107 +188,7 @@ class TestBashCommands:
             ("git -C ../angel-captain --version", False),
             ("FOO=1 && touch ../angel-captain/x.txt", True),
             ("cat <<A > a.md; cat <<B > b.md\none\nA\ntwo\nB", False),
-        ],
-        ids=[
-            "cat-sibling",
-            "ls-sibling",
-            "grep-sibling",
-            "git-read-in-sibling",
-            "git-C-read",
-            "sed-print",
-            "find-plain",
-            "cp-from-sibling",
-            "redirect-local-from-sibling",
-            "echo-mentions-sibling",
-            "local-rm-mkdir",
-            "local-commit-mentions-sibling",
-            "redirect-dev-null",
-            "redirect-outside-root",
-            "heredoc-with-apostrophe",
-            "redirect-into-sibling",
-            "append-into-sibling",
-            "cd-then-commit",
-            "git-C-commit",
-            "rm-in-sibling",
-            "mv-out-of-sibling",
-            "cp-into-sibling",
-            "cp-target-dir",
-            "sed-in-place",
-            "tilde-path",
-            "env-var-path",
-            "mkdir-in-sibling",
-            "pipe-to-tee",
-            "newline-separated",
-            "subshell-cd",
-            "command-substitution",
-            "find-delete",
-            "env-assignment-prefix",
-            "sudo-prefix",
-            "redirect-under-root",
-            "cp-target-dir-long-option",
-            "git-config-option-then-commit",
-            "git-work-tree-add",
-            "git-global-option-then-log",
-            "git-no-subcommand",
-            "bare-assignment-segment",
-            "two-heredocs-one-line",
-        ],
-    )
-    def test_bash(self, scope, layout, command, asks):
-        tool_input = {"command": _fill(command, layout)}
-        targets = scope.write_targets("Bash", tool_input, layout["project"])
-        assert bool(targets) is asks
-
-    @pytest.mark.parametrize(
-        ("command", "asks"),
-        [
-            ("ls", False),
-            ("git status", False),
-            ("python build.py", True),
-            ("git commit -m wip", True),
-        ],
-        ids=["ls", "git-status", "run-script", "commit"],
-    )
-    def test_session_cwd_inside_sibling(self, scope, layout, command, asks):
-        """If the shell is already sitting in another project, running there asks."""
-        targets = scope.write_targets("Bash", {"command": command}, layout["other"])
-        assert bool(targets) is asks
-
-    @pytest.mark.parametrize(
-        "command",
-        ["rm ../angel-captain/*.pyc", "rm ../angel-captain/*/cache"],
-        ids=["wildcard-name", "wildcard-folder"],
-    )
-    def test_unresolvable_path_still_checked(self, scope, layout, monkeypatch, command):
-        """Windows before Python 3.10 raises on resolve() for names like *.pyc.
-
-        The guard must not crash (and so let the write through); the folder the
-        name sits in still decides which project it touches.
-        """
-        real_resolve = Path.resolve
-
-        def windows_resolve(self, strict=False):
-            if "*" in str(self):
-                raise OSError(123, "The filename syntax is incorrect", str(self))
-            return real_resolve(self, strict)
-
-        monkeypatch.setattr(Path, "resolve", windows_resolve)
-        targets = scope.write_targets("Bash", {"command": command}, layout["project"])
-        assert targets
-
-    def test_unbalanced_quotes_still_checked(self, scope, layout):
-        """A command shlex cannot parse falls back to a coarse check, not a pass."""
-        command = "echo \"it's > ../angel-captain/x.txt"
-        targets = scope.write_targets("Bash", {"command": command}, layout["project"])
-        assert targets
-
-
-class TestWrappedAndAttachedPaths:
-    """Commands that carry a command, code or a path inside an option."""
-
-    @pytest.mark.parametrize(
-        ("command", "asks"),
-        [
+            # A command or a path carried inside another command or an option.
             # sed: flags joined together still edit in place
             ("sed -Ei s/a/b/ {other}/setup.cfg", True),
             ("sed -ni s/a/b/ {other}/setup.cfg", True),
@@ -341,6 +241,48 @@ class TestWrappedAndAttachedPaths:
             ("find {other} -name '*.pyc' | xargs rm", False),
         ],
         ids=[
+            "cat-sibling",
+            "ls-sibling",
+            "grep-sibling",
+            "git-read-in-sibling",
+            "git-C-read",
+            "sed-print",
+            "find-plain",
+            "cp-from-sibling",
+            "redirect-local-from-sibling",
+            "echo-mentions-sibling",
+            "local-rm-mkdir",
+            "local-commit-mentions-sibling",
+            "redirect-dev-null",
+            "redirect-outside-root",
+            "heredoc-with-apostrophe",
+            "redirect-into-sibling",
+            "append-into-sibling",
+            "cd-then-commit",
+            "git-C-commit",
+            "rm-in-sibling",
+            "mv-out-of-sibling",
+            "cp-into-sibling",
+            "cp-target-dir",
+            "sed-in-place",
+            "tilde-path",
+            "env-var-path",
+            "mkdir-in-sibling",
+            "pipe-to-tee",
+            "newline-separated",
+            "subshell-cd",
+            "command-substitution",
+            "find-delete",
+            "env-assignment-prefix",
+            "sudo-prefix",
+            "redirect-under-root",
+            "cp-target-dir-long-option",
+            "git-config-option-then-commit",
+            "git-work-tree-add",
+            "git-global-option-then-log",
+            "git-no-subcommand",
+            "bare-assignment-segment",
+            "two-heredocs-one-line",
             "sed-Ei",
             "sed-ni",
             "sed-i-bak",
@@ -388,6 +330,49 @@ class TestWrappedAndAttachedPaths:
         tool_input = {"command": _fill(command, layout)}
         targets = scope.write_targets("Bash", tool_input, layout["project"])
         assert bool(targets) is asks
+
+    @pytest.mark.parametrize(
+        ("command", "asks"),
+        [
+            ("ls", False),
+            ("git status", False),
+            ("python build.py", True),
+            ("git commit -m wip", True),
+        ],
+        ids=["ls", "git-status", "run-script", "commit"],
+    )
+    def test_session_cwd_inside_sibling(self, scope, layout, command, asks):
+        """If the shell is already sitting in another project, running there asks."""
+        targets = scope.write_targets("Bash", {"command": command}, layout["other"])
+        assert bool(targets) is asks
+
+    @pytest.mark.parametrize(
+        "command",
+        ["rm ../angel-captain/*.pyc", "rm ../angel-captain/*/cache"],
+        ids=["wildcard-name", "wildcard-folder"],
+    )
+    def test_unresolvable_path_still_checked(self, scope, layout, monkeypatch, command):
+        """Windows before Python 3.10 raises on resolve() for names like *.pyc.
+
+        The guard must not crash (and so let the write through); the folder the
+        name sits in still decides which project it touches.
+        """
+        real_resolve = Path.resolve
+
+        def windows_resolve(self, strict=False):
+            if "*" in str(self):
+                raise OSError(123, "The filename syntax is incorrect", str(self))
+            return real_resolve(self, strict)
+
+        monkeypatch.setattr(Path, "resolve", windows_resolve)
+        targets = scope.write_targets("Bash", {"command": command}, layout["project"])
+        assert targets
+
+    def test_unbalanced_quotes_still_checked(self, scope, layout):
+        """A command shlex cannot parse falls back to a coarse check, not a pass."""
+        command = "echo \"it's > ../angel-captain/x.txt"
+        targets = scope.write_targets("Bash", {"command": command}, layout["project"])
+        assert targets
 
 
 class TestDecide:
