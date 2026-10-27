@@ -14,7 +14,7 @@ import stat
 import tarfile
 import zipfile
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import IO, Optional, Tuple, cast
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -152,10 +152,9 @@ def download_fzf(install_dir: Optional[Path] = None) -> Path:
         with tarfile.open(fileobj=io.BytesIO(archive_data), mode="r:gz") as tf:
             for member in tf.getmembers():
                 if member.isfile() and Path(member.name).name == binary_name:
-                    handle = tf.extractfile(member)
-                    if handle is not None:
-                        payload = handle.read()
-                        break
+                    # isfile() means extractfile() returns a file object
+                    payload = cast(IO[bytes], tf.extractfile(member)).read()
+                    break
     if payload is None:
         raise RuntimeError(f"'{binary_name}' not found in archive")
     target_path.write_bytes(payload)

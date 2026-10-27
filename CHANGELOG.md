@@ -113,6 +113,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   through to "allow"), and counted a skipped matrix as a pass. It now asks the same tested
   `gate_checks.py ci-status` the CI gate uses, over up to 100 runs.
 
+- **The local patch-coverage gate agreed with Codecov only on lines** — `scripts/patch_coverage.py`
+  reported 100% while Codecov counted 8 partially covered branches and failed the patch. It now
+  reports the branches no test took, not just the lines, so the gap shows before a push.
+
 ### Removed
 
 - **Unused code** (nothing in the launcher called it): `utils/git.py` (`clone_repository`), the

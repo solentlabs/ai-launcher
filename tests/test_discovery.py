@@ -217,3 +217,17 @@ class TestSymlinksArePreserved:
         )
 
         assert [p.path for p in projects] == [alias]  # the manual one wins
+
+
+def test_two_manual_projects_that_are_the_same_folder_are_one(tmp_path, make_symlink):
+    from ai_launcher.core.models import Project
+
+    real = tmp_path / "repo"
+    (real / ".git").mkdir(parents=True)
+    alias = tmp_path / "alias"
+    make_symlink(alias, real, target_is_directory=True)
+    manual = [Project.from_path(alias, True), Project.from_path(real, True)]
+
+    projects = get_all_projects([], 5, [], manual)
+
+    assert len(projects) == 1

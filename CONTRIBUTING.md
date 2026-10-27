@@ -143,6 +143,12 @@ truth.
 | Formatters      | 95%+   |
 | Providers       | 70%+   |
 
+**Patch coverage counts branches.** Codecov judges the diff, and a line whose `if` was only ever
+taken one way is a _partial_ there even though the line ran. `make validate-ci` (through
+`scripts/patch_coverage.py`) reports both: `changed line(s) uncovered` and
+`branch(es) only partly covered`, naming the line and the branch that no test took. A branch that
+cannot happen is better removed than tested around.
+
 ### Test categories
 
 1. **Unit** — single components in isolation.

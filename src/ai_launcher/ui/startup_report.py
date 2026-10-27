@@ -43,11 +43,9 @@ def _cut_to_width(text: str, limit: int) -> str:
     """Shorten text to at most `limit` visual columns, ending in an ellipsis."""
     if _visual_length(text) <= limit:
         return text
-    kept = ""
-    for char in text:
-        if _visual_length(kept + char) > limit - 1:
-            break
-        kept += char
+    kept = text
+    while _visual_length(kept) > limit - 1:  # leave a column for the ellipsis
+        kept = kept[:-1]
     return kept + "…"
 
 

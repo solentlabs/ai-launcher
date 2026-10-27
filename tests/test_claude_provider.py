@@ -555,3 +555,21 @@ def test_project_hooks_are_detected(mock_home, hooks, configured):
     config = get_claude_session_config(project)
 
     assert config.hooks_configured is configured
+
+
+def test_a_global_mcp_server_already_in_the_project_is_not_listed_twice(mock_home):
+    from ai_launcher.providers.claude import get_claude_session_config
+
+    project = mock_home / "proj"
+    (project / ".claude").mkdir(parents=True)
+    (project / ".claude" / "settings.local.json").write_text(
+        json.dumps({"mcpServers": {"shared": {}, "only-project": {}}})
+    )
+    (mock_home / ".claude").mkdir()
+    (mock_home / ".claude" / "mcp.json").write_text(
+        json.dumps({"mcpServers": {"shared": {}, "only-global": {}}})
+    )
+
+    config = get_claude_session_config(project)
+
+    assert sorted(config.mcp_servers) == ["only-global", "only-project", "shared"]

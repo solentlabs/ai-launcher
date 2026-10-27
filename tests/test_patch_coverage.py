@@ -117,6 +117,66 @@ class TestUncoveredInPatch:
         ) == {"src/ai_launcher/ui/formatter.py": [616]}
 
 
+class TestPartialBranchesInPatch:
+    """Codecov calls a line whose branch only ever went one way a partial."""
+
+    def _coverage_file(self, tmp_path, files):
+        path = tmp_path / "coverage.json"
+        path.write_text(json.dumps({"files": files}), encoding="utf-8")
+        return path
+
+    def test_flags_a_changed_line_whose_branch_no_test_took(self, tmp_path):
+        cov = self._coverage_file(
+            tmp_path,
+            {
+                "src/ai_launcher/utils/fzf.py": {
+                    "missing_lines": [],
+                    "missing_branches": [[147, 159], [200, 201]],
+                }
+            },
+        )
+
+        result = patch_coverage.partial_branches_in_patch(
+            cov, {"src/ai_launcher/utils/fzf.py": {147, 148}}
+        )
+
+        assert result == {"src/ai_launcher/utils/fzf.py": [(147, 159)]}
+
+    def test_silent_when_every_changed_branch_was_taken(self, tmp_path):
+        cov = self._coverage_file(
+            tmp_path,
+            {
+                "src/ai_launcher/x.py": {
+                    "missing_lines": [],
+                    "missing_branches": [[9, 10]],
+                }
+            },
+        )
+
+        assert (
+            patch_coverage.partial_branches_in_patch(cov, {"src/ai_launcher/x.py": {1}})
+            == {}
+        )
+
+    def test_a_coverage_file_without_branch_data_is_fine(self, tmp_path):
+        cov = self._coverage_file(
+            tmp_path, {"src/ai_launcher/x.py": {"missing_lines": []}}
+        )
+
+        assert (
+            patch_coverage.partial_branches_in_patch(cov, {"src/ai_launcher/x.py": {1}})
+            == {}
+        )
+
+    def test_unmeasured_files_are_skipped(self, tmp_path):
+        cov = self._coverage_file(tmp_path, {})
+
+        assert (
+            patch_coverage.partial_branches_in_patch(cov, {"tests/test_x.py": {1}})
+            == {}
+        )
+
+
 class TestMainExitCodes:
     """Exit behaviour, including the warn-only mode ci-local.sh uses."""
 
@@ -149,3 +209,38 @@ class TestMainExitCodes:
             return_value={"src/ai_launcher/ui/formatter.py": {616}},
         ):
             assert patch_coverage.main(args) == expected
+
+    @pytest.mark.parametrize("warn_only,expected", [(True, 0), (False, 1)])
+    def test_a_partial_branch_alone_fails_the_gate(
+        self, tmp_path, capsys, warn_only, expected
+    ):
+        """Every changed line ran, but one `if` only went one way: Codecov fails that."""
+        cov = tmp_path / "coverage.json"
+        cov.write_text(
+            json.dumps(
+                {
+                    "files": {
+                        "src/ai_launcher/utils/fzf.py": {
+                            "missing_lines": [],
+                            "missing_branches": [[147, 159]],
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        args = ["--coverage-json", str(cov)]
+        if warn_only:
+            args.append("--warn-only")
+
+        with patch.object(
+            patch_coverage,
+            "changed_lines",
+            return_value={"src/ai_launcher/utils/fzf.py": {147, 148}},
+        ):
+            code = patch_coverage.main(args)
+
+        out = capsys.readouterr().out
+        assert code == expected
+        assert "100%" not in out
+        assert "1 branch" in out and "147" in out and "159" in out

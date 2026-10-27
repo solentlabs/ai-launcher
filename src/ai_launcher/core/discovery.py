@@ -23,7 +23,6 @@ def scan_for_git_repos(
         List of discovered Project instances
     """
     projects = []
-    seen_paths: set = set()
     # Track visited real directories to prevent cycles when following symlinks
     seen_real_dirs: set = set()
 
@@ -66,13 +65,10 @@ def scan_for_git_repos(
             )
 
             if has_git:
-                # The path as listed (symlinks are preserved); duplicates are
-                # found by real path so a project reachable twice appears once.
-                project_path = Path(root)
-
-                if real_root not in seen_paths:
-                    seen_paths.add(real_root)
-                    projects.append(Project.from_path(project_path, is_manual=False))
+                # The path as listed (symlinks are preserved). A project reachable
+                # twice appears once: the cycle check above keeps the first route to
+                # each real directory.
+                projects.append(Project.from_path(Path(root), is_manual=False))
 
     return projects
 

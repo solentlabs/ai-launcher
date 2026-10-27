@@ -621,8 +621,17 @@ class TestHookEntryPoint:
         (["-o~/x"], ["~/x"]),
         (["-v"], []),
         (["-ofile.txt"], []),
+        (["--file="], []),
     ],
-    ids=["drive-forward", "drive-back", "posix", "tilde", "plain-flag", "relative"],
+    ids=[
+        "drive-forward",
+        "drive-back",
+        "posix",
+        "tilde",
+        "plain-flag",
+        "relative",
+        "empty-long-option-value",
+    ],
 )
 def test_attached_short_option_paths_include_windows_drives(args, expected):
     from ai_launcher.core.scope_guard import _attached_paths
