@@ -221,6 +221,19 @@ def _notice_config(
     return config
 
 
+def _update_check(update: Dict[str, Any], warnings: List[str]) -> bool:
+    """Read the opt-in [update] table. Only `check = true` turns anything on."""
+    enabled = False
+    for key, value in update.items():
+        if key != "check":
+            warnings.append(f"user registry: [update] unknown key {key!r} ignored")
+        elif not isinstance(value, bool):
+            warnings.append("user registry: [update] check has the wrong type")
+        else:
+            enabled = value
+    return enabled
+
+
 def load_registry(
     platform: Optional[str] = None,
     user_file: Optional[Path] = None,
@@ -266,9 +279,14 @@ def load_registry(
         platform,
         warnings,
     )
+    update_table = user_data.get("update", {})
+    update_check = _update_check(
+        update_table if isinstance(update_table, dict) else {}, warnings
+    )
     return Registry(
         locations=list(by_id.values()),
         notice=config,
+        update_check=update_check,
         warnings=warnings,
         user_file=user_file,
     )

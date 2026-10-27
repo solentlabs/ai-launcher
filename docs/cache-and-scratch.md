@@ -85,16 +85,19 @@ Deletion guards that hold whatever the registry says:
 The registry is data, not code: a TOML file of known locations. This follows the project invariant
 that nothing is a hardcoded list.
 
-| File                                                      | Role                                            |
-| --------------------------------------------------------- | ----------------------------------------------- |
-| `src/ai_launcher/data/caches.toml` (ships in the package) | The defaults                                    |
-| `<config dir>/caches.toml` (optional, user-owned)         | Your additions, overrides and notice thresholds |
+| File                                                      | Role                                         |
+| --------------------------------------------------------- | -------------------------------------------- |
+| `src/ai_launcher/data/caches.toml` (ships in the package) | The defaults                                 |
+| `<config dir>/caches.toml` (optional, user-owned)         | Your additions, overrides, notice thresholds |
 
 `<config dir>` is `platformdirs.user_config_path("ai-launcher")`: `~/.config/ai-launcher/` on Linux
 and WSL, `~/Library/Application Support/ai-launcher/` on macOS, `%LOCALAPPDATA%\ai-launcher\` on
 Windows (the same directories [architecture.md](architecture.md#platform-specific-paths) lists). The
 file is never created or edited by the launcher; the page prints its path. The package data file
 must be added to `pyproject.toml` (`[tool.setuptools.package-data]`).
+
+The same file holds one setting that is not about caches: `[update] check = true`, the opt-in daily
+look for a newer release. See [Updating](updating.md#checking-automatically).
 
 ### Entry format
 

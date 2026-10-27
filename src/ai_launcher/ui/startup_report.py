@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, List, Optional, Sequence
 
 if TYPE_CHECKING:
     from ai_launcher.core.cache_data import CacheNotice
+    from ai_launcher.core.update_check import UpdateNotice
     from ai_launcher.providers.base import AIProvider
 
 from ai_launcher.utils.humanize import humanize_count
@@ -588,6 +589,16 @@ def _cache_notice_line(notice: "CacheNotice", width: int) -> str:
     )
 
 
+def _update_line(notice: "UpdateNotice", width: int) -> str:
+    """The one-line update notice."""
+    prefix = "│ 🆕 Update:   "
+    text = _fit(
+        f"{notice.latest} is available (you have {notice.installed}) · ai-launcher update",
+        width - 2 - _visual_length(prefix),
+    )
+    return _pad_line(prefix + text, width)
+
+
 def _scratch_line(scratch_dir: Path, width: int) -> str:
     """Where the session was asked to put its scratch files."""
     prefix = "│ 📂 Scratch:  $AI_SCRATCH_DIR → "
@@ -603,6 +614,7 @@ def display_launch_info(
     scope_exempt: Sequence[Path] = (),
     notice: Optional["CacheNotice"] = None,
     scratch_dir: Optional[Path] = None,
+    update_notice: Optional["UpdateNotice"] = None,
 ) -> None:
     """Display launch information before starting the AI provider.
 
@@ -617,6 +629,7 @@ def display_launch_info(
         scope_exempt: Directories the guard lets the session write to freely
         notice: A cache and scratch notice to show, if one is due
         scratch_dir: The session's scratch folder, if one was made
+        update_notice: A newer release to mention, if the user opted in to checks
     """
     if not verbose:
         # Minimal output - just launching message
@@ -668,6 +681,8 @@ def display_launch_info(
             print(_pad_line(prefix + shown, width))
     if notice is not None:
         print(_cache_notice_line(notice, width))
+    if update_notice is not None:
+        print(_update_line(update_notice, width))
     if scratch_dir is not None:
         print(_scratch_line(scratch_dir, width))
     print(_pad_line("│", width))

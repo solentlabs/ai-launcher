@@ -1,7 +1,8 @@
 # Updating
 
 `ai-launcher update` upgrades AI Launcher to the latest release on PyPI. It runs only when you run
-it: AI Launcher never checks for a new version on its own, at launch or in the background.
+it. By default AI Launcher never checks for a new version on its own; you can
+[opt in to a daily check](#checking-automatically).
 
 ```bash
 ai-launcher update --check   # say whether a newer release exists; change nothing
@@ -25,6 +26,38 @@ ai-launcher update --yes     # same, without the question (needed without a term
 
 The command runs as a list of arguments, never through a shell, and the package name is fixed in the
 code, so nothing from PyPI's reply is ever run.
+
+## Checking Automatically
+
+Off by default. To be told when a newer release exists, add this to `caches.toml` in the config
+folder (`~/.config/ai-launcher/` on Linux and WSL; see [Registry](cache-and-scratch.md#registry)):
+
+```toml
+[update]
+check = true
+```
+
+Then, while the project picker is open, AI Launcher asks PyPI for the latest version in the
+background, at most once every 24 hours. If a newer release exists, the launch box shows one line
+after you pick a project:
+
+```text
+│ 🆕 Update:   0.9.0 is available (you have 0.8.0) · ai-launcher update             │
+```
+
+Decisions:
+
+- **Opt-in.** With `check` unset or `false`, nothing contacts PyPI except `ai-launcher update`.
+- **Never slows a launch.** The check runs in a background thread while you choose a project. The
+  launch box reads the saved result only, so a result found during this picker shows from the next
+  launch on.
+- **Same request as `update --check`.** One GET to the PyPI URL above, with nothing about you or
+  your projects in it. It installs nothing: the line only names the command.
+- **Quiet on error.** No network, a timeout, or an unreadable reply means no line, and the check is
+  tried again at the next launch. A bug here must not stop a session starting.
+- **Once per release.** The line repeats at every launch until you update; it has no snooze.
+- **Last result** is kept in `update-check.json` in the state folder, beside `cache-sizes.json`.
+  Deleting it only means the next launch checks again.
 
 ## Windows
 
@@ -52,3 +85,5 @@ run the install command above once by hand; after that, `update` handles it.
 | 0    | Up to date, or the update ran, or `--check`               |
 | 1    | The upgrade command failed, or no terminal and no `--yes` |
 | 2    | Could not reach PyPI or read its reply                    |
+
+The automatic check has no exit code of its own: it never changes how a launch ends.

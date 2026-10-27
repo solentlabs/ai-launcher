@@ -1,7 +1,8 @@
 # Configuration
 
 AI Launcher is configured through CLI flags. The one file it reads is an optional `caches.toml` for
-the [cache page](cache-and-scratch.md#registry); nothing needs it.
+the [cache page](cache-and-scratch.md#registry), which also holds the opt-in
+[`[update]` check](updating.md#checking-automatically); nothing needs it.
 
 ## CLI Options
 
@@ -52,7 +53,9 @@ page which folders are projects, so it never offers one for deletion. The option
 | `ai-launcher update --check` | Says whether a newer release exists on PyPI; changes nothing      |
 | `ai-launcher update`         | Shows the upgrade command for how you installed it, asks, runs it |
 
-It contacts PyPI only when you run it. See [Updating](updating.md).
+It contacts PyPI only when you run it, unless you opt in to a daily background check with
+`[update] check = true` in `caches.toml`. That adds a one-line launch notice when a newer release
+exists. See [Updating](updating.md).
 
 ## Available Providers
 

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Opt-in update check** — with `[update] check = true` in `caches.toml`, AI Launcher asks PyPI
+  once a day, in the background while the picker is open, and shows one line in the launch box when
+  a newer release exists. Off by default; nothing is installed. See `docs/updating.md`.
+
+### Notes
+
+- **Bash prototype diverges** — `bin/ai-launcher` has no update command, so it has no check either.
+
 ## [0.8.0] - 2026-10-15
 
 ### Added

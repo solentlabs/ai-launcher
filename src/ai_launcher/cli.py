@@ -28,6 +28,7 @@ from ai_launcher.utils.logging import setup_logging
 from ai_launcher.utils.terminal import format_terminal_title, set_terminal_title
 
 if TYPE_CHECKING:
+    from ai_launcher.core.update_check import UpdateNotice
     from ai_launcher.providers.base import AIProvider
 
 app = typer.Typer(
@@ -215,6 +216,7 @@ def _run_launcher(
     # Refresh stale cache sizes while the picker is open, so the launch notice
     # has numbers without ever walking a tree itself
     start_size_refresh()
+    start_update_check()
 
     # Interactive selection
     selection = select_project(
@@ -329,6 +331,29 @@ def start_size_refresh() -> None:
         logging.getLogger("ai_launcher").debug(f"Size refresh not started: {error}")
 
 
+def start_update_check() -> None:
+    """Start the opt-in background update check. Never raises: a launch comes first."""
+    try:
+        from ai_launcher.core.cache_registry import load_registry
+        from ai_launcher.core.update_check import start_check
+
+        start_check(load_registry().update_check)
+    except Exception as error:
+        logging.getLogger("ai_launcher").debug(f"Update check not started: {error}")
+
+
+def current_update_notice() -> Optional["UpdateNotice"]:
+    """The saved update notice for this launch, or None. Never raises."""
+    try:
+        from ai_launcher.core.cache_registry import load_registry
+        from ai_launcher.core.update_check import update_notice
+
+        return update_notice(load_registry().update_check, __version__)
+    except Exception as error:
+        logging.getLogger("ai_launcher").debug(f"Update notice failed: {error}")
+        return None
+
+
 def prepare_scratch(project_path: Path) -> Optional[Path]:
     """Make this session's scratch folder and name it in AI_SCRATCH_DIR.
 
@@ -407,6 +432,7 @@ def launch_ai(
     from ai_launcher.core.cache_notice import launch_notice
 
     notice = launch_notice()
+    update_notice = current_update_notice()
 
     # A scratch folder for the session. The scope guard must not ask about it.
     scratch_dir = prepare_scratch(project_path)
@@ -422,6 +448,7 @@ def launch_ai(
         scope_exempt=scope_exempt,
         notice=notice,
         scratch_dir=scratch_dir,
+        update_notice=update_notice,
     )
     try:
         provider.launch_with_title(
