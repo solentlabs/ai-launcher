@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -158,6 +159,7 @@ def test_a_cache_that_merely_contains_repositories_can_still_be_cleaned(
     assert [i.entry.path for i in plan.items] == [cache]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
 def test_making_writable_never_follows_a_link_and_keeps_directories_usable(
     cache_home, make_symlink
 ):

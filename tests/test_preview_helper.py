@@ -4,6 +4,7 @@ Author: Solent Labs™
 """
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -158,12 +159,14 @@ def test_a_scan_root_lists_its_manual_paths_relative_to_home_when_it_can(
     capsys, tmp_path, monkeypatch
 ):
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Path.home() on Windows
     scan_root = tmp_path / "projects"
     scan_root.mkdir()
+    elsewhere = Path("/somewhere/else")  # printed as the OS spells it
     env = {
         "AI_LAUNCHER_PROVIDER": "claude-code",
         "AI_LAUNCHER_SCAN_PATHS": str(scan_root),
-        "AI_LAUNCHER_MANUAL_PATHS": f"{tmp_path}/inside, /somewhere/else ,",
+        "AI_LAUNCHER_MANUAL_PATHS": f"{tmp_path / 'inside'}, {elsewhere} ,",
         "AI_LAUNCHER_GLOBAL_FILES": "",
     }
 
@@ -178,4 +181,4 @@ def test_a_scan_root_lists_its_manual_paths_relative_to_home_when_it_can(
     out = capsys.readouterr().out
     assert "📌 Manual Paths:" in out
     assert "  ~/inside" in out
-    assert "  /somewhere/else" in out
+    assert f"  {elsewhere}" in out

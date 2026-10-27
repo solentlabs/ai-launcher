@@ -173,8 +173,8 @@ COMMAND_PREFIXES = frozenset(
 _ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # A path written inside code or a string: starts with ~, $HOME, / or a drive.
 _TEXT_PATH = re.compile(r"""(?:~|\$HOME|[A-Za-z]:[\\/]|/)[^\s'"`;|&()<>,{}\[\]]*""")
-# A path stuck to a short option: -o/path, -C~/dir, -f../x
-_ATTACHED_SHORT = re.compile(r"^-[A-Za-z]((?:/|~|\$|\.\.?/).*)$")
+# A path stuck to a short option: -o/path, -C~/dir, -f../x, -oC:/dir (Windows)
+_ATTACHED_SHORT = re.compile(r"^-[A-Za-z]((?:/|~|\$|\.\.?/|[A-Za-z]:[\\/]).*)$")
 _HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 # Shell operator characters; a newline separates commands like ';'.
 _PUNCTUATION_CHARS = "();<>|&\n"

@@ -574,7 +574,10 @@ class TestHookEntryPoint:
 
         settings = scope_guard_settings(layout["project"], [layout["root"]])
         hook = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-        words = shlex.split(hook, posix=(sys.platform != "win32"))
+        words = [
+            word.strip('"')
+            for word in shlex.split(hook, posix=(sys.platform != "win32"))
+        ]  # Windows quoting (non-POSIX split) leaves the quotes on each word
         assert words[1].endswith("scope_guard.py")  # by path, not -m
 
         shadow = tmp_path / "hostile" / "ai_launcher" / "core"
@@ -597,3 +600,21 @@ class TestHookEntryPoint:
             json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
             == "ask"
         )
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (["-oC:/Users/me/projects/x"], ["C:/Users/me/projects/x"]),
+        (["-oC:\\Users\\me\\x"], ["C:\\Users\\me\\x"]),
+        (["-o/home/me/x"], ["/home/me/x"]),
+        (["-o~/x"], ["~/x"]),
+        (["-v"], []),
+        (["-ofile.txt"], []),
+    ],
+    ids=["drive-forward", "drive-back", "posix", "tilde", "plain-flag", "relative"],
+)
+def test_attached_short_option_paths_include_windows_drives(args, expected):
+    from ai_launcher.core.scope_guard import _attached_paths
+
+    assert _attached_paths("curl", args) == expected

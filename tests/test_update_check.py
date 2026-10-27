@@ -1,6 +1,7 @@
 """Tests for the opt-in update check: setting, saved result, thread, launch line."""
 
 import json
+import os
 from http.client import IncompleteRead
 from unittest.mock import MagicMock
 
@@ -118,7 +119,8 @@ def test_check_now_saves_the_answer_and_the_time(state):
     assert uc.check_now(lambda: "0.9.0", state, now=50.0) == "0.9.0"
 
     assert json.loads(state.read_text()) == {"checked_at": 50.0, "latest": "0.9.0"}
-    assert (state.stat().st_mode & 0o777) == 0o600
+    if os.name != "nt":  # Windows has no POSIX modes
+        assert (state.stat().st_mode & 0o777) == 0o600
 
 
 @pytest.mark.parametrize(

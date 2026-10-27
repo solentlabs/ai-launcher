@@ -451,7 +451,7 @@ discover_projects() {
     fi
 
     # Output unique projects
-    printf '%s\n' "${projects[@]}" | sort -u
+    printf '%s\n' ${projects[@]+"${projects[@]}"} | sort -u
 }
 
 
@@ -521,7 +521,7 @@ show_menu() {
     local recent_display=""
 
     local sorted_paths
-    sorted_paths=$(printf '%s\n' "${projects[@]}" | sort)
+    sorted_paths=$(printf '%s\n' ${projects[@]+"${projects[@]}"} | sort)
 
     while IFS= read -r path; do
         IFS='/' read -ra parts <<< "$path"
@@ -537,7 +537,7 @@ show_menu() {
             fi
 
             local found=0
-            for shown in "${shown_dirs[@]}"; do
+            for shown in ${shown_dirs[@]+"${shown_dirs[@]}"}; do
                 [[ "$shown" == "$dir_path" ]] && found=1 && break
             done
 
@@ -680,7 +680,7 @@ memory_dir="$session_dir/memory"
 if [[ -d "$memory_dir" ]]; then
     memory_files=($(ls "$memory_dir"/*.md 2>/dev/null))
     if [[ ${#memory_files[@]} -gt 0 ]]; then
-        for mem_file in "${memory_files[@]}"; do
+        for mem_file in ${memory_files[@]+"${memory_files[@]}"}; do
             size=$(stat -f%z "$mem_file" 2>/dev/null || stat -c%s "$mem_file" 2>/dev/null)
             basename=$(basename "$mem_file")
             echo "  $(tput setaf 2)✓$(tput sgr0) $basename ($(human_size $size))"
@@ -772,7 +772,7 @@ Ctrl-O for other tools"
     while true; do
         # --expect prints the key on the first line (empty for Enter) and the
         # selected row on the second
-        out=$(printf '%s\n' "${display_lines[@]}" | fzf \
+        out=$(printf '%s\n' ${display_lines[@]+"${display_lines[@]}"} | fzf \
             --exact \
             --layout=reverse \
             --border=rounded \
@@ -982,7 +982,7 @@ main() {
     done
 
     check_dependencies
-    load_config "${paths[@]}"
+    load_config ${paths[@]+"${paths[@]}"}
 
     local menu_result
     local open_with

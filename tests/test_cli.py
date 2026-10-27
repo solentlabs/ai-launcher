@@ -473,7 +473,12 @@ def test_run_launcher_takes_everything_after_the_provider_by_keyword():
 
 @pytest.mark.parametrize("command", ["claude", "gemini", "cursor", "aider", "copilot"])
 def test_cleanup_flags_have_their_own_help(command):
-    out = runner.invoke(app, [command, "--help"], env={"COLUMNS": "250"}).output
+    from ai_launcher.ui.formatter import strip_ansi
+
+    # CI forces colour on, and Rich splits "--clean-provider" into coloured pieces
+    out = strip_ansi(
+        runner.invoke(app, [command, "--help"], env={"COLUMNS": "250"}).output
+    )
     flat = " ".join(out.replace("│", " ").split())
 
     assert "--clean-provider" in flat

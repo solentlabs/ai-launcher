@@ -84,3 +84,22 @@ def test_a_tilde_argument_is_expanded(home):
     result = run(home, "--list", "~/work")
 
     assert f"{home}/work/repo" in result.stdout
+
+
+def test_no_bare_array_expansion_breaks_bash_3_under_set_u():
+    """macOS ships bash 3.2, where "${arr[@]}" on an empty array is an error under
+    `set -u`. Arrays that can be empty must use "${arr[@]+"${arr[@]}"}". Only
+    `dirs` is exempt: it always holds "." and "..".
+    """
+    import re
+
+    always_filled = {"dirs"}
+    bare = []
+    for number, line in enumerate(
+        PROTOTYPE.read_text(encoding="utf-8").splitlines(), 1
+    ):
+        for match in re.finditer(r'(?<!\+)"\$\{(\w+)\[@\]\}"', line):
+            if match.group(1) not in always_filled:
+                bare.append(f"line {number}: {match.group(0)}")
+
+    assert bare == []
