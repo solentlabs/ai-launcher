@@ -11,6 +11,7 @@ Last Modified: 2026-02-10 (Added settings menu item)
 import os
 import shutil
 import subprocess  # nosec B404
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
@@ -57,9 +58,9 @@ def about_row_label_now() -> str:
     """The About row's text. Reads saved data only; any failure leaves it plain."""
     try:
         from ai_launcher import __version__
-        from ai_launcher.core.cache_registry import load_registry
+        from ai_launcher.core.update_check import load_setting
 
-        return about_row_label(load_registry().update_check, __version__)
+        return about_row_label(load_setting().enabled, __version__)
     except Exception:
         return ABOUT_ROW
 
@@ -205,6 +206,8 @@ def select_project(
 
     # Action loop - allows rescanning, adding, removing
     current_projects = projects
+    # Read once: nothing in the loop can change it, since an update exits
+    about_label = about_row_label_now()
     while True:
         if not current_projects:
             print("No projects found. Pass a scan directory or use --manual-paths")
@@ -233,7 +236,7 @@ def select_project(
         choices.append("__ACTION__\t\t")
         choices.append("__ACTION__\t\t🔧 Configuration")
         choices.append(f"__ACTION__\t\t{cache_row_label()}")
-        choices.append(f"__ACTION__\t\t{about_row_label_now()}")
+        choices.append(f"__ACTION__\t\t{about_label}")
 
         # Build header with project info
         project_count = len(current_projects)
@@ -341,7 +344,8 @@ Ctrl-O for other tools
             if selected.startswith(f"__ACTION__\t\t{ABOUT_ROW}"):
                 from ai_launcher.ui import about
 
-                about.run_about()
+                if about.run_about():
+                    sys.exit(0)  # updated: restart to use the new version
                 continue
 
             # Handle empty line action item (just loop back)

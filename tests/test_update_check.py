@@ -1,6 +1,7 @@
 """Tests for the opt-in update check: setting, saved result, thread, launch line."""
 
 import json
+from http.client import IncompleteRead
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,12 +17,6 @@ from ai_launcher.ui.startup_report import _visual_length, display_launch_info
 from tests.test_cache_integration import make_box_provider
 
 DAY = 24 * 3600
-
-
-def registry_with(cache_home, text):
-    user = cache_home / "user.toml"
-    user.write_text(text, encoding="utf-8")
-    return reg.load_registry(platform="linux", user_file=user)
 
 
 @pytest.fixture
@@ -40,18 +35,46 @@ def state(cache_home):
         ("[update]\ncheck = false\n", False, 0),
         ('[update]\ncheck = "yes"\n', False, 1),
         ("[update]\nbogus = 1\n", False, 1),
-        ("update = 3\n", False, 0),
+        ("[update]\ncheck = true\nbogus = 1\n", True, 1),
+        ("update = 3\n", False, 1),
+        ("this is not [ toml", False, 1),
+        ("[notice]\nstale_days = 3\n", False, 0),
     ],
-    ids=["absent", "on", "off", "wrong-type", "unknown-key", "not-a-table"],
+    ids=[
+        "absent",
+        "on",
+        "off",
+        "wrong-type",
+        "unknown-key",
+        "on-with-a-typo",
+        "not-a-table",
+        "broken-file",
+        "other-tables-ignored",
+    ],
 )
-def test_update_check_setting(cache_home, text, enabled, warnings):
-    if text is None:
-        registry = reg.load_registry(platform="linux", user_file=cache_home / "none")
-    else:
-        registry = registry_with(cache_home, text)
+def test_update_setting(cache_home, text, enabled, warnings):
+    path = cache_home / "user.toml"
+    if text is not None:
+        path.write_text(text, encoding="utf-8")
 
-    assert registry.update_check is enabled
-    assert len(registry.warnings) == warnings
+    setting = uc.load_setting(path)
+
+    assert setting.enabled is enabled
+    assert len(setting.warnings) == warnings
+
+
+def test_the_setting_defaults_to_the_users_registry_file(cache_home):
+    path = reg.user_registry_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("[update]\ncheck = true\n", encoding="utf-8")
+
+    assert uc.load_setting().enabled is True
+
+
+def test_the_cache_registry_no_longer_knows_the_setting(cache_home):
+    registry = reg.load_registry(platform="linux", user_file=cache_home / "none")
+
+    assert not hasattr(registry, "update_check")
 
 
 # --------------------------------------------------------------- saved result
@@ -81,8 +104,9 @@ def test_load_state(state, content, expected):
         (1000.0, 1000.0 + DAY - 1, False),
         (1000.0, 1000.0 + DAY, True),
         ("soon", 1000.0, True),
+        (9_999_999_999.0, 1000.0, True),
     ],
-    ids=["never", "just-under", "exactly-a-day", "garbage"],
+    ids=["never", "just-under", "exactly-a-day", "garbage", "saved-in-the-future"],
 )
 def test_check_is_due(saved_at, now, due):
     data = {} if saved_at is None else {"checked_at": saved_at}
@@ -97,12 +121,19 @@ def test_check_now_saves_the_answer_and_the_time(state):
     assert (state.stat().st_mode & 0o777) == 0o600
 
 
-def test_a_failed_check_saves_nothing_so_the_next_launch_retries(state):
+@pytest.mark.parametrize(
+    "error",
+    [UpdateError("offline"), IncompleteRead(b"par"), RuntimeError("bug")],
+    ids=["update-error", "truncated-reply", "anything-else"],
+)
+def test_a_failed_check_records_the_attempt_and_no_answer(state, error):
     def broken():
-        raise UpdateError("offline")
+        raise error
 
     assert uc.check_now(broken, state, now=50.0) is None
-    assert not state.exists()
+
+    assert json.loads(state.read_text()) == {"checked_at": 50.0}
+    assert uc.is_due(uc.load_state(state), 50.0 + 3600) is False  # no retry today
 
 
 def test_a_failed_check_keeps_the_previous_answer(state):
@@ -110,7 +141,7 @@ def test_a_failed_check_keeps_the_previous_answer(state):
 
     uc.check_now(lambda: (_ for _ in ()).throw(UpdateError("x")), state, now=50.0)
 
-    assert uc.load_state(state)["latest"] == "0.9.0"
+    assert uc.load_state(state) == {"checked_at": 50.0, "latest": "0.9.0"}
 
 
 # ---------------------------------------------------------------- the thread
@@ -146,17 +177,15 @@ def test_background_check_stays_quiet(state, enabled, saved):
 
 
 def test_cli_hook_never_raises_and_respects_the_setting(cache_home, monkeypatch):
-    registry = reg.load_registry(platform="linux", user_file=cache_home / "none")
     seen = []
     monkeypatch.setattr(uc, "start_check", lambda enabled: seen.append(enabled))
-    monkeypatch.setattr(reg, "load_registry", lambda: registry)
 
     start_update_check()
 
     assert seen == [False]  # off by default
 
     monkeypatch.setattr(
-        reg, "load_registry", lambda: (_ for _ in ()).throw(RuntimeError("x"))
+        uc, "load_setting", lambda *a: (_ for _ in ()).throw(RuntimeError("x"))
     )
 
     start_update_check()  # must not raise
@@ -267,9 +296,7 @@ def test_current_update_notice_follows_the_setting(
 ):
     from ai_launcher.cli import current_update_notice
 
-    registry = reg.load_registry(platform="linux", user_file=cache_home / "none")
-    registry.update_check = enabled
-    monkeypatch.setattr(reg, "load_registry", lambda: registry)
+    monkeypatch.setattr(uc, "load_setting", lambda *a: uc.UpdateSetting(enabled))
     uc.state_path().parent.mkdir(parents=True, exist_ok=True)
     uc.state_path().write_text(json.dumps(saved), encoding="utf-8")
     monkeypatch.setattr("ai_launcher.cli.__version__", "0.8.0")
@@ -283,7 +310,7 @@ def test_current_update_notice_never_raises(monkeypatch):
     from ai_launcher.cli import current_update_notice
 
     monkeypatch.setattr(
-        reg, "load_registry", lambda: (_ for _ in ()).throw(RuntimeError("x"))
+        uc, "load_setting", lambda *a: (_ for _ in ()).throw(RuntimeError("x"))
     )
 
     assert current_update_notice() is None

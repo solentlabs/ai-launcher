@@ -53,11 +53,19 @@ Decisions:
   launch on.
 - **Same request as `update --check`.** One GET to the PyPI URL above, with nothing about you or
   your projects in it. It installs nothing: the line only names the command.
-- **Quiet on error.** No network, a timeout, or an unreadable reply means no line, and the check is
-  tried again at the next launch. A bug here must not stop a session starting.
+- **Quiet on error.** No network, a timeout, or an unreadable reply means no line, and never a
+  message over the picker. A failed attempt counts as an attempt: it is not repeated until the next
+  day, so an offline machine is not asked at every launch. The last good answer is kept.
+- **A wrong clock heals itself.** A saved time in the future (a clock that was wrong once) counts as
+  due, so the check cannot be switched off by it.
 - **Once per release.** The line repeats at every launch until you update; it has no snooze.
-- **Last result** is kept in `update-check.json` in the state folder, beside `cache-sizes.json`.
-  Deleting it only means the next launch checks again.
+- **Last result** is kept in `update-check.json` in the state folder, beside `cache-sizes.json`: the
+  time of the last attempt, and the newest version seen. Deleting it only means the next launch
+  checks again.
+- **Its own setting.** The `[update]` table sits in `caches.toml` only because that is the one
+  optional file AI Launcher reads. It is read on its own, by `core/update_check.py`, and never goes
+  through the cache registry, so a change to one cannot break the other. A mistake in it (a wrong
+  type or an unknown key) is shown in the About row's preview, and the check stays off.
 
 ## The About Row
 

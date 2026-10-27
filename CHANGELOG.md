@@ -14,7 +14,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a newer release exists. Off by default; nothing is installed. See `docs/updating.md`.
 - **About row in the picker** — shows the version, how it was installed and the update status from
   the saved check (no network). Enter runs `ai-launcher update` in place, so a manual upgrade is one
-  keypress away even without the automatic check. A 🆕 on the row marks a newer release.
+  keypress away even without the automatic check. A 🆕 on the row marks a newer release. After an
+  update the picker exits, so it never runs half old and half new code.
 
 ### Notes
 

@@ -334,10 +334,9 @@ def start_size_refresh() -> None:
 def start_update_check() -> None:
     """Start the opt-in background update check. Never raises: a launch comes first."""
     try:
-        from ai_launcher.core.cache_registry import load_registry
-        from ai_launcher.core.update_check import start_check
+        from ai_launcher.core.update_check import load_setting, start_check
 
-        start_check(load_registry().update_check)
+        start_check(load_setting().enabled)
     except Exception as error:
         logging.getLogger("ai_launcher").debug(f"Update check not started: {error}")
 
@@ -345,10 +344,9 @@ def start_update_check() -> None:
 def current_update_notice() -> Optional["UpdateNotice"]:
     """The saved update notice for this launch, or None. Never raises."""
     try:
-        from ai_launcher.core.cache_registry import load_registry
-        from ai_launcher.core.update_check import update_notice
+        from ai_launcher.core.update_check import load_setting, update_notice
 
-        return update_notice(load_registry().update_check, __version__)
+        return update_notice(load_setting().enabled, __version__)
     except Exception as error:
         logging.getLogger("ai_launcher").debug(f"Update notice failed: {error}")
         return None

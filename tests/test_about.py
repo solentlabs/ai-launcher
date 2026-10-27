@@ -18,10 +18,12 @@ def state(cache_home):
     return cache_home / "update-check.json"
 
 
-def preview(plan=None, enabled=False, installed="0.8.0", state_file=None):
+def preview(plan=None, enabled=False, installed="0.8.0", state_file=None, warnings=()):
     plan = plan or su.UpdatePlan(su.PIP, argv=["py"], display=["py"])
     return cache_page.strip_ansi(
-        about.render_about(plan, enabled, installed, state_file, "~/c.toml")
+        about.render_about(
+            plan, enabled, installed, state_file, "~/c.toml", list(warnings)
+        )
     )
 
 
@@ -73,6 +75,27 @@ def test_preview_content(state, plan, enabled, saved, expected):
         assert fragment in text
 
 
+@pytest.mark.parametrize(
+    "checked_at",
+    [1e20, -1e20, float("inf"), float("nan")],
+    ids=["huge", "negative-huge", "infinite", "nan"],
+)
+def test_preview_survives_a_corrupt_checked_at(state, checked_at):
+    state.write_text(
+        json.dumps({"checked_at": checked_at, "latest": "0.9.0"}), encoding="utf-8"
+    )
+
+    text = preview(enabled=True, state_file=state)
+
+    assert "0.9.0 is available" in text and "checked" not in text
+
+
+def test_preview_shows_a_problem_with_the_setting():
+    text = preview(enabled=False, warnings=["[update] check has the wrong type"])
+
+    assert "check has the wrong type" in text
+
+
 def test_preview_makes_no_network_call(state, monkeypatch):
     monkeypatch.setattr(su, "fetch_latest", lambda *a, **k: pytest.fail("network"))
 
@@ -96,8 +119,13 @@ def test_helper_prints_the_preview(cache_home, monkeypatch):
 # ------------------------------------------------------------- Enter on it
 
 
-def test_run_about_clears_the_picker_then_runs_the_update_flow_then_waits(
-    monkeypatch,
+@pytest.mark.parametrize(
+    ("outcome", "waits", "updated"),
+    [((0, True), False, True), ((0, False), True, False), ((1, False), True, False)],
+    ids=["installed", "nothing-to-do", "failed"],
+)
+def test_run_about_clears_runs_the_update_flow_and_reports_whether_it_installed(
+    monkeypatch, outcome, waits, updated
 ):
     # fzf runs with --no-clear, so its frame is still up: clear it first
     order = []
@@ -105,16 +133,18 @@ def test_run_about_clears_the_picker_then_runs_the_update_flow_then_waits(
         "ai_launcher.ui.selector.clear_screen", lambda: order.append("clear")
     )
     monkeypatch.setattr(
-        update_ui, "update_command", lambda **k: order.append(("update", k)) or 0
+        update_ui, "run_update", lambda **k: order.append(("update", k)) or outcome
     )
 
-    about.run_about(input_fn=lambda prompt: order.append("wait") or "")
+    result = about.run_about(input_fn=lambda prompt: order.append("wait") or "")
 
-    assert order == ["clear", ("update", {"check": False, "yes": False}), "wait"]
+    assert result is updated
+    expected = ["clear", ("update", {"check": False, "yes": False})]
+    assert order == expected + (["wait"] if waits else [])
 
 
 def test_run_about_survives_ctrl_c_at_the_pause(monkeypatch):
-    monkeypatch.setattr(update_ui, "update_command", lambda **k: 0)
+    monkeypatch.setattr(update_ui, "run_update", lambda **k: (0, False))
 
     def interrupt(prompt):
         raise KeyboardInterrupt
@@ -133,10 +163,70 @@ def test_picker_has_an_about_row_below_the_cache_row(tmp_path, cache_home):
 def test_enter_on_the_about_row_runs_about_then_returns_to_the_picker(
     tmp_path, cache_home, monkeypatch
 ):
-    run = MagicMock()
+    run = MagicMock(return_value=False)
     monkeypatch.setattr(about, "run_about", run)
 
     result, _, _, project = run_picker(tmp_path, [ABOUT_LINE + "  🆕", None])
 
     run.assert_called_once()
     assert result.project == project
+
+
+def test_picker_exits_after_a_successful_update(tmp_path, cache_home, monkeypatch):
+    monkeypatch.setattr(about, "run_about", lambda: True)
+
+    with pytest.raises(SystemExit) as stopped:
+        run_picker(tmp_path, [ABOUT_LINE, None])
+
+    assert stopped.value.code == 0
+
+
+def test_the_about_label_is_read_once_per_picker(tmp_path, cache_home, monkeypatch):
+    from ai_launcher.ui import selector
+
+    calls = []
+    monkeypatch.setattr(
+        selector, "about_row_label_now", lambda: calls.append(1) or about.ABOUT_ROW
+    )
+    monkeypatch.setattr(about, "run_about", lambda: False)
+
+    run_picker(tmp_path, [ABOUT_LINE, ABOUT_LINE, None])
+
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "checked_at", ["yesterday", None, True], ids=["text", "none", "bool"]
+)
+def test_preview_omits_a_date_that_is_not_a_number(state, checked_at):
+    state.write_text(
+        json.dumps({"checked_at": checked_at, "latest": "0.9.0"}), encoding="utf-8"
+    )
+
+    text = preview(enabled=True, state_file=state)
+
+    assert "0.9.0 is available" in text and "checked" not in text
+
+
+def test_the_row_label_stays_plain_when_the_setting_cannot_be_read(monkeypatch):
+    from ai_launcher.core import update_check
+    from ai_launcher.ui import selector
+
+    monkeypatch.setattr(
+        update_check, "load_setting", lambda *a: (_ for _ in ()).throw(RuntimeError())
+    )
+
+    assert selector.about_row_label_now() == about.ABOUT_ROW
+
+
+def test_the_row_label_follows_the_setting(cache_home, monkeypatch):
+    from ai_launcher.core import update_check
+    from ai_launcher.ui import selector
+
+    update_check.state_path().parent.mkdir(parents=True, exist_ok=True)
+    update_check.state_path().write_text('{"latest": "9.9.9"}', encoding="utf-8")
+    monkeypatch.setattr(
+        update_check, "load_setting", lambda *a: update_check.UpdateSetting(True)
+    )
+
+    assert selector.about_row_label_now() == f"{about.ABOUT_ROW}  🆕"

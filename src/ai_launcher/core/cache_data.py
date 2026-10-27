@@ -147,7 +147,6 @@ class Registry:
 
     locations: List[CacheLocation] = field(default_factory=list)
     notice: NoticeConfig = field(default_factory=NoticeConfig)
-    update_check: bool = False
     warnings: List[str] = field(default_factory=list)
     user_file: Optional[Path] = None
 

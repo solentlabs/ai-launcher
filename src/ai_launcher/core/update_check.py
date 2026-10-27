@@ -10,17 +10,24 @@ Author: Solent Labs™
 import contextlib
 import json
 import os
+import sys
 import tempfile
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import platformdirs
 
-from ai_launcher.core.self_update import UpdateError, fetch_latest, is_newer
+from ai_launcher.core.cache_registry import user_registry_path
+from ai_launcher.core.self_update import fetch_latest, is_newer
 from ai_launcher.utils.logging import get_logger
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # pragma: no cover - exercised on 3.8 to 3.10 only
+    import tomli as tomllib
 
 logger = get_logger(__name__)
 
@@ -33,6 +40,44 @@ class UpdateNotice:
 
     latest: str
     installed: str
+
+
+@dataclass
+class UpdateSetting:
+    """The user's [update] table: whether the check is on, and what was wrong with it."""
+
+    enabled: bool = False
+    warnings: List[str] = field(default_factory=list)
+
+
+def load_setting(path: Optional[Path] = None) -> UpdateSetting:
+    """Read `[update] check` on its own, never through the cache registry.
+
+    Only `check = true` turns anything on. Nothing here raises: a broken file or
+    value becomes a warning and leaves the check off.
+    """
+    setting = UpdateSetting()
+    try:
+        with open(path or user_registry_path(), "rb") as handle:
+            table = tomllib.load(handle).get("update")
+    except FileNotFoundError:
+        return setting
+    except (OSError, ValueError) as error:
+        setting.warnings.append(f"caches.toml could not be read: {error}")
+        return setting
+    if table is None:
+        return setting
+    if not isinstance(table, dict):
+        setting.warnings.append("[update] must be a table")
+        return setting
+    for key, value in table.items():
+        if key != "check":
+            setting.warnings.append(f"[update] unknown key {key!r} ignored")
+        elif not isinstance(value, bool):
+            setting.warnings.append("[update] check has the wrong type")
+        else:
+            setting.enabled = value
+    return setting
 
 
 def state_path() -> Path:
@@ -50,9 +95,10 @@ def load_state(path: Optional[Path] = None) -> Dict[str, Any]:
 
 
 def is_due(data: Dict[str, Any], now: float) -> bool:
-    """Has a day passed since the last successful check."""
+    """Has a day passed since the last attempt. A time in the future (a clock
+    that was wrong once) counts as due, so it cannot switch the check off."""
     last = data.get("checked_at")
-    if not isinstance(last, (int, float)):
+    if not isinstance(last, (int, float)) or last > now:
         return True
     return now - last >= INTERVAL_SECONDS
 
@@ -79,16 +125,22 @@ def check_now(
     path: Optional[Path] = None,
     now: Optional[float] = None,
 ) -> Optional[str]:
-    """Ask PyPI and save the answer. A failure saves nothing, so the next launch retries."""
+    """Ask PyPI and save the attempt. Never raises.
+
+    The time is recorded even when the ask fails, so an offline machine is not
+    asked at every launch; the last good answer is kept.
+    """
+    path = path or state_path()
     try:
-        latest = fetch()
-    except UpdateError as error:
+        latest: Optional[str] = fetch()
+    except Exception as error:  # a thread must not print over the picker
         logger.debug(f"Update check failed: {error}")
-        return None
-    _save(
-        {"checked_at": now if now is not None else time.time(), "latest": latest},
-        path or state_path(),
-    )
+        latest = None
+    data: Dict[str, Any] = {"checked_at": now if now is not None else time.time()}
+    answer = latest or load_state(path).get("latest")
+    if isinstance(answer, str):
+        data["latest"] = answer
+    _save(data, path)
     return latest
 
 
