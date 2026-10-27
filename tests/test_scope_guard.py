@@ -9,6 +9,7 @@ Author: Solent Labs™
 
 import io
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -586,9 +587,18 @@ class TestHookEntryPoint:
         (shadow / "__init__.py").write_text("")
         (shadow / "scope_guard.py").write_text("print('SHADOWED')\n")
 
+        # Not measured: from another folder this process cannot find pyproject.toml, so
+        # coverage would record statement data into the same directory as the main
+        # process's branch data, and older coverage (Python 3.8) refuses to combine them.
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith(("COV_CORE", "COVERAGE"))
+        }
         result = subprocess.run(
             words,
             cwd=tmp_path / "hostile",
+            env=env,
             input=self._event(layout, "other"),
             capture_output=True,
             text=True,
