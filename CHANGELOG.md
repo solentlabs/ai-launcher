@@ -42,8 +42,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Release workflows hardened** — PyPI publishing by hand is limited to `v*` tags (Test PyPI can
   still start anywhere), the changelog check no longer interpolates branch names into a shell
   script, the tag gate no longer reads an all-skipped test matrix as a pass and requires `Lint`, the
-  tag-on-main check is an ancestor test, actions are pinned to commit SHAs with Dependabot to update
-  them, and every workflow declares `permissions:`.
+  tag-on-main check is an ancestor test, actions are pinned to commit SHAs, and every workflow
+  declares `permissions:`.
 
 - **A hand-edited Claude settings file broke the preview** — `"allow": null`, a top-level list, a
   non-UTF-8 file or an unreadable one raised out of the preview, the launch box and
