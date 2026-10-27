@@ -41,9 +41,10 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 # Expand a leading ~ (and nothing else). The old `eval echo "$path"` ran
 # any $(...) or backticks in a path given on the command line or in the config.
 expand_path() {
+    # \~ matches a literal tilde; a quoted "~" makes ShellCheck think expansion was meant
     case "$1" in
-        "~") printf '%s\n' "$HOME" ;;
-        "~/"*) printf '%s\n' "$HOME/${1#\~/}" ;;
+        \~) printf '%s\n' "$HOME" ;;
+        \~/*) printf '%s\n' "$HOME/${1#\~/}" ;;
         *) printf '%s\n' "$1" ;;
     esac
 }
@@ -304,6 +305,9 @@ Current: $current_dir
         # The directory names reach the preview shell through the environment, not
         # by being spliced into its command line: a name with a quote must not
         # break out of it.
+        # The preview below is single-quoted on purpose: $AI_CURRENT_DIR and
+        # $AI_REAL_DIR must expand in fzf's shell, when it runs the preview, not here.
+        # shellcheck disable=SC2016
         selection=$(printf '%s\n' "${dirs[@]}" | AI_CURRENT_DIR="$current_dir" AI_REAL_DIR="$real_dir" fzf \
             --height=80% \
             --layout=reverse \
