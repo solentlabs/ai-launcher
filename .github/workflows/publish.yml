@@ -75,8 +75,9 @@ jobs:
   publish:
     name: Publish to PyPI
     needs: build
+    # The normal release arrives as workflow_run (ref: main) after the tag gate.
     # By hand, real PyPI only from a v* tag (Test PyPI may start from any ref).
-    # Also restrict the pypi environment to tags in the repository settings.
+    # See docs/releasing.md, "Workflow Safety", before restricting this environment.
     if: >
       github.event.inputs.test_pypi != 'true' &&
       (
