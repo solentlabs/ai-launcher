@@ -35,6 +35,34 @@ def ensure_utf8_output() -> None:
             stream.reconfigure(encoding="utf-8", errors="replace")
 
 
+def clear_screen() -> None:
+    """Clear the terminal screen, leaving the alternate screen first.
+
+    The picker runs fzf with --no-clear, so fzf stays on that screen when it
+    exits.
+    """
+    print("\033[?1049l\033[H\033[2J", end="", flush=True)
+
+
+def clear_page() -> None:
+    """Home the cursor and clear the screen, staying on the current screen."""
+    print("\033[H\033[2J", end="", flush=True)
+
+
+def cursor_home() -> None:
+    """Move the cursor to the top left."""
+    print("\033[H", end="", flush=True)
+
+
+def grey_out_screen(lines: int, columns: int) -> None:
+    """Give everything already on screen a grey foreground.
+
+    DECCARA changes the attributes of a rectangle of cells that are already
+    drawn. A terminal without it ignores the sequence.
+    """
+    print(f"\033[1;1;{lines};{columns};38;5;240$r", end="", flush=True)
+
+
 def set_terminal_title(title: str) -> bool:
     """Set the terminal window title.
 
@@ -146,7 +174,9 @@ def format_terminal_title(
             path=full_path,
             parent=parent_name,
         )
-    except KeyError as e:
+    except (KeyError, IndexError, AttributeError, ValueError) as e:
+        # str.format raises a different error for each way a format can be
+        # wrong ({}, {0}, {project.x}, {project!z}); the contract is ValueError.
         raise ValueError(
             f"Invalid format string variable: {e}. "
             f"Valid variables: project, provider, path, parent"

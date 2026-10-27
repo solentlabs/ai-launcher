@@ -33,18 +33,14 @@ class Project:
         Returns:
             Project instance
         """
-        # For manual projects, don't resolve symlinks so they appear under their symlink location
-        # For discovered projects, resolve to avoid duplicates
-        if is_manual:
-            resolved_path = path
-        else:
-            resolved_path = path.resolve()
-
-        is_git = (resolved_path / ".git").exists()
+        # The path as listed: symlinks are preserved for every project, because
+        # Claude Code keys its history and memory on the path a session starts in.
+        # Duplicates are found by real path in core.discovery.
+        is_git = (path / ".git").exists()
         return cls(
-            path=resolved_path,
-            name=resolved_path.name,
-            parent_path=resolved_path.parent,
+            path=path,
+            name=path.name,
+            parent_path=path.parent,
             is_git_repo=is_git,
             is_manual=is_manual,
         )

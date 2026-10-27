@@ -10,7 +10,7 @@ import os
 import subprocess
 import sys
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -70,7 +70,7 @@ class TestClaudeCleanup:
         assert backup.exists()
 
     def test_cleanup_backup_files(self, provider, mock_home, cleanup_config):
-        """Test cleanup removes .claude.json.backup.* files."""
+        """Cleanup removes old .claude.json.backup.* files but keeps the newest."""
         # Create backup files
         backup1 = mock_home / ".claude.json.backup.123"
         backup2 = mock_home / ".claude.json.backup.456"
@@ -79,12 +79,14 @@ class TestClaudeCleanup:
         backup1.write_text("backup1")
         backup2.write_text("backup2")
         other_file.write_text("other")
+        os.utime(backup1, (100, 100))
+        os.utime(backup2, (200, 200))
 
         provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
-        # Backup files should be removed
+        # The older backup is removed, the newest is kept as a recovery copy
         assert not backup1.exists()
-        assert not backup2.exists()
+        assert backup2.exists()
         # Other files should remain
         assert other_file.exists()
 
@@ -112,39 +114,46 @@ class TestClaudeCleanup:
         # Recent log should remain
         assert recent_log.exists()
 
-    def test_cleanup_old_versions(self, provider, mock_home, cleanup_config):
-        """Test cleanup removes old CLI versions."""
+    def test_cleanup_old_versions(
+        self, provider, mock_home, cleanup_config, make_symlink
+    ):
+        """Old native versions go; the one `claude` resolves to stays."""
         versions_dir = mock_home / ".local" / "share" / "claude" / "versions"
         versions_dir.mkdir(parents=True)
-
-        # Create version files
         current = versions_dir / "2.1.37"
         old1 = versions_dir / "2.1.36"
         old2 = versions_dir / "2.1.35"
         other = versions_dir / "other.txt"
+        for f in (current, old1, old2, other):
+            f.write_text(f.name)
+        link = mock_home / ".local" / "bin" / "claude"
+        link.parent.mkdir(parents=True)
+        make_symlink(link, current)
 
-        current.write_text("current")
-        old1.write_text("old1")
-        old2.write_text("old2")
-        other.write_text("other")
+        with patch("shutil.which", return_value=str(link)):
+            provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
-        # Mock claude --version to return current version
-        with patch("shutil.which", return_value="/usr/bin/claude"):
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = MagicMock(
-                    returncode=0, stdout="2.1.37 (Claude Code)"
-                )
-
-                provider.cleanup_environment(
-                    verbose=False, cleanup_config=cleanup_config
-                )
-
-        # Old versions should be removed
         assert not old1.exists()
         assert not old2.exists()
-        # Current version and non-version files should remain
         assert current.exists()
         assert other.exists()
+
+    def test_cleanup_leaves_native_versions_alone_when_claude_is_elsewhere(
+        self, provider, mock_home, cleanup_config
+    ):
+        """An npm `claude` first on PATH must not cost the user the native binary."""
+        versions_dir = mock_home / ".local" / "share" / "claude" / "versions"
+        versions_dir.mkdir(parents=True)
+        native = versions_dir / "2.1.37"
+        native.write_text("native")
+        npm = mock_home / "npm" / "bin" / "claude"
+        npm.parent.mkdir(parents=True)
+        npm.write_text("#!/bin/sh")
+
+        with patch("shutil.which", return_value=str(npm)):
+            provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
+
+        assert native.exists()
 
     def test_cleanup_verbose_output(self, provider, mock_home, cleanup_config, capsys):
         """Test cleanup prints messages when verbose=True."""
@@ -232,7 +241,8 @@ class TestClaudeLaunchScope:
         }
         (hook,) = entry["hooks"]
         assert hook["type"] == "command"
-        assert "ai_launcher.core.scope_guard" in hook["command"]
+        assert "scope_guard.py" in hook["command"]
+        assert "-m ai_launcher" not in hook["command"]
 
     @pytest.mark.parametrize(
         ("os_name", "expected"),
@@ -318,3 +328,248 @@ class TestClaudeProviderBasics:
         assert "logs" in categories
         assert "memory" in categories
         assert "cache" in categories
+
+
+class TestOddSettingsFiles:
+    """A hand-edited settings file must never break the preview or the launch box."""
+
+    ODD = [
+        b'{"permissions": {"allow": null}}',
+        b'{"permissions": {"allow": "Bash(*)"}}',
+        b'{"permissions": []}',
+        b'{"permissions": {"allow": ["Bash(*)", 3, null]}}',
+        b"[]",
+        b'"just a string"',
+        b"null",
+        b'{"mcpServers": []}',
+        b'{"mcpServers": 3}',
+        b'{"hooks": []}',
+        b'{"hooks": 3}',
+        b'{"model": {"x": 1}}',
+        b"\xff\xfe\x00not utf-8",
+        b"{not json",
+        b"",
+    ]
+    IDS = [
+        "allow-null",
+        "allow-string",
+        "permissions-list",
+        "allow-mixed",
+        "top-level-list",
+        "top-level-string",
+        "top-level-null",
+        "mcp-list",
+        "mcp-number",
+        "hooks-list",
+        "hooks-number",
+        "model-object",
+        "not-utf8",
+        "not-json",
+        "empty",
+    ]
+
+    @pytest.fixture
+    def project(self, mock_home):
+        project = mock_home / "proj"
+        (project / ".claude").mkdir(parents=True)
+        (mock_home / ".claude").mkdir()
+        return project
+
+    @pytest.mark.parametrize("content", ODD, ids=IDS)
+    @pytest.mark.parametrize(
+        "where",
+        [
+            ("proj", ".claude", "settings.local.json"),
+            (".claude", "settings.json"),
+            (".claude", "settings.local.json"),
+            (".claude", "mcp.json"),
+        ],
+        ids=["project-local", "global", "global-local", "mcp"],
+    )
+    def test_never_raises(self, mock_home, project, content, where):
+        from ai_launcher.providers.claude import get_claude_session_config
+
+        target = mock_home.joinpath(*where)
+        target.write_bytes(content)
+
+        get_claude_session_config(project)  # must not raise
+
+    def test_a_bad_file_does_not_hide_a_good_one(self, mock_home, project):
+        from ai_launcher.providers.claude import get_claude_session_config
+
+        (project / ".claude" / "settings.local.json").write_bytes(
+            b'{"permissions": {"allow": null}}'
+        )
+        (mock_home / ".claude" / "settings.json").write_text(
+            json.dumps({"permissions": {"allow": ["Bash(*)", 3]}, "model": "opus"})
+        )
+
+        config = get_claude_session_config(project)
+
+        assert config.global_permissions == ["Bash(*)"]  # the non-string is dropped
+        assert config.model == "opus"
+        assert config.permissions_count == 0
+
+    def test_a_directory_in_place_of_a_file_is_skipped(self, mock_home, project):
+        from ai_launcher.providers.claude import get_claude_session_config
+
+        (mock_home / ".claude" / "settings.json").mkdir()
+
+        get_claude_session_config(project)  # IsADirectoryError is an OSError
+
+
+def test_project_memory_is_found_under_the_listed_path(mock_home, make_symlink):
+    """Claude keys memory on the path the session starts in: the link, not its target."""
+    from ai_launcher.providers.claude import _get_memory_info
+    from ai_launcher.utils.session import encode_project_path
+
+    real = mock_home / "real" / "proj"
+    real.mkdir(parents=True)
+    link = mock_home / "projects" / "proj"
+    link.parent.mkdir()
+    make_symlink(link, real, target_is_directory=True)
+    memory = mock_home / ".claude" / "projects" / encode_project_path(link) / "memory"
+    memory.mkdir(parents=True)
+    (memory / "MEMORY.md").write_text("# Memory\n")
+
+    info = _get_memory_info(link)
+
+    assert info is not None and info.project_memory == memory / "MEMORY.md"
+    assert _get_memory_info(real) is None  # the target has its own, separate history
+
+
+class TestClaudeConfigDirOverride:
+    """CLAUDE_CONFIG_DIR moves Claude Code's folder: the preview must follow it."""
+
+    @pytest.fixture
+    def custom(self, mock_home, monkeypatch):
+        folder = mock_home / "elsewhere" / "claude-config"
+        folder.mkdir(parents=True)
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(folder))
+        return folder
+
+    @pytest.mark.parametrize(
+        ("env", "expected"),
+        [(None, ".claude"), ("", ".claude"), ("~/cfg", "cfg")],
+        ids=["unset", "empty", "tilde"],
+    )
+    def test_claude_config_dir(self, mock_home, monkeypatch, env, expected):
+        from ai_launcher.utils.session import claude_config_dir
+
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        if env is not None:
+            monkeypatch.setenv("CLAUDE_CONFIG_DIR", env)
+
+        assert claude_config_dir() == mock_home / expected
+
+    def test_settings_are_read_from_the_override(self, mock_home, custom):
+        from ai_launcher.providers.claude import get_claude_session_config
+
+        (custom / "settings.json").write_text(
+            json.dumps({"model": "opus", "permissions": {"allow": ["Bash(*)"]}})
+        )
+        (mock_home / ".claude").mkdir()
+        (mock_home / ".claude" / "settings.json").write_text(
+            json.dumps({"model": "the-wrong-one"})
+        )
+        project = mock_home / "proj"
+        project.mkdir()
+
+        config = get_claude_session_config(project)
+
+        assert config.model == "opus"
+        assert config.global_permissions == ["Bash(*)"]
+
+    def test_memory_is_read_from_the_override(self, mock_home, custom):
+        from ai_launcher.providers.claude import _get_memory_info
+        from ai_launcher.utils.session import encode_project_path
+
+        project = mock_home / "proj"
+        project.mkdir()
+        memory = custom / "projects" / encode_project_path(project) / "memory"
+        memory.mkdir(parents=True)
+        (memory / "MEMORY.md").write_text("# Memory\n")
+
+        info = _get_memory_info(project)
+
+        assert info is not None and info.project_memory == memory / "MEMORY.md"
+
+    def test_the_permission_report_reads_the_override(self, mock_home, custom, capsys):
+        from ai_launcher.core.models import Project
+        from ai_launcher.ui.permissions_report import check_project_permissions
+
+        (custom / "settings.json").write_text(
+            json.dumps({"permissions": {"allow": ["Bash(only-in-override)"]}})
+        )
+        project = mock_home / "p"
+        project.mkdir()
+
+        check_project_permissions(
+            [Project(project, "p", mock_home, False, False)], "claude-code"
+        )
+
+        assert "only-in-override" in capsys.readouterr().out
+
+
+def test_verbose_cleanup_reports_how_many_old_versions_went(
+    mock_home, make_symlink, capsys
+):
+    from unittest.mock import patch
+
+    from ai_launcher.core.models import CleanupConfig
+    from ai_launcher.providers.claude import ClaudeProvider
+
+    versions = mock_home / ".local" / "share" / "claude" / "versions"
+    versions.mkdir(parents=True)
+    for name in ("2.1.37", "2.1.36", "2.1.35"):
+        (versions / name).write_text(name)
+    link = mock_home / ".local" / "bin" / "claude"
+    link.parent.mkdir(parents=True)
+    make_symlink(link, versions / "2.1.37")
+    config = CleanupConfig(enabled=True, clean_provider_files=True)
+
+    with patch("shutil.which", return_value=str(link)):
+        ClaudeProvider().cleanup_environment(verbose=True, cleanup_config=config)
+
+    assert "Removed 2 old version(s)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("hooks", "configured"),
+    [
+        ({"PreToolUse": [{"matcher": "Bash"}]}, True),
+        ({"PreToolUse": []}, False),
+        ({}, False),
+    ],
+    ids=["a-hook", "empty-hook-list", "no-hooks"],
+)
+def test_project_hooks_are_detected(mock_home, hooks, configured):
+    from ai_launcher.providers.claude import get_claude_session_config
+
+    project = mock_home / "proj"
+    (project / ".claude").mkdir(parents=True)
+    (project / ".claude" / "settings.local.json").write_text(
+        json.dumps({"hooks": hooks, "permissions": {"allow": ["Bash(*)"]}})
+    )
+
+    config = get_claude_session_config(project)
+
+    assert config.hooks_configured is configured
+
+
+def test_a_global_mcp_server_already_in_the_project_is_not_listed_twice(mock_home):
+    from ai_launcher.providers.claude import get_claude_session_config
+
+    project = mock_home / "proj"
+    (project / ".claude").mkdir(parents=True)
+    (project / ".claude" / "settings.local.json").write_text(
+        json.dumps({"mcpServers": {"shared": {}, "only-project": {}}})
+    )
+    (mock_home / ".claude").mkdir()
+    (mock_home / ".claude" / "mcp.json").write_text(
+        json.dumps({"mcpServers": {"shared": {}, "only-global": {}}})
+    )
+
+    config = get_claude_session_config(project)
+
+    assert sorted(config.mcp_servers) == ["only-global", "only-project", "shared"]

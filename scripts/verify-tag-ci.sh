@@ -47,17 +47,12 @@ fi
 COMMIT=$(git rev-parse HEAD)
 echo "Checking CI status for commit ${COMMIT:0:8}..."
 
-# Use check-runs API (matches tag-protection.yml) — only look at CI test jobs
-STATUS=$(gh api "repos/{owner}/{repo}/commits/$COMMIT/check-runs" \
-    --paginate \
-    --jq '[.check_runs[] | select(.name | startswith("test ("))] |
-          if length == 0 then "pending"
-          elif all(.status == "completed") then
-            if all(.conclusion == "success") then "success"
-            else "failure"
-            end
-          else "pending"
-          end' 2>/dev/null || echo "unknown")
+# The same decision the CI gate makes (tag-protection.yml): scripts/gate_checks.py is
+# covered by tests/test_gate_checks.py, so the two cannot drift apart. per_page=100
+# keeps it to one page; --paginate with a filter emits one answer per page.
+GATE_CHECKS="$(dirname "${BASH_SOURCE[0]}")/gate_checks.py"
+STATUS=$(gh api "repos/{owner}/{repo}/commits/$COMMIT/check-runs?per_page=100" 2>/dev/null \
+    | python3 "$GATE_CHECKS" ci-status 2>/dev/null || echo "unknown")
 
 case "$STATUS" in
     success)

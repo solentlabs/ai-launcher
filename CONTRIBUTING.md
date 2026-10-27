@@ -82,6 +82,8 @@ The prototype reads `~/.claude/project-launcher.conf` when no paths are passed.
 - Strict type hints on public APIs; docstrings on public functions.
 - Run: `./venv/bin/ruff check src/ tests/` and `./venv/bin/ruff format src/ tests/`.
 - Type check: `./venv/bin/mypy src/`.
+- No raw ANSI escape codes outside `ui/formatter.py` (styling, through `PreviewFormatter`) and
+  `utils/terminal.py` (screen and title control). `tests/test_ansi_invariant.py` enforces it.
 
 ### Bash
 
@@ -140,6 +142,12 @@ truth.
 | Data structures | 100%   |
 | Formatters      | 95%+   |
 | Providers       | 70%+   |
+
+**Patch coverage counts branches.** Codecov judges the diff, and a line whose `if` was only ever
+taken one way is a _partial_ there even though the line ran. `make validate-ci` (through
+`scripts/patch_coverage.py`) reports both: `changed line(s) uncovered` and
+`branch(es) only partly covered`, naming the line and the branch that no test took. A branch that
+cannot happen is better removed than tested around.
 
 ### Test categories
 

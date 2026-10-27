@@ -162,3 +162,23 @@ def test_statement_names_the_folder_and_what_to_keep(cache_home):
 
     assert "/x/y" in text
     assert "worth keeping belongs in the project" in text
+
+
+def test_prune_skips_a_session_folder_that_vanished_mid_listing(
+    cache_home, ctx, monkeypatch
+):
+    root = scratch_root()
+    fill(root / "p" / "old", age_days=20)
+    ghost = root / "p" / "vanished"
+    real_subdirs = scratch._subdirs
+    monkeypatch.setattr(
+        scratch,
+        "_subdirs",
+        lambda path: (
+            [*real_subdirs(path), ghost] if path.name == "p" else real_subdirs(path)
+        ),
+    )
+
+    plan = scratch.prune_candidates(14 * DAY, ctx)  # must not raise
+
+    assert [i.entry.path.name for i in plan.items] == ["old"]

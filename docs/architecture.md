@@ -604,7 +604,7 @@ permission prompts. Users have no visibility into their effective permissions ac
 ### Data Flow
 
 ```text
-Settings files → _get_claude_session_config() → _analyze_permissions()
+Settings files → get_claude_session_config() → _analyze_permissions()
                                                        │
                                                        ↓
                                                  SessionConfig
@@ -625,7 +625,7 @@ Settings files → _get_claude_session_config() → _analyze_permissions()
 - **Diagnostics**: `permission_warnings`, `permission_recommendations`, `has_broad_bash`
 - **Provenance**: `config_file_path`, `global_config_file_path`
 
-The analysis runs once in `_get_claude_session_config()`. Presentation layers read the pre-computed
+The analysis runs once in `get_claude_session_config()`. Presentation layers read the pre-computed
 diagnostics — they never re-analyze.
 
 ### Why the Analysis Lives in `claude.py`
@@ -666,7 +666,7 @@ provider.launch(project_path, scope_roots, scope_exempt)
 claude --append-system-prompt "<launched in PROJECT; flag other-project requests>"
        --settings '{"hooks": {"PreToolUse": [scope_guard]}}'
    ↓ (on every Write / Edit / MultiEdit / NotebookEdit / Bash)
-python -m ai_launcher.core.scope_guard --project P --root R... [--exempt E...]
+python <path>/core/scope_guard.py --project P --root R... [--exempt E...]
    → nothing, or {"permissionDecision": "ask", "systemMessage": reason}
 ```
 
@@ -693,9 +693,13 @@ python -m ai_launcher.core.scope_guard --project P --root R... [--exempt E...]
 - **Not Claude Code's sandbox.** It confines shell writes at the OS level, but it also restricts
   network access (breaking `gh`, `pip`, `git push` until configured) and needs bubblewrap on Linux.
   That is too much for a launcher to impose.
-- **Fails open, visibly.** A guard error exits 1, which Claude Code shows as a non-blocking hook
-  error. A bug in the guard must not stop work. The module is stdlib-only and takes about 0.1s per
-  call.
+- **A bug in the guard asks.** An error while judging a call becomes an `ask` that names the error,
+  so a bug never lets a write through unasked and never blocks work either. Unreadable hook input
+  (not a tool call) is the one case that exits 1, a non-blocking hook error Claude Code shows. The
+  module is stdlib-only and takes about 0.1s per call.
+- **Run by path, not `-m`.** Claude Code runs hooks from the project folder, and `python -m` puts
+  that folder first on `sys.path`, so a project with its own `ai_launcher` folder would replace the
+  guard. `-I` would close that but drops the user site-packages, which breaks `pip install --user`.
 - **Other providers get nothing extra.** Copilot already asks for paths outside its folder, Gemini's
   file tools refuse them, and Aider asks before editing any file not in the chat. Cursor's CLI
   behaviour is undocumented. Their `launch()` accepts `scope_roots` and ignores it; the table in
@@ -836,10 +840,15 @@ cli.py
   environment says which shell started it. A Windows user who has set `SHELL` to a program that can
   be run gets that instead. `cmd.exe` cannot start in a UNC path, such as a network share or a WSL
   folder reached as `\\wsl.localhost\...`: it says so and starts in the Windows directory.
-- **A symlinked manual project keeps its path.** The shell is started with `PWD` set to the
-  project's path as listed, made absolute, so a `--manual-paths` project that is a symlink shows its
-  own path in the prompt. Scanned projects are resolved during discovery, before the picker, so for
-  them the listed path is already the target's.
+- **Every project keeps its path as listed.** Nothing is resolved to a real path, scanned or manual:
+  a symlinked scan folder (`~/projects -> /mnt/d/projects`) lists its projects under `~/projects/…`,
+  the session starts in that path, and Claude Code's history and memory (keyed on the path the
+  session starts in) are the ones you already have. The shell is started with `PWD` set to the path
+  as listed, made absolute, so the prompt shows it too. Duplicates are found by **real path**: a
+  project reachable twice appears once. Folders are walked in name order with symlinks last, so the
+  real folder wins over a link to it in the same parent, and a manual project wins over a scanned
+  one. This used to resolve scanned projects "to avoid duplicates", which the invariant in
+  [CLAUDE.md](../CLAUDE.md) forbids and which broke the history match for symlinked scan folders.
 - **The list is a dialog, drawn by a second fzf.** The picker runs with `--no-clear`, so its last
   frame stays on screen when it exits. The list then runs in fzf's height mode, also with
   `--no-clear`, which draws only inside its margins and leaves the rest of the screen alone. The
@@ -884,6 +893,22 @@ cli.py
   last-opened history when a shell is opened, as it does for Claude.
 
 ---
+
+## Removed Code
+
+Recorded so nobody rebuilds it by accident. All of it was unreachable from the launcher (nothing in
+`src/` imported it; only its own tests did):
+
+- **`ui/browser.py`, `ui/_browser_preview.py`, `ui/_file_preview.py`** — an interactive directory
+  browser from the bash prototype's `--add`. It built `fzf --preview` commands with a path in double
+  quotes, which a POSIX shell still expands (`$(…)`, backticks). If a browser is wanted again, pass
+  the path as one argument that fzf quotes (`{}`), as the picker and the cache page do.
+- **`StartupReport`, `generate_startup_report`** in `ui/startup_report.py` — a text report of what a
+  session loads, superseded by the launch box (`display_launch_info`) and the provider's own preview
+  data. The launch box stays.
+- **`utils/cleanup.cleanup_environment`** — a copy of the Claude provider's cleanup that had drifted
+  from it. Its npm step was the only live behaviour left in it, and nothing called that, so
+  `--clean-npm` silently did nothing; it is now `clean_npm_cache()`, called from `launch_ai`.
 
 ## Future Architecture
 

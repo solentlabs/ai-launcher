@@ -26,10 +26,11 @@ variable can write where the text does not say.
 Paths are resolved (symlinks followed) for comparison only, so a link inside
 the project that points into another project is still that other project.
 
-Runs as ``python -m ai_launcher.core.scope_guard --project P --root R...
-[--exempt E...]``
-with the hook event JSON on stdin. Stdlib only: it runs on every file edit and
-shell command, so it must start fast.
+Runs as ``python /path/to/scope_guard.py --project P --root R... [--exempt E...]``
+with the hook event JSON on stdin. By path, not ``-m``: Claude Code runs hooks
+from the project folder, and ``-m`` would import a project's own ``ai_launcher``
+folder in the guard's place. Stdlib only: it runs on every file edit and shell
+command, so it must start fast.
 
 Author: Solent Labs™
 """
@@ -95,12 +96,32 @@ READ_ONLY_COMMANDS = frozenset(
     }
 )
 
-# sed edits in place with -i, -i.bak, -i'' or --in-place.
-SED_IN_PLACE_PREFIXES = ("-i", "--in-place")
-
 # find actions that change or run things (matched exactly: -executable only reads).
 FIND_WRITING_ACTIONS = frozenset(
-    {"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprintf", "-fls"}
+    {
+        "-delete",
+        "-exec",
+        "-execdir",
+        "-ok",
+        "-okdir",
+        "-fprint",
+        "-fprint0",
+        "-fprintf",
+        "-fls",
+    }
+)
+
+# fd runs a command for each match with these.
+FD_EXEC_OPTIONS = frozenset({"-x", "-X", "--exec", "--exec-batch"})
+
+# Shells whose -c argument is a command line to read as one.
+SHELL_WRAPPERS = frozenset({"ash", "bash", "dash", "ksh", "sh", "zsh"})
+
+# Interpreters given code on the command line. The code cannot be read as
+# shell, so a path in it that points into another project asks.
+_INTERPRETER = re.compile(r"^(python[0-9.]*|node|nodejs|perl|ruby|php|lua)$")
+INLINE_CODE_OPTIONS = frozenset(
+    {"-c", "-e", "-E", "-r", "-p", "-pe", "-ne", "-ple", "--eval", "--print"}
 )
 
 # git subcommands that only read. Every other subcommand changes the repo.
@@ -150,6 +171,10 @@ COMMAND_PREFIXES = frozenset(
 )
 
 _ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# A path written inside code or a string: starts with ~, $HOME, / or a drive.
+_TEXT_PATH = re.compile(r"""(?:~|\$HOME|[A-Za-z]:[\\/]|/)[^\s'"`;|&()<>,{}\[\]]*""")
+# A path stuck to a short option: -o/path, -C~/dir, -f../x, -oC:/dir (Windows)
+_ATTACHED_SHORT = re.compile(r"^-[A-Za-z]((?:/|~|\$|\.\.?/|[A-Za-z]:[\\/]).*)$")
 _HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 # Shell operator characters; a newline separates commands like ';'.
 _PUNCTUATION_CHARS = "();<>|&\n"
@@ -282,13 +307,21 @@ def _bash_write_targets(command: str, cwd: Path, scope: ProjectScope) -> List[Pa
         ]
 
     targets: List[Path] = []
+    previous = cwd  # where `cd -` goes back to
     for segment in _split_segments(tokens):
-        cwd = _check_segment(segment, cwd, scope, targets)
+        after = _check_segment(segment, cwd, previous, scope, targets)
+        if after != cwd:
+            previous = cwd
+        cwd = after
     return targets
 
 
 def _check_segment(
-    segment: List[str], cwd: Path, scope: ProjectScope, targets: List[Path]
+    segment: List[str],
+    cwd: Path,
+    previous: Path,
+    scope: ProjectScope,
+    targets: List[Path],
 ) -> Path:
     """Add this command's writes into other projects to targets.
 
@@ -310,7 +343,14 @@ def _check_segment(
     operands = [arg for arg in args if not arg.startswith("-")]
 
     if name in ("cd", "pushd"):
+        if args == ["-"]:
+            return previous
         return scope.resolve(operands[0], cwd) if operands else Path.home()
+    inner = _inner_command(name, args)
+    if inner is not None:
+        # A command line inside another command: read it as if it were typed.
+        targets.extend(_bash_write_targets(inner, cwd, scope))
+        return cwd
     if name == "git":
         _check_git(args, cwd, scope, add)
     elif name in READ_ONLY_COMMANDS and not _has_writing_option(name, args):
@@ -324,7 +364,47 @@ def _check_segment(
         add(cwd)
         for operand in operands:
             add(scope.resolve(operand, cwd))
+        for path in _attached_paths(name, args):
+            add(scope.resolve(path, cwd))
     return cwd
+
+
+def _inner_command(name: str, args: List[str]) -> Optional[str]:
+    """The command line inside `bash -c '…'`, `sh -lc '…'` or `eval …`, if any."""
+    if name == "eval":
+        return " ".join(args) if args else None
+    if name not in SHELL_WRAPPERS:
+        return None
+    for index, arg in enumerate(args):
+        if not arg.startswith("-"):
+            return None  # a script file, not a command line
+        if not arg.startswith("--") and "c" in arg[1:]:
+            return args[index + 1] if index + 1 < len(args) else None
+    return None
+
+
+def _attached_paths(name: str, args: List[str]) -> List[str]:
+    """Paths a command takes inside an option rather than as its own word.
+
+    `dd of=PATH`, `--file=PATH`, `-oPATH`, and the paths written in the code
+    given to an interpreter (`python3 -c '…'`).
+    """
+    paths: List[str] = []
+    for arg in args:
+        if arg.startswith("of=") and len(arg) > 3:
+            paths.append(arg[3:])
+        elif arg.startswith("--") and "=" in arg:
+            value = arg.split("=", 1)[1]
+            if value:
+                paths.append(value)
+        else:
+            attached = _ATTACHED_SHORT.match(arg)
+            if attached:
+                paths.append(attached.group(1))
+    if _INTERPRETER.match(name) and any(arg in INLINE_CODE_OPTIONS for arg in args):
+        for arg in args:
+            paths.extend(_TEXT_PATH.findall(arg))
+    return paths
 
 
 def _take_redirects(
@@ -352,10 +432,19 @@ def _take_redirects(
 def _has_writing_option(name: str, args: List[str]) -> bool:
     """True if a read-only command was given an option that writes."""
     if name == "sed":
-        return any(arg.startswith(SED_IN_PLACE_PREFIXES) for arg in args)
+        return any(_sed_in_place(arg) for arg in args)
     if name == "find":
         return any(arg in FIND_WRITING_ACTIONS for arg in args)
+    if name == "fd":
+        return any(arg in FD_EXEC_OPTIONS or arg.startswith("--exec=") for arg in args)
     return False
+
+
+def _sed_in_place(arg: str) -> bool:
+    """sed edits in place with -i, -i.bak, -Ei, -ni, -i'' or --in-place[=SUFFIX]."""
+    if arg.startswith("--"):
+        return arg.startswith("--in-place")
+    return arg.startswith("-") and "i" in arg[1:]
 
 
 def _copy_destination(args: List[str], operands: List[str]) -> Optional[str]:
@@ -381,9 +470,12 @@ def _check_git(
             index += 2
         elif arg == "-c":
             index += 2
-        elif arg.startswith("--work-tree="):
+        elif arg.startswith(("--work-tree=", "--git-dir=")):
             repo = scope.resolve(arg.split("=", 1)[1], repo)
             index += 1
+        elif arg in ("--work-tree", "--git-dir") and index + 1 < len(args):
+            repo = scope.resolve(args[index + 1], repo)
+            index += 2
         elif arg.startswith("-"):
             index += 1
         else:
@@ -417,6 +509,11 @@ def decide(event: Dict[str, Any], scope: ProjectScope) -> Optional[Dict[str, Any
         f"{scope.project.name}, the project this session was launched in. "
         "Approve only if you meant to change another project from here."
     )
+    return _ask(reason)
+
+
+def _ask(reason: str) -> Dict[str, Any]:
+    """Hook output that makes Claude Code ask the user first, with this reason."""
     return {
         # Claude Code's permission dialog shows the path but not this reason
         # (checked on 2.1.270). As a systemMessage it is printed under the
@@ -440,12 +537,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         event = json.load(sys.stdin)
+    except Exception as error:
+        # Not a tool call, so nothing to judge. Exit 1 is a non-blocking hook
+        # error: Claude shows it and proceeds.
+        sys.stderr.write(f"AI Launcher scope guard failed: {error}\n")
+        return 1
+    try:
         exempt = [_claude_config_dir(), *args.exempt]
         output = decide(event, ProjectScope(args.project, args.root, exempt))
     except Exception as error:
-        # Exit 1 is a non-blocking hook error: Claude shows it and proceeds.
-        sys.stderr.write(f"AI Launcher scope guard failed: {error}\n")
-        return 1
+        # A bug in the guard must not let a write through unasked.
+        output = _ask(
+            f"AI Launcher: the scope guard could not check this call ({error}). "
+            "Approve only if it stays inside the project this session was launched in."
+        )
     if output is not None:
         sys.stdout.write(json.dumps(output))
     return 0

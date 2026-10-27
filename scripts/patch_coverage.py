@@ -10,7 +10,9 @@ branch pulled a line that had never been covered into the diff, and Codecov
 failed the PR at 91.67% patch coverage. Nothing locally could have said so.
 
 Reads ``coverage.json`` (``pytest --cov-report=json``) and the diff against a
-base ref, and reports added or modified executable lines that no test reached.
+base ref, and reports added or modified executable lines that no test reached,
+and branches on those lines that no test took. Codecov counts both: a line whose
+``if`` only ever went one way is a "partial" there, though the line ran.
 
 Author: Solent Labs™
 Created: 2026-08-06
@@ -22,7 +24,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 
@@ -54,10 +56,8 @@ def changed_lines(base: str, paths: Sequence[str] = ()) -> Dict[str, Set[int]]:
     return {f: lines for f, lines in result.items() if lines}
 
 
-def uncovered_in_patch(
-    coverage_path: Path, changed: Dict[str, Set[int]]
-) -> Dict[str, List[int]]:
-    """Intersect changed lines with the executable lines no test reached."""
+def _measured(coverage_path: Path):
+    """A lookup from a changed path to its coverage.json entry, or None."""
     data = json.loads(coverage_path.read_text(encoding="utf-8"))
     files = data.get("files", {})
 
@@ -66,14 +66,23 @@ def uncovered_in_patch(
     for name, payload in files.items():
         by_suffix[Path(name).as_posix()] = payload
 
-    def lookup(path: str):
+    def lookup(path: str) -> Optional[Dict[str, Any]]:
         posix = Path(path).as_posix()
         if posix in by_suffix:
-            return by_suffix[posix]
+            return by_suffix[posix]  # type: ignore[no-any-return]
         for name, payload in by_suffix.items():
             if name.endswith(posix) or posix.endswith(name):
-                return payload
+                return payload  # type: ignore[no-any-return]
         return None
+
+    return lookup
+
+
+def uncovered_in_patch(
+    coverage_path: Path, changed: Dict[str, Set[int]]
+) -> Dict[str, List[int]]:
+    """Intersect changed lines with the executable lines no test reached."""
+    lookup = _measured(coverage_path)
 
     result: Dict[str, List[int]] = {}
     for path, lines in changed.items():
@@ -82,6 +91,31 @@ def uncovered_in_patch(
             continue  # not measured (a test file, or outside --cov scope)
         missing = set(payload.get("missing_lines", []))
         hit = sorted(lines & missing)
+        if hit:
+            result[path] = hit
+    return result
+
+
+def partial_branches_in_patch(
+    coverage_path: Path, changed: Dict[str, Set[int]]
+) -> Dict[str, List[Tuple[int, int]]]:
+    """Branches on changed lines that no test took, as (line, destination) pairs.
+
+    This is what Codecov calls a partial: the line ran, but one way out of it
+    never did.
+    """
+    lookup = _measured(coverage_path)
+
+    result: Dict[str, List[Tuple[int, int]]] = {}
+    for path, lines in changed.items():
+        payload = lookup(path)
+        if payload is None:
+            continue
+        hit = sorted(
+            (int(src), int(dest))
+            for src, dest in payload.get("missing_branches", [])
+            if src in lines
+        )
         if hit:
             result[path] = hit
     return result
@@ -119,18 +153,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     uncovered = uncovered_in_patch(coverage_path, changed)
+    partial = partial_branches_in_patch(coverage_path, changed)
     total = sum(len(v) for v in changed.values())
     missed = sum(len(v) for v in uncovered.values())
+    partials = sum(len(v) for v in partial.values())
     covered_pct = 100.0 if total == 0 else (total - missed) * 100.0 / total
 
-    if not uncovered:
+    if not uncovered and not partial:
         print(f"patch-coverage: 100% of {total} changed line(s) covered")
         return 0
 
-    print(f"patch-coverage: {covered_pct:.1f}% — {missed} changed line(s) uncovered")
+    parts = []
+    if missed:
+        parts.append(f"{missed} changed line(s) uncovered")
+    if partials:
+        parts.append(f"{partials} branch(es) only partly covered")
+    print(f"patch-coverage: {covered_pct:.1f}% of lines — {', '.join(parts)}")
     for path, lines in sorted(uncovered.items()):
         pretty = ", ".join(str(n) for n in lines)
-        print(f"  {path}: {pretty}")
+        print(f"  {path}: lines {pretty}")
+    for path, branches in sorted(partial.items()):
+        pretty = ", ".join(f"{src}->{dest}" for src, dest in branches)
+        print(f"  {path}: branches {pretty}")
     print("\nCodecov reports these as patch coverage. Add tests or justify each line.")
     return 0 if args.warn_only else 1
 

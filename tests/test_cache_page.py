@@ -677,3 +677,21 @@ def test_prune_exit_code_reports_a_failed_removal(cache_home, monkeypatch):
     )
 
     assert page.prune_command("14d", yes=True) == 1
+
+
+def test_confirm_step_says_when_no_project_is_known():
+    out = []
+
+    page.confirm_plan(
+        plan_of(ent("a")), lambda p: "n", True, out.append, no_projects=True
+    )
+
+    assert "only git repositories are protected" in "\n".join(out)
+
+
+def test_confirm_step_is_quiet_when_projects_are_known():
+    out = []
+
+    page.confirm_plan(plan_of(ent("a")), lambda p: "n", True, out.append)
+
+    assert "only git repositories" not in "\n".join(out)

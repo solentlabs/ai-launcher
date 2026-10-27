@@ -11,7 +11,10 @@ import sys
 from pathlib import Path
 
 from ai_launcher.core.provider_discovery import ProviderDiscovery
+from ai_launcher.ui.formatter import PreviewFormatter
 from ai_launcher.utils.humanize import humanize_count, humanize_size
+
+fmt = PreviewFormatter()
 
 
 def show_provider_context(provider_name: str) -> None:
@@ -28,13 +31,13 @@ def show_provider_context(provider_name: str) -> None:
         return
 
     # Header
-    print(f"\033[1m{provider.name}\033[0m")
+    print(fmt.paint(f"{provider.name}", fmt.BOLD))
     print("━" * 80)
     print()
 
     # Installation status
     if not provider.context:
-        print("\033[33mStatus: Not installed\033[0m")
+        print(fmt.paint("Status: Not installed", fmt.YELLOW))
         print()
         print(f"Command: {provider.command}")
         print(f"Install: {provider.install_url}")
@@ -45,7 +48,7 @@ def show_provider_context(provider_name: str) -> None:
     context = provider.context
 
     # Version and status
-    print("\033[32m✓ Installed\033[0m")
+    print(fmt.paint("✓ Installed", fmt.GREEN))
     print()
     print(f"Command: {provider.command}")
     if context.version:
@@ -55,7 +58,7 @@ def show_provider_context(provider_name: str) -> None:
     print()
 
     # Global configuration
-    print("\033[1mGLOBAL CONFIGURATION\033[0m")
+    print(fmt.paint("GLOBAL CONFIGURATION", fmt.BOLD))
     if context.global_config:
         for path in context.global_config:
             if path.exists():
@@ -72,12 +75,12 @@ def show_provider_context(provider_name: str) -> None:
 
     # Project data pattern
     if context.project_data_pattern:
-        print("\033[1mPROJECT DATA PATTERN\033[0m")
+        print(fmt.paint("PROJECT DATA PATTERN", fmt.BOLD))
         print(f"  {context.project_data_pattern}")
         print()
 
     # Context categories
-    print("\033[1mCONTEXT BREAKDOWN\033[0m")
+    print(fmt.paint("CONTEXT BREAKDOWN", fmt.BOLD))
     if context.categories:
         from ai_launcher.core.context_analyzer import ContextAnalyzer
 
@@ -98,7 +101,7 @@ def show_provider_context(provider_name: str) -> None:
         print()
 
     # Total summary
-    print("\033[1mTOTAL CONTEXT\033[0m")
+    print(fmt.paint("TOTAL CONTEXT", fmt.BOLD))
     print(f"  Files: {humanize_count(context.file_count, 'file')}")
     print(f"  Size: {humanize_size(context.total_size)}")
 
@@ -110,11 +113,11 @@ def show_project_context(project_path: Path) -> None:
         project_path: Path to the project
     """
     if not project_path.exists():
-        print(f"\033[33mProject not found: {project_path}\033[0m")
+        print(fmt.paint(f"Project not found: {project_path}", fmt.YELLOW))
         return
 
     # Header
-    print(f"\033[1m{project_path.name}\033[0m")
+    print(fmt.paint(f"{project_path.name}", fmt.BOLD))
     print("━" * 80)
     print()
 
@@ -125,7 +128,7 @@ def show_project_context(project_path: Path) -> None:
     print()
 
     # Check for context files
-    print("\033[1mCONTEXT FILES\033[0m")
+    print(fmt.paint("CONTEXT FILES", fmt.BOLD))
     context_files = ["CLAUDE.md", ".clauderc", "GEMINI.md", ".geminirc", "README.md"]
     found_any = False
 
@@ -146,12 +149,19 @@ def show_project_context(project_path: Path) -> None:
 
     # Git status if applicable
     if is_git:
-        print("\033[1mGIT STATUS\033[0m")
+        print(fmt.paint("GIT STATUS", fmt.BOLD))
         try:
             import subprocess
 
             result = subprocess.run(
-                ["git", "-C", str(project_path), "status", "--short"],
+                [
+                    "git",
+                    "--no-optional-locks",
+                    "-C",
+                    str(project_path),
+                    "status",
+                    "--short",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=2,

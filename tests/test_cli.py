@@ -439,3 +439,72 @@ def test_launch_shell_errors(
     assert exit_info.value.code == 1
     assert expected_error in capsys.readouterr().out
     mock_run.assert_not_called()
+
+
+@patch("ai_launcher.cli.launch_ai")
+@patch("ai_launcher.cli.select_project")
+@patch("ai_launcher.utils.fzf.ensure_fzf", return_value=True)
+def test_a_symlinked_scan_folder_launches_under_the_link(
+    mock_fzf, mock_select, mock_launch, tmp_path, make_symlink
+):
+    (tmp_path / "real_projects" / "proj" / ".git").mkdir(parents=True)
+    link = tmp_path / "projects"
+    make_symlink(link, tmp_path / "real_projects", target_is_directory=True)
+    mock_select.side_effect = lambda projects, *args, **kwargs: Selection(projects[0])
+
+    result = runner.invoke(app, ["claude", str(link)])
+
+    assert result.exit_code == 0, result.output
+    assert mock_launch.call_args.args == (link / "proj",)
+    assert mock_launch.call_args.kwargs["scope_roots"] == [link]
+
+
+def test_run_launcher_takes_everything_after_the_provider_by_keyword():
+    """Fourteen positional flags let a reorder silently swap two of them."""
+    import inspect
+
+    from ai_launcher.cli import _run_launcher
+
+    params = list(inspect.signature(_run_launcher).parameters.values())
+
+    assert params[0].name == "provider_name"
+    assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in params[1:])
+
+
+@pytest.mark.parametrize("command", ["claude", "gemini", "cursor", "aider", "copilot"])
+def test_cleanup_flags_have_their_own_help(command):
+    from ai_launcher.ui.formatter import strip_ansi
+
+    # CI forces colour on, and Rich splits "--clean-provider" into coloured pieces
+    out = strip_ansi(
+        runner.invoke(app, [command, "--help"], env={"COLUMNS": "250"}).output
+    )
+    flat = " ".join(out.replace("│", " ").split())
+
+    assert "--clean-provider" in flat
+    assert "provider-specific files only" in flat.lower()
+    assert flat.lower().count("clean ai assistant cache/logs") == 0
+
+
+@pytest.mark.parametrize("command", ["claude", "gemini", "cursor", "aider", "copilot"])
+def test_every_launch_command_makes_stdout_utf8_safe(command, tmp_path, monkeypatch):
+    """The launch box prints emoji: a cp1252 pipe on Windows must not raise."""
+    calls = []
+    monkeypatch.setattr(
+        "ai_launcher.utils.terminal.ensure_utf8_output", lambda: calls.append(command)
+    )
+    (tmp_path / "proj" / ".git").mkdir(parents=True)
+
+    result = runner.invoke(app, [command, str(tmp_path), "--list"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [command]
+
+
+def test_ctrl_c_while_scanning_exits_quietly_with_130(tmp_path):
+    """Typer turns Ctrl-C into a clean exit; no traceback reaches the user."""
+    with patch("ai_launcher.cli.get_all_projects", side_effect=KeyboardInterrupt):
+        result = runner.invoke(app, ["claude", str(tmp_path)])
+
+    assert result.exit_code == 130
+    assert "Traceback" not in result.output

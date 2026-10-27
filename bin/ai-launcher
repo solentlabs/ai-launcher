@@ -33,6 +33,21 @@ die() {
     exit 1
 }
 
+# Temp files live in one folder that is removed however the script ends (Ctrl-C
+# included), instead of being cleaned up by hand on the happy path only.
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# Expand a leading ~ (and nothing else). The old `eval echo "$path"` ran
+# any $(...) or backticks in a path given on the command line or in the config.
+expand_path() {
+    case "$1" in
+        "~") printf '%s\n' "$HOME" ;;
+        "~/"*) printf '%s\n' "$HOME/${1#\~/}" ;;
+        *) printf '%s\n' "$1" ;;
+    esac
+}
+
 # The project menu runs with --no-clear, so fzf stays on the alternate screen
 # when it exits. This returns to the normal one.
 leave_menu_screen() {
@@ -233,7 +248,7 @@ save_to_history() {
     mkdir -p "$(dirname "$HISTORY_FILE")"
 
     local temp_file
-    temp_file=$(mktemp)
+    temp_file=$(mktemp "$TMP_DIR/f.XXXXXX")
     echo "${timestamp}|${project_path}" > "$temp_file"
 
     if [[ -f "$HISTORY_FILE" ]]; then
@@ -286,14 +301,17 @@ Current: $current_dir
 @ suffix = symlink"
 
         local selection
-        selection=$(printf '%s\n' "${dirs[@]}" | fzf \
+        # The directory names reach the preview shell through the environment, not
+        # by being spliced into its command line: a name with a quote must not
+        # break out of it.
+        selection=$(printf '%s\n' "${dirs[@]}" | AI_CURRENT_DIR="$current_dir" AI_REAL_DIR="$real_dir" fzf \
             --height=80% \
             --layout=reverse \
             --border=rounded \
             --header="$header" \
             --header-first \
             --prompt="> " \
-            --preview="if [[ {} == '.' ]]; then echo 'Select: $current_dir'; elif [[ {} == '..' ]]; then echo 'Go to: $(dirname "$current_dir")'; else target='$real_dir/{}'; target=\${target%@}; if [[ -L \"\$target\" ]]; then echo \"Symlink to: \$(readlink -f \"\$target\")\"; echo ''; fi; ls -la \"\$target\" 2>/dev/null | head -20; fi" \
+            --preview='if [[ {} == "." ]]; then echo "Select: $AI_CURRENT_DIR"; elif [[ {} == ".." ]]; then echo "Go to: $(dirname "$AI_CURRENT_DIR")"; else target="$AI_REAL_DIR"/{}; target=${target%@}; if [[ -L "$target" ]]; then echo "Symlink to: $(readlink -f "$target")"; echo ""; fi; ls -la "$target" 2>/dev/null | head -20; fi' \
             --preview-window=right:60%:wrap) || return 1
 
         if [[ "$selection" == "." ]]; then
@@ -337,7 +355,7 @@ add_manual_path() {
         source "$CONFIG_FILE" 2>/dev/null || true
         for scan_path in $SCAN_PATHS; do
             local expanded
-            expanded=$(eval echo "$scan_path")
+            expanded=$(expand_path "$scan_path")
             if [[ "$path" == "$expanded"/* ]] && [[ -d "$path/.git" ]]; then
                 echo "Note: This path is already discoverable via SCAN_PATHS (has .git)"
             fi
@@ -381,7 +399,7 @@ Select path to remove (Esc to cancel)" \
 
     if [[ -n "$selection" ]]; then
         local temp_file
-        temp_file=$(mktemp)
+        temp_file=$(mktemp "$TMP_DIR/f.XXXXXX")
         grep -vx "$selection" "$MANUAL_PATHS_FILE" > "$temp_file" || true
         mv "$temp_file" "$MANUAL_PATHS_FILE"
 
@@ -415,7 +433,7 @@ discover_projects() {
     # Scan each path for .git directories
     for scan_path in $SCAN_PATHS; do
         local expanded
-        expanded=$(eval echo "$scan_path")
+        expanded=$(expand_path "$scan_path")
         if [[ ! -d "$expanded" ]]; then
             continue
         fi
@@ -433,7 +451,7 @@ discover_projects() {
     fi
 
     # Output unique projects
-    printf '%s\n' "${projects[@]}" | sort -u
+    printf '%s\n' ${projects[@]+"${projects[@]}"} | sort -u
 }
 
 
@@ -450,7 +468,7 @@ resolve_to_full_path() {
     # Try to resolve relative to scan paths
     for scan_path in $SCAN_PATHS; do
         local expanded
-        expanded=$(eval echo "$scan_path")
+        expanded=$(expand_path "$scan_path")
         local parent
         parent=$(dirname "$expanded")
         local test_path="${parent}/${display_name}"
@@ -476,7 +494,7 @@ show_menu() {
 
     # Get the root path for display
     local root_path
-    root_path=$(eval echo "$SCAN_PATHS" | awk '{print $1}')
+    root_path=$(expand_path "${SCAN_PATHS%% *}")
 
     # Get project paths as relative paths
     local -a projects=()
@@ -503,7 +521,7 @@ show_menu() {
     local recent_display=""
 
     local sorted_paths
-    sorted_paths=$(printf '%s\n' "${projects[@]}" | sort)
+    sorted_paths=$(printf '%s\n' ${projects[@]+"${projects[@]}"} | sort)
 
     while IFS= read -r path; do
         IFS='/' read -ra parts <<< "$path"
@@ -519,7 +537,7 @@ show_menu() {
             fi
 
             local found=0
-            for shown in "${shown_dirs[@]}"; do
+            for shown in ${shown_dirs[@]+"${shown_dirs[@]}"}; do
                 [[ "$shown" == "$dir_path" ]] && found=1 && break
             done
 
@@ -560,14 +578,14 @@ show_menu() {
 
     # Write path map to temp file for preview
     local map_file
-    map_file=$(mktemp)
+    map_file=$(mktemp "$TMP_DIR/f.XXXXXX")
     for key in "${!path_map[@]}"; do
         printf '%s\t%s\n' "$key" "${path_map[$key]}" >> "$map_file"
     done
 
     # Create preview script
     local preview_script
-    preview_script=$(mktemp)
+    preview_script=$(mktemp "$TMP_DIR/f.XXXXXX")
     cat > "$preview_script" << 'PREVIEW_EOF'
 #!/usr/bin/env bash
 display="$1"
@@ -662,7 +680,7 @@ memory_dir="$session_dir/memory"
 if [[ -d "$memory_dir" ]]; then
     memory_files=($(ls "$memory_dir"/*.md 2>/dev/null))
     if [[ ${#memory_files[@]} -gt 0 ]]; then
-        for mem_file in "${memory_files[@]}"; do
+        for mem_file in ${memory_files[@]+"${memory_files[@]}"}; do
             size=$(stat -f%z "$mem_file" 2>/dev/null || stat -c%s "$mem_file" 2>/dev/null)
             basename=$(basename "$mem_file")
             echo "  $(tput setaf 2)✓$(tput sgr0) $basename ($(human_size $size))"
@@ -754,7 +772,7 @@ Ctrl-O for other tools"
     while true; do
         # --expect prints the key on the first line (empty for Enter) and the
         # selected row on the second
-        out=$(printf '%s\n' "${display_lines[@]}" | fzf \
+        out=$(printf '%s\n' ${display_lines[@]+"${display_lines[@]}"} | fzf \
             --exact \
             --layout=reverse \
             --border=rounded \
@@ -964,7 +982,7 @@ main() {
     done
 
     check_dependencies
-    load_config "${paths[@]}"
+    load_config ${paths[@]+"${paths[@]}"}
 
     local menu_result
     local open_with
@@ -991,6 +1009,7 @@ main() {
 
             echo "AI Launcher: shell in $selected_path (type 'exit' to leave)"
             cd "$selected_path"
+            rm -rf "$TMP_DIR"  # exec skips the EXIT trap
             exec "$shell"
         fi
 
@@ -1156,6 +1175,7 @@ main() {
 
         echo ""
         cd "$selected_path"
+        rm -rf "$TMP_DIR"  # exec skips the EXIT trap
         exec claude  # TODO: Make this configurable
     fi
 }

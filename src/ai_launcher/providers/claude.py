@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
+from ai_launcher.core import scope_guard
 from ai_launcher.core.provider_data import (
     ContextFile,
     GlobalContextSummary,
@@ -35,7 +36,9 @@ from ai_launcher.core.scope_guard import GUARDED_TOOLS
 from ai_launcher.core.scratch import ENV_VAR as SCRATCH_ENV_VAR
 from ai_launcher.core.scratch import SCRATCH_STATEMENT
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
-from ai_launcher.utils.session import encode_project_path
+from ai_launcher.utils.cleanup import prune_claude_backups, prune_claude_versions
+from ai_launcher.utils.jsonfile import as_dict, read_json_object, string_list
+from ai_launcher.utils.session import claude_config_dir, encode_project_path
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import CleanupConfig
@@ -68,7 +71,10 @@ def scope_guard_settings(
     replacing them, and its "ask" overrides allow rules such as Bash(*).
     Writes under scope_exempt never ask.
     """
-    words = [sys.executable, "-m", "ai_launcher.core.scope_guard"]
+    # By file path, not `-m`: Claude Code runs hooks from the project folder, and
+    # `-m` would import a project's own ai_launcher folder in place of the guard.
+    # The guard imports only the standard library, so it needs nothing else.
+    words = [sys.executable, str(Path(scope_guard.__file__).resolve())]
     words += ["--project", str(project_path)]
     for root in scope_roots:
         words += ["--root", str(root)]
@@ -91,12 +97,12 @@ class ClaudeProvider(AIProvider):
     """Claude Code provider implementation.
 
     Provides integration with Anthropic's Claude Code CLI tool.
-    Delegates cleanup to the existing utils/cleanup.py module which handles:
-    - Clearing ~/.cache directory
+    Shares its Claude file pruning with utils/cleanup.py (one copy, so the two
+    cannot drift). The cleanup:
     - Cleaning npm cache
-    - Removing .claude.json.backup.* files
+    - Removing old .claude.json.backup.* files, keeping the newest
     - Cleaning old debug logs
-    - Removing old CLI versions
+    - Removing old CLI versions, only when the native one is in use
     """
 
     @property
@@ -206,13 +212,8 @@ class ClaudeProvider(AIProvider):
         # Files are created in ~/ instead of ~/.claude/ directory.
         # TODO: Remove this cleanup when GitHub issue #21429 is resolved.
         if verbose:
-            print("    → Removing old .claude.json.backup.* files")
-        try:
-            for backup_file in home.glob(".claude.json.backup.*"):
-                if backup_file.is_file():
-                    backup_file.unlink(missing_ok=True)
-        except (OSError, PermissionError):
-            pass  # Non-fatal, continue with other cleanup
+            print("    → Removing old .claude.json.backup.* files (keeping the newest)")
+        prune_claude_backups(home)
 
         # 2. Remove old Claude debug logs
         # Debug logs in ~/.claude/debug/ accumulate indefinitely and can reach 500MB+.
@@ -221,7 +222,7 @@ class ClaudeProvider(AIProvider):
         if verbose:
             print(f"    → Removing debug logs older than {max_age_days} days")
 
-        claude_debug_dir = home / ".claude" / "debug"
+        claude_debug_dir = claude_config_dir() / "debug"
         if claude_debug_dir.exists() and claude_debug_dir.is_dir():
             try:
                 import time
@@ -246,45 +247,11 @@ class ClaudeProvider(AIProvider):
         # 3. Remove old Claude CLI versions
         # Claude auto-updates leave old versions in ~/.local/share/claude/versions/
         # Each version is ~212MB. Keep only the currently running version.
-        if shutil.which("claude"):
-            if verbose:
-                print("    → Removing old CLI versions (keeping current)")
-
-            versions_dir = home / ".local" / "share" / "claude" / "versions"
-            if versions_dir.exists() and versions_dir.is_dir():
-                try:
-                    import re
-
-                    # Get current version
-                    result = subprocess.run(
-                        ["claude", "--version"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                        timeout=5,
-                    )  # nosec B603, B607
-
-                    if result.returncode == 0:
-                        # Extract version number (e.g., "2.1.37" from output)
-                        match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
-                        if match:
-                            current_version = match.group(1)
-
-                            # Remove all version files except current
-                            removed_count = 0
-                            for version_file in versions_dir.iterdir():
-                                if (
-                                    version_file.is_file()
-                                    and version_file.name != current_version
-                                    and re.match(r"^\d+\.\d+\.\d+$", version_file.name)
-                                ):
-                                    version_file.unlink(missing_ok=True)
-                                    removed_count += 1
-
-                            if removed_count > 0 and verbose:
-                                print(f"    → Removed {removed_count} old version(s)")
-                except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-                    pass  # Non-fatal, continue
+        if verbose:
+            print("    → Removing old CLI versions (keeping the one in use)")
+        removed_versions = prune_claude_versions(home)
+        if removed_versions and verbose:
+            print(f"    → Removed {removed_versions} old version(s)")
 
         if verbose:
             print("    ✓ Claude cleanup complete")
@@ -329,7 +296,7 @@ class ClaudeProvider(AIProvider):
         global_paths = self.get_global_context_paths()
 
         # Session configuration (permissions, MCP, hooks, model)
-        session_config = _get_claude_session_config(project_path)
+        session_config = get_claude_session_config(project_path)
 
         # Memory info (personal + project memory)
         memory_info = _get_memory_info(project_path)
@@ -372,7 +339,7 @@ class ClaudeProvider(AIProvider):
     def get_global_context_paths(self) -> List[Path]:
         """Get paths to Claude's global configuration."""
         return [
-            Path.home() / ".claude",
+            claude_config_dir(),
             Path.home() / ".claude.json",
         ]
 
@@ -407,7 +374,7 @@ def _get_personal_context_file() -> Optional[ContextFile]:
     home = Path.home()
     candidates = [
         home / "CLAUDE.md",
-        home / ".claude" / "CLAUDE.md",
+        claude_config_dir() / "CLAUDE.md",
     ]
 
     for path in candidates:
@@ -496,7 +463,7 @@ def _get_session_dir(project_path: Path) -> Optional[Path]:
         Path to session directory if it exists, None otherwise
     """
     encoded_name = encode_project_path(project_path)
-    session_dir = Path.home() / ".claude" / "projects" / encoded_name
+    session_dir = claude_config_dir() / "projects" / encoded_name
     return session_dir if session_dir.exists() else None
 
 
@@ -732,7 +699,7 @@ def _discover_claude_context_files() -> Optional["GlobalFiles"]:
 
     from ai_launcher.core.provider_data import GlobalFiles
 
-    claude_dir = Path.home() / ".claude"
+    claude_dir = claude_config_dir()
     if not claude_dir.exists():
         return None
 
@@ -874,7 +841,7 @@ def _analyze_permissions(
     return warnings, recommendations, has_broad_bash
 
 
-def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
+def get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     """Get Claude Code session configuration.
 
     Claude Code resolves permissions from three layers (highest priority first):
@@ -900,72 +867,60 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     Returns:
         SessionConfig instance or None if no config exists
     """
-    import json
-
     config = SessionConfig()
 
     # Layer 1: Project-level permissions (the ones that accumulate)
     project_settings = project_path / ".claude" / "settings.local.json"
     if project_settings.exists():
         config.config_file_path = str(project_settings)
-        try:
-            settings = json.loads(project_settings.read_text())
+        settings = read_json_object(project_settings) or {}
 
-            # Permissions
-            if "permissions" in settings and "allow" in settings["permissions"]:
-                config.permissions = settings["permissions"]["allow"]
-                config.permissions_count = len(config.permissions)
+        # Permissions
+        allow = as_dict(settings.get("permissions")).get("allow")
+        if isinstance(allow, list):
+            config.permissions = string_list(allow)
+            config.permissions_count = len(config.permissions)
 
-            # MCP servers (project-level)
-            if "mcpServers" in settings:
-                config.mcp_servers = list(settings["mcpServers"].keys())
+        # MCP servers (project-level)
+        servers = settings.get("mcpServers")
+        if isinstance(servers, dict):
+            config.mcp_servers = list(servers.keys())
 
-            # Hooks (project-level)
-            if "hooks" in settings:
-                config.hooks_configured = any(
-                    hook_config for hook_config in settings["hooks"].values()
-                )
-        except (json.JSONDecodeError, KeyError):
-            pass
+        # Hooks (project-level)
+        hooks = settings.get("hooks")
+        if isinstance(hooks, dict):
+            config.hooks_configured = any(hook_config for hook_config in hooks.values())
 
     # Layer 2: Global settings.json — shared allow/deny/ask + model
-    global_settings = Path.home() / ".claude" / "settings.json"
+    global_settings = claude_config_dir() / "settings.json"
     global_allow: List[str] = []
     global_deny: List[str] = []
     global_ask: List[str] = []
     if global_settings.exists():
-        try:
-            settings = json.loads(global_settings.read_text())
-            config.model = settings.get("model")
+        settings = read_json_object(global_settings) or {}
+        model = settings.get("model")
+        config.model = model if isinstance(model, str) else None
 
-            # Global permissions
-            if "permissions" in settings:
-                perms = settings["permissions"]
-                global_allow.extend(perms.get("allow", []))
-                global_deny.extend(perms.get("deny", []))
-                global_ask.extend(perms.get("ask", []))
-        except json.JSONDecodeError:
-            pass
+        # Global permissions
+        perms = as_dict(settings.get("permissions"))
+        global_allow.extend(string_list(perms.get("allow")))
+        global_deny.extend(string_list(perms.get("deny")))
+        global_ask.extend(string_list(perms.get("ask")))
 
     # Layer 3: Global settings.local.json — merged with settings.json (union)
-    global_local_settings = Path.home() / ".claude" / "settings.local.json"
+    global_local_settings = claude_config_dir() / "settings.local.json"
     if global_local_settings.exists():
         config.global_config_file_path = str(global_local_settings)
-        try:
-            settings = json.loads(global_local_settings.read_text())
-            if "permissions" in settings:
-                perms = settings["permissions"]
-                for perm in perms.get("allow", []):
-                    if perm not in global_allow:
-                        global_allow.append(perm)
-                for perm in perms.get("deny", []):
-                    if perm not in global_deny:
-                        global_deny.append(perm)
-                for perm in perms.get("ask", []):
-                    if perm not in global_ask:
-                        global_ask.append(perm)
-        except json.JSONDecodeError:
-            pass
+        settings = read_json_object(global_local_settings) or {}
+        perms = as_dict(settings.get("permissions"))
+        for target, key in (
+            (global_allow, "allow"),
+            (global_deny, "deny"),
+            (global_ask, "ask"),
+        ):
+            for perm in string_list(perms.get(key)):
+                if perm not in target:
+                    target.append(perm)
     elif global_settings.exists():
         config.global_config_file_path = str(global_settings)
 
@@ -986,21 +941,17 @@ def _get_claude_session_config(project_path: Path) -> Optional[SessionConfig]:
     )
 
     # Check global MCP servers
-    mcp_config = Path.home() / ".claude" / "mcp.json"
+    mcp_config = claude_config_dir() / "mcp.json"
     if mcp_config.exists():
-        try:
-            mcp_data = json.loads(mcp_config.read_text())
-            if "mcpServers" in mcp_data:
-                # Merge with project-level MCP servers (avoid duplicates)
-                global_servers = list(mcp_data["mcpServers"].keys())
-                for server in global_servers:
-                    if server not in config.mcp_servers:
-                        config.mcp_servers.append(server)
-        except (json.JSONDecodeError, KeyError):
-            pass
+        servers = as_dict(read_json_object(mcp_config)).get("mcpServers")
+        if isinstance(servers, dict):
+            # Merge with project-level MCP servers (avoid duplicates)
+            for server in servers:
+                if server not in config.mcp_servers:
+                    config.mcp_servers.append(server)
 
     # Check global hooks
-    hooks_config = Path.home() / ".claude" / "hooks.json"
+    hooks_config = claude_config_dir() / "hooks.json"
     if hooks_config.exists() and not config.hooks_configured:
         config.hooks_configured = True
 
@@ -1036,7 +987,7 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
     home = Path.home()
     personal_encoded = encode_project_path(home)
     personal_mem = (
-        home / ".claude" / "projects" / personal_encoded / "memory" / "MEMORY.md"
+        claude_config_dir() / "projects" / personal_encoded / "memory" / "MEMORY.md"
     )
     if personal_mem.exists():
         info.personal_memory = personal_mem
@@ -1049,7 +1000,7 @@ def _get_memory_info(project_path: Path) -> Optional[MemoryInfo]:
     # Project memory - encode project path
     project_encoded = encode_project_path(project_path)
     project_mem = (
-        home / ".claude" / "projects" / project_encoded / "memory" / "MEMORY.md"
+        claude_config_dir() / "projects" / project_encoded / "memory" / "MEMORY.md"
     )
     if project_mem.exists():
         info.project_memory = project_mem
@@ -1071,7 +1022,7 @@ def _get_skills() -> List[SkillInfo]:
         List of SkillInfo instances
     """
     skills: List[SkillInfo] = []
-    skills_dir = Path.home() / ".claude" / "skills"
+    skills_dir = claude_config_dir() / "skills"
 
     if not skills_dir.exists():
         return skills
@@ -1096,7 +1047,7 @@ def _get_global_context_summary() -> Optional[GlobalContextSummary]:
     Returns:
         GlobalContextSummary instance or None if no files found
     """
-    claude_dir = Path.home() / ".claude"
+    claude_dir = claude_config_dir()
     if not claude_dir.exists():
         return None
 
@@ -1158,7 +1109,7 @@ def _discover_marketplace_plugins() -> Optional[MarketplaceInfo]:
         MarketplaceInfo instance or None if no marketplace plugins found
     """
 
-    marketplaces_dir = Path.home() / ".claude" / "plugins" / "marketplaces"
+    marketplaces_dir = claude_config_dir() / "plugins" / "marketplaces"
     if not marketplaces_dir.exists():
         return None
 

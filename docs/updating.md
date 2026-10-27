@@ -1,7 +1,8 @@
 # Updating
 
 `ai-launcher update` upgrades AI Launcher to the latest release on PyPI. It runs only when you run
-it: AI Launcher never checks for a new version on its own, at launch or in the background.
+it. By default AI Launcher never checks for a new version on its own; you can
+[opt in to a daily check](#checking-automatically).
 
 ```bash
 ai-launcher update --check   # say whether a newer release exists; change nothing
@@ -25,6 +26,64 @@ ai-launcher update --yes     # same, without the question (needed without a term
 
 The command runs as a list of arguments, never through a shell, and the package name is fixed in the
 code, so nothing from PyPI's reply is ever run.
+
+## Checking Automatically
+
+Off by default. To be told when a newer release exists, add this to `caches.toml` in the config
+folder (`~/.config/ai-launcher/` on Linux and WSL; see [Registry](cache-and-scratch.md#registry)):
+
+```toml
+[update]
+check = true
+```
+
+Then, while the project picker is open, AI Launcher asks PyPI for the latest version in the
+background, at most once every 24 hours. If a newer release exists, the launch box shows one line
+after you pick a project:
+
+```text
+│ 🆕 Update:   0.9.0 is available (you have 0.8.0) · ai-launcher update             │
+```
+
+Decisions:
+
+- **Opt-in.** With `check` unset or `false`, nothing contacts PyPI except `ai-launcher update`.
+- **Never slows a launch.** The check runs in a background thread while you choose a project. The
+  launch box reads the saved result only, so a result found during this picker shows from the next
+  launch on.
+- **Same request as `update --check`.** One GET to the PyPI URL above, with nothing about you or
+  your projects in it. It installs nothing: the line only names the command.
+- **Quiet on error.** No network, a timeout, or an unreadable reply means no line, and never a
+  message over the picker. A failed attempt counts as an attempt: it is not repeated until the next
+  day, so an offline machine is not asked at every launch. The last good answer is kept.
+- **A wrong clock heals itself.** A saved time in the future (a clock that was wrong once) counts as
+  due, so the check cannot be switched off by it.
+- **Once per release.** The line repeats at every launch until you update; it has no snooze.
+- **Last result** is kept in `update-check.json` in the state folder, beside `cache-sizes.json`: the
+  time of the last attempt, and the newest version seen. Deleting it only means the next launch
+  checks again.
+- **Its own setting.** The `[update]` table sits in `caches.toml` only because that is the one
+  optional file AI Launcher reads. It is read on its own, by `core/update_check.py`, and never goes
+  through the cache registry, so a change to one cannot break the other. A mistake in it (a wrong
+  type or an unknown key) is shown in the About row's preview, and the check stays off.
+
+## The About Row
+
+The project picker has an `📦 About` row under Configuration and Cache and scratch. It works whether
+or not you opted in to the automatic check.
+
+- **The preview pane** shows the version you are running, how AI Launcher was installed (pipx,
+  `pip --user`, a virtual environment, or an editable or source checkout), and the update status:
+  the newest release the automatic check has seen and when, `not checked yet`, or `off` with the
+  setting to add. It reads saved data only and makes no network call.
+- **Enter on the row** runs `ai-launcher update` in place: it asks PyPI, shows the command, asks
+  `Update now? [y/N]`, and runs it. This is the only moment the row contacts PyPI. When it finishes,
+  press Enter to go back to the picker. The new version is used the next time you start AI Launcher.
+- **A 🆕 after the row's name** means the saved check found a newer release, so you can see it
+  without opening the row.
+
+It is the same flow, with the same install detection, as the command: an editable install is told to
+`git pull`, and on Windows, started from `ai-launcher.exe`, the command is shown, not run.
 
 ## Windows
 
@@ -52,3 +111,5 @@ run the install command above once by hand; after that, `update` handles it.
 | 0    | Up to date, or the update ran, or `--check`               |
 | 1    | The upgrade command failed, or no terminal and no `--yes` |
 | 2    | Could not reach PyPI or read its reply                    |
+
+The automatic check has no exit code of its own: it never changes how a launch ends.

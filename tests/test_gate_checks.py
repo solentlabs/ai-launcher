@@ -154,6 +154,42 @@ class TestCiStatus:
         ]
         assert gate_checks.ci_status(runs) == gate_checks.SUCCESS
 
+    def test_a_matrix_that_was_all_skipped_is_not_a_pass(self):
+        """Nothing ran, so nothing was tested. Lint failing skips the whole matrix."""
+        runs = [
+            _check("test (ubuntu-latest, 3.12)", conclusion="skipped"),
+            _check("test (macos-latest, 3.8)", conclusion="neutral"),
+        ]
+        assert gate_checks.ci_status(runs) == gate_checks.FAILURE
+
+    def test_failed_lint_fails_the_gate_even_when_the_matrix_was_skipped(self):
+        runs = [
+            _check("Lint", conclusion="failure"),
+            _check("test (ubuntu-latest, 3.12)", conclusion="skipped"),
+        ]
+        assert gate_checks.ci_status(runs) == gate_checks.FAILURE
+
+    def test_failed_lint_fails_the_gate_even_when_the_matrix_passed(self):
+        runs = [
+            _check("Lint", conclusion="failure"),
+            _check("test (ubuntu-latest, 3.12)"),
+        ]
+        assert gate_checks.ci_status(runs) == gate_checks.FAILURE
+
+    def test_passing_lint_and_tests_is_a_pass(self):
+        runs = [_check("Lint"), _check("test (ubuntu-latest, 3.12)")]
+        assert gate_checks.ci_status(runs) == gate_checks.SUCCESS
+
+    def test_lint_still_running_is_pending(self):
+        runs = [
+            _check("Lint", status="in_progress", conclusion=None),
+            _check("test (ubuntu-latest, 3.12)"),
+        ]
+        assert gate_checks.ci_status(runs) == gate_checks.PENDING
+
+    def test_lint_alone_is_pending_because_the_matrix_has_not_registered(self):
+        assert gate_checks.ci_status([_check("Lint")]) == gate_checks.PENDING
+
     @pytest.mark.parametrize(
         "conclusion", ["cancelled", "timed_out", "action_required"]
     )

@@ -2,16 +2,16 @@
 
 ## For Users
 
-| Document                                           | Description                                           |
-| -------------------------------------------------- | ----------------------------------------------------- |
-| [installation.md](installation.md)                 | How to install AI Launcher (pipx, pip, from source)   |
-| [configuration.md](configuration.md)               | CLI options and provider subcommands                  |
-| [troubleshooting.md](troubleshooting.md)           | Common issues and fixes (includes terminal title)     |
-| [windows-terminal.md](windows-terminal.md)         | Windows Terminal profile setup for WSL                |
-| [context-transparency.md](context-transparency.md) | What context Claude Code loads and how to optimize it |
-| [project-scope.md](project-scope.md)               | Why writes to other projects ask first                |
-| [cache-and-scratch.md](cache-and-scratch.md)       | Finding and clearing the disk space AI sessions use   |
-| [updating.md](updating.md)                         | `ai-launcher update`: check for and install updates   |
+| Document                                           | Description                                            |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| [installation.md](installation.md)                 | How to install AI Launcher (pipx, pip, from source)    |
+| [configuration.md](configuration.md)               | CLI options and provider subcommands                   |
+| [troubleshooting.md](troubleshooting.md)           | Common issues and fixes (includes terminal title)      |
+| [windows-terminal.md](windows-terminal.md)         | Windows Terminal profile setup for WSL                 |
+| [context-transparency.md](context-transparency.md) | What context Claude Code loads and how to optimize it  |
+| [project-scope.md](project-scope.md)               | Why writes to other projects ask first                 |
+| [cache-and-scratch.md](cache-and-scratch.md)       | Finding and clearing the disk space AI sessions use    |
+| [updating.md](updating.md)                         | `ai-launcher update` and the opt-in daily update check |
 
 ## For Contributors
 

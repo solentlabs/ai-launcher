@@ -15,7 +15,6 @@ import pytest
 
 from ai_launcher.providers.claude import (
     _analyze_permissions,
-    _get_claude_session_config,
     _get_global_context_summary,
     _get_memory_files,
     _get_memory_info,
@@ -24,6 +23,7 @@ from ai_launcher.providers.claude import (
     _get_session_dir,
     _get_session_stats,
     _get_skills,
+    get_claude_session_config,
 )
 from ai_launcher.utils.session import encode_project_path
 
@@ -261,7 +261,7 @@ class TestGetSessionStats:
 
 
 class TestGetClaudeSessionConfig:
-    """Tests for _get_claude_session_config()."""
+    """Tests for get_claude_session_config()."""
 
     def test_session_config_with_permissions(self, mock_home):
         """Test getting session config with project permissions."""
@@ -278,7 +278,7 @@ class TestGetClaudeSessionConfig:
             json.dumps({"permissions": {"allow": ["Bash(git *)", "Read(*)"]}})
         )
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert result.permissions_count == 2
@@ -297,7 +297,7 @@ class TestGetClaudeSessionConfig:
         settings = claude_dir / "settings.json"
         settings.write_text(json.dumps({"model": "opus"}))
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert result.model == "opus"
@@ -315,7 +315,7 @@ class TestGetClaudeSessionConfig:
         mcp = claude_dir / "mcp.json"
         mcp.write_text(json.dumps({"mcpServers": {"filesystem": {}, "github": {}}}))
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert "filesystem" in result.mcp_servers
@@ -332,7 +332,7 @@ class TestGetClaudeSessionConfig:
         hooks = claude_dir / "hooks.json"
         hooks.write_text("{}")
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert result.hooks_configured is True
@@ -342,7 +342,7 @@ class TestGetClaudeSessionConfig:
         project_path = mock_home / "my-project"
         project_path.mkdir()
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is None
 
@@ -611,7 +611,7 @@ class TestAnalyzePermissions:
 
 
 class TestSessionConfigGlobalPermissions:
-    """Tests for _get_claude_session_config() reading global permissions."""
+    """Tests for get_claude_session_config() reading global permissions."""
 
     def test_reads_global_settings_permissions(self, mock_home):
         """Test reading allow/deny/ask from global settings.json."""
@@ -635,7 +635,7 @@ class TestSessionConfigGlobalPermissions:
             )
         )
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert "Bash(*)" in result.global_permissions
@@ -657,7 +657,7 @@ class TestSessionConfigGlobalPermissions:
             json.dumps({"permissions": {"allow": ["Bash(*)", "WebSearch"]}})
         )
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert "Bash(*)" in result.global_permissions
@@ -683,7 +683,7 @@ class TestSessionConfigGlobalPermissions:
             json.dumps({"permissions": {"allow": ["Bash(*)", "WebSearch"]}})
         )
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         # Bash(*) should appear once, not twice
@@ -707,7 +707,7 @@ class TestSessionConfigGlobalPermissions:
             json.dumps({"permissions": {"allow": perms}})
         )
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert len(result.permission_warnings) > 0
@@ -727,7 +727,7 @@ class TestSessionConfigGlobalPermissions:
             json.dumps({"permissions": {"allow": ["Bash(*)"]}})
         )
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert result.has_broad_bash is True
@@ -744,7 +744,7 @@ class TestSessionConfigGlobalPermissions:
         settings = claude_dir / "settings.json"
         settings.write_text(json.dumps({"model": "opus"}))
 
-        result = _get_claude_session_config(project_path)
+        result = get_claude_session_config(project_path)
 
         assert result is not None
         assert result.global_config_file_path == str(settings)

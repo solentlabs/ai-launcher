@@ -11,14 +11,17 @@ Last Modified: 2026-02-10 (Added settings menu item)
 import os
 import shutil
 import subprocess  # nosec B404
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 # ConfigManager removed - using runtime config from CLI flags
 from ai_launcher.core.models import Project, ProviderConfig, Selection
 from ai_launcher.providers.registry import get_registry
+from ai_launcher.ui.about import ABOUT_ROW, about_row_label
 from ai_launcher.ui.preview import build_tree_view
 from ai_launcher.utils.paths import fzf_preview_cmd, is_relative_to
+from ai_launcher.utils.terminal import clear_screen, cursor_home, grey_out_screen
 
 if TYPE_CHECKING:
     from ai_launcher.core.models import ConfigData
@@ -52,22 +55,20 @@ def cache_row_label() -> str:
     return CACHE_ROW
 
 
-def clear_screen() -> None:
-    """Clear the terminal screen using ANSI escape codes.
+def about_row_label_now() -> str:
+    """The About row's text. Reads saved data only; any failure leaves it plain."""
+    try:
+        from ai_launcher import __version__
+        from ai_launcher.core.update_check import load_setting
 
-    Leaves the alternate screen first: the picker runs with --no-clear, so
-    fzf stays on that screen when it exits.
-    """
-    print("\033[?1049l\033[H\033[2J", end="", flush=True)
+        return about_row_label(load_setting().enabled, __version__)
+    except Exception:
+        return ABOUT_ROW
 
 
 def _grey_out_screen(size: os.terminal_size) -> None:
-    """Give everything already on screen a grey foreground.
-
-    DECCARA changes the attributes of a rectangle of cells that are already
-    drawn. A terminal without it ignores the sequence.
-    """
-    print(f"\033[1;1;{size.lines};{size.columns};38;5;240$r", end="", flush=True)
+    """Give everything already on screen a grey foreground (see utils.terminal)."""
+    grey_out_screen(size.lines, size.columns)
 
 
 def _dialog_geometry(
@@ -143,7 +144,7 @@ def select_open_with(project: Project, default_provider: str) -> Optional[Select
     size = shutil.get_terminal_size()
     height, margin = _dialog_geometry(len(rows), len(label), size)
     _grey_out_screen(size)
-    print("\033[H", end="", flush=True)
+    cursor_home()
     process = subprocess.Popen(  # nosec B603, B607
         [
             "fzf",
@@ -193,6 +194,8 @@ def select_project(
 
     # Action loop - allows rescanning, adding, removing
     current_projects = projects
+    # Read once: nothing in the loop can change it, since an update exits
+    about_label = about_row_label_now()
     while True:
         if not current_projects:
             print("No projects found. Pass a scan directory or use --manual-paths")
@@ -221,6 +224,7 @@ def select_project(
         choices.append("__ACTION__\t\t")
         choices.append("__ACTION__\t\t🔧 Configuration")
         choices.append(f"__ACTION__\t\t{cache_row_label()}")
+        choices.append(f"__ACTION__\t\t{about_label}")
 
         # Build header with project info
         project_count = len(current_projects)
@@ -286,12 +290,20 @@ Ctrl-O for other tools
             input_data = "\n".join(choices)
             input_bytes = input_data.encode("utf-8")
 
-            process = subprocess.Popen(  # nosec B603
-                fzf_cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                env=env,
-            )
+            try:
+                process = subprocess.Popen(  # nosec B603
+                    fzf_cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    env=env,
+                )
+            except FileNotFoundError:
+                # Only this call can mean fzf is missing; a FileNotFoundError
+                # from anywhere else in the loop is a bug and falls through.
+                print("Error: fzf not found. Please install fzf:")
+                print("  Ubuntu/Debian: sudo apt install fzf")
+                print("  macOS: brew install fzf")
+                return None
 
             stdout_bytes, _ = process.communicate(input=input_bytes)
             result_code = process.returncode
@@ -324,14 +336,19 @@ Ctrl-O for other tools
                 run_cache_page([p.path for p in current_projects])
                 continue
 
+            # A manual update, in place, then back to the picker
+            if selected.startswith(f"__ACTION__\t\t{ABOUT_ROW}"):
+                from ai_launcher.ui import about
+
+                if about.run_about():
+                    sys.exit(0)  # updated: restart to use the new version
+                continue
+
             # Handle empty line action item (just loop back)
             if selected == "__ACTION__\t\t" or selected.startswith("__SPACE__"):
                 continue
 
-            # Regular project selection
-            if not selected:
-                return None
-
+            # Regular project selection (an empty selection returned above)
             # Look up the project from the formatted line
             project = choice_to_project.get(selected)
             if project:
@@ -346,34 +363,17 @@ Ctrl-O for other tools
                 clear_screen()
                 return selection
 
-            # Not a project - check if it's a directory header or other non-selectable item
-            # Extract path from formatted line to check
-            parts = selected.split("\t\t", 1)
-            if len(parts) == 2:
-                path_str = parts[0]
-                try:
-                    path = Path(path_str).expanduser().resolve()
-                    # If it's a directory (folder header), just loop back
-                    if path.is_dir() and not (path / ".git").exists():
-                        continue
-                except Exception:
-                    pass
-
-            # If we get here, it's an unknown selection - just loop back instead of closing
+            # Not a project: a folder header or another non-selectable row. Back to
+            # the picker rather than closing it.
             continue
 
-        except FileNotFoundError:
-            print("Error: fzf not found. Please install fzf:")
-            print("  Ubuntu/Debian: sudo apt install fzf")
-            print("  macOS: brew install fzf")
-            return None
         except Exception as e:
             clear_screen()
             print(f"Error in project selector: {e}")
             import traceback
 
             traceback.print_exc()
-            return None
+            sys.exit(1)  # a crash is not "no project selected"
 
 
 def show_project_list(projects: List[Project]) -> None:

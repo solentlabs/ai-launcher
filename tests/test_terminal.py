@@ -58,6 +58,18 @@ class TestFormatTerminalTitle:
                 "Claude Code",
             )
 
+    @pytest.mark.parametrize(
+        "bad",
+        ["{}", "{0}", "{project.x}", "{project!z}", "{project", "{:>}"],
+        ids=["empty", "positional", "attribute", "conversion", "unclosed", "spec"],
+    )
+    def test_every_bad_format_is_a_value_error(self, bad):
+        """The contract is ValueError, not whichever error str.format raised."""
+        with pytest.raises(ValueError, match="Invalid format string"):
+            format_terminal_title(
+                bad, Path("/home/user/projects/my-app"), "Claude Code"
+            )
+
     def test_format_multiple_invalid_variables(self):
         """Test error message lists valid variables."""
         with pytest.raises(ValueError, match="Valid variables"):
@@ -304,3 +316,35 @@ class TestEnsureUtf8Output:
         monkeypatch.setattr("sys.stderr", object())
 
         ensure_utf8_output()
+
+
+class TestControlSequences:
+    """Terminal control lives here, not scattered through the UI."""
+
+    def test_clear_screen_leaves_the_alternate_screen_first(self, capsys):
+        from ai_launcher.utils.terminal import clear_screen
+
+        clear_screen()
+
+        assert capsys.readouterr().out == "\033[?1049l\033[H\033[2J"
+
+    def test_clear_page_homes_and_clears_without_leaving_the_screen(self, capsys):
+        from ai_launcher.utils.terminal import clear_page
+
+        clear_page()
+
+        assert capsys.readouterr().out == "\033[H\033[2J"
+
+    def test_cursor_home(self, capsys):
+        from ai_launcher.utils.terminal import cursor_home
+
+        cursor_home()
+
+        assert capsys.readouterr().out == "\033[H"
+
+    def test_grey_out_covers_the_whole_screen(self, capsys):
+        from ai_launcher.utils.terminal import grey_out_screen
+
+        grey_out_screen(24, 100)
+
+        assert capsys.readouterr().out == "\033[1;1;24;100;38;5;240$r"

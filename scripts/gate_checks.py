@@ -34,6 +34,9 @@ EXEMPT_BRANCH_PREFIXES = ("release/",)
 
 # Check-run names the tag gate considers. The matrix jobs are named "test (os, ver)".
 CI_CHECK_PREFIX = "test ("
+# The lint job runs before the matrix. When it fails the matrix is skipped, and an
+# all-skipped matrix must not read as a pass, so a failed lint fails the gate itself.
+LINT_CHECK = "Lint"
 
 PENDING = "pending"
 SUCCESS = "success"
@@ -86,24 +89,32 @@ def ci_status(check_runs: Sequence[dict]) -> str:
         check_runs: Objects with "name", "status" and "conclusion" keys.
 
     Returns:
-        One of PENDING, SUCCESS, FAILURE.
+        One of PENDING, SUCCESS, FAILURE. SUCCESS needs a passing ``Lint`` (when
+        present) and at least one passing matrix job.
     """
-    relevant = [
+    tests = [
         c for c in check_runs if str(c.get("name", "")).startswith(CI_CHECK_PREFIX)
     ]
-    if not relevant:
+    if not tests:
         return PENDING
+    lint = [c for c in check_runs if c.get("name") == LINT_CHECK]
 
     # Anything still queued or running means the answer is not yet knowable.
-    for check in relevant:
+    for check in tests + lint:
         if check.get("status") != "completed" or check.get("conclusion") is None:
             return PENDING
 
-    for check in relevant:
+    for check in lint:
+        if check.get("conclusion") != SUCCESS:
+            return FAILURE
+    for check in tests:
         # "neutral" and "skipped" are not failures; anything else is.
         if check.get("conclusion") not in (SUCCESS, "neutral", "skipped"):
             return FAILURE
 
+    # Skipped is not tested: at least one matrix job must really have passed.
+    if not any(check.get("conclusion") == SUCCESS for check in tests):
+        return FAILURE
     return SUCCESS
 
 

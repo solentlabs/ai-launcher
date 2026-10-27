@@ -5,6 +5,132 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-10-27
+
+### Added
+
+- **Opt-in update check** — with `[update] check = true` in `caches.toml`, AI Launcher asks PyPI
+  once a day, in the background while the picker is open, and shows one line in the launch box when
+  a newer release exists. Off by default; nothing is installed. See `docs/updating.md`.
+- **About row in the picker** — shows the version, how it was installed and the update status from
+  the saved check (no network). Enter runs `ai-launcher update` in place, so a manual upgrade is one
+  keypress away even without the automatic check. A 🆕 on the row marks a newer release. After an
+  update the picker exits, so it never runs half old and half new code.
+
+### Fixed
+
+- **Scope guard hook could be replaced by a project** — it ran as `python -m ai_launcher…` from the
+  project folder, so a repository with its own `ai_launcher` folder took its place. It now runs by
+  file path.
+- **Scope guard missed common writers** — `sed -Ei`/`-ni`, `bash -c`, `sh -c`, `eval`, inline
+  `python -c`/`node -e`, `fd -x`, `dd of=`, `curl -o`, `tar --file=`, `git --git-dir`/`--work-tree`
+  with a space, `find -fprint0`. `cd -` now returns to the previous folder.
+- **Scope guard failed open on its own bug** — an error while judging a call now asks instead of
+  letting the call through.
+- **Cache deletion guards had gaps** — a path under a symlinked folder was not refused, a user entry
+  such as `~/*` or `~/.*` could delete any direct child of home outside a short blocklist, and a
+  bare `ai-launcher cache` knew of no projects. Now a symlink anywhere in the path refuses it, no
+  direct child of home and nothing under `.ssh`, `.gnupg`, `.aws`, `.kube`, `Documents`, `Desktop`,
+  `Downloads` or `Pictures` is deletable, and a git repository never is. The confirm step says when
+  no scan folder was given. Making a read-only entry writable no longer follows a link's target.
+- **`--cleanup` could delete the native Claude Code binary** — it kept the version printed by
+  whichever `claude` came first on `PATH`, so with an npm install there it removed every native
+  binary. It now prunes only when `claude` resolves into the native versions folder, keeps that
+  file, and skips a file it cannot remove. It also keeps the newest `~/.claude.json.backup.*`. The
+  two copies of this code (`utils/cleanup.py` and the Claude provider) now share one.
+
+- **Release workflows hardened** — PyPI publishing by hand is limited to `v*` tags (Test PyPI can
+  still start anywhere), the changelog check no longer interpolates branch names into a shell
+  script, the tag gate no longer reads an all-skipped test matrix as a pass and requires `Lint`, the
+  tag-on-main check is an ancestor test, actions are pinned to commit SHAs with Dependabot to update
+  them, and every workflow declares `permissions:`.
+
+- **A hand-edited Claude settings file broke the preview** — `"allow": null`, a top-level list, a
+  non-UTF-8 file or an unreadable one raised out of the preview, the launch box and
+  `--check-permissions`. Such files and fields are now skipped. The permission report's box border
+  was also one column short on two lines.
+- **A crash in the picker looked like "No project selected"** — every `FileNotFoundError` anywhere
+  in the picker was reported as "fzf not found", and any other error exited with status 0. Only a
+  missing fzf says that now, and an unexpected error exits with status 1.
+- **A launch error could leak the session's scratch folder** — the cleanup started after the launch
+  box was drawn. An unreadable parent folder also crashed the "sibling projects" lines. A scratch
+  folder that cannot be made no longer leaves an inherited `AI_SCRATCH_DIR` pointing at a stale one.
+- **`ensure_fzf` and `scratch prune` leaked tracebacks** — a bad download (a damaged archive, a full
+  disk) and a session folder that vanished mid-prune are now handled.
+- **`format_terminal_title` raised more than `ValueError`** for a bad format such as `{}`; the
+  format is not user-settable today, so this only fixes the function's contract.
+
+- **Scanned projects were listed under their resolved path** — with `~/projects` linked to
+  `/mnt/d/projects`, every project, the launched session and the previews used `/mnt/d/…`, so Claude
+  Code's history and memory (keyed on the path) did not match the ones from a manual launch.
+  Projects now keep the path as listed, and duplicates are found by real path. The preview's memory
+  lookup uses the listed path too.
+
+- **The preview could fight your own git commands** — it ran `git status` on every cursor move and
+  that refreshes the index, which can collide with a `git add` or commit in another terminal
+  (`index.lock exists`). It now runs `git --no-optional-locks status`, in the context preview too.
+  The status lines also kept only one column, so a staged and an unstaged change looked alike; both
+  columns are kept.
+- **A long path or name pushed the launch box's right border out** — lines are now cut to the box
+  with an ellipsis.
+- **Raw escape codes were spread through the UI** (`_preview_helper`, `_context_preview`, `preview`,
+  `selector`, `cache_page`), against the project invariant. Styling goes through `PreviewFormatter`
+  and terminal control (clear screen, grey-out) lives in `utils/terminal.py`.
+  `tests/test_ansi_invariant.py` fails if a raw escape code appears anywhere else.
+
+- **`--clean-npm` did nothing** — since the cleanup moved into the providers, the npm step was left
+  in `utils/cleanup.py` and nothing called it, so the documented flag was a silent no-op for every
+  provider. It now runs `npm cache clean --force` before launch (10-second limit, skipped when `npm`
+  is missing). The unused duplicate of the Claude cleanup in that module was removed.
+
+- **`install.sh` was unusable the documented way and unsafe with odd input** — run as
+  `curl … | bash`, every prompt read the rest of the script instead of the keyboard. The Windows
+  Terminal profile it wrote ran `ai-launcher <folder>`, which the CLI rejects (a provider is needed:
+  `ai-launcher claude <folder>`), and so did its closing message. It spliced shell variables into
+  inline Python, did not expand a typed `~`, aborted on a settings file with comments (which Windows
+  Terminal allows), and rewrote that file in place with no backup and made the profile the default
+  without asking. Prompts now read from `/dev/tty`, values reach Python through the environment, the
+  file is backed up and replaced atomically, and the default profile is asked about.
+
+- **Bash prototype ran `$(...)` in paths and leaked temp files** — `eval echo "$path"` expanded the
+  `~` in scan paths but also ran any command substitution or backticks in a path given on the
+  command line or in the config; only a leading `~` is expanded now. The directory browser's
+  `fzf --preview` spliced folder names into a shell command, so a name with a quote broke out of it;
+  names now reach the preview through the environment. Temp files live in one folder removed on exit
+  (Ctrl-C included, and before the `exec` that replaces the shell). A scan path with a space in it
+  is still not supported: scan paths are a space-separated list.
+
+- **`scripts/release.py` could build a release from the wrong branch** — off `main` it only warned,
+  and it edited the version files before cutting `release/vX.Y.Z` (so an existing release branch was
+  checked out over a dirty tree). It now stops off `main`/`master`, cuts the branch first, and on a
+  re-run with the tag already pushed checks that the remote tag is at `HEAD` before resuming.
+
+- **Launching with piped output on Windows could raise `UnicodeEncodeError`** — only `cache`,
+  `update` and `scratch prune` switched stdout to UTF-8; the launch box prints emoji and did not.
+
+- **The pre-push tag check disagreed with the CI tag gate** — `scripts/verify-tag-ci.sh` had its own
+  `jq` rule, read only the first 30 check runs (a second page produced several answers and fell
+  through to "allow"), and counted a skipped matrix as a pass. It now asks the same tested
+  `gate_checks.py ci-status` the CI gate uses, over up to 100 runs.
+
+- **The local patch-coverage gate agreed with Codecov only on lines** — `scripts/patch_coverage.py`
+  reported 100% while Codecov counted 8 partially covered branches and failed the patch. It now
+  reports the branches no test took, not just the lines, so the gap shows before a push.
+
+### Removed
+
+- **Unused code** (nothing in the launcher called it): `utils/git.py` (`clone_repository`), the
+  directory browser (`ui/browser.py`, `ui/_browser_preview.py`, `ui/_file_preview.py`), the
+  `StartupReport` class and `generate_startup_report` (about 460 lines; its text pointed at a
+  `--startup-report` flag that never existed), and two helpers in `ui/_preview_helper.py`. The
+  browser also built `fzf --preview` commands by quoting a path in double quotes, which a POSIX
+  shell still expands. The launch box, which is what runs, is unchanged.
+
+### Notes
+
+- **Bash prototype diverges** — `bin/ai-launcher` has no update command, so it has no check or About
+  row either.
+
 ## [0.8.0] - 2026-10-15
 
 ### Added

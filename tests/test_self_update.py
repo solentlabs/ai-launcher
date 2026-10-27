@@ -395,3 +395,32 @@ def test_the_launcher_makes_no_request_unless_update_is_run(monkeypatch):
     result = CliRunner().invoke(app, ["--version"])
 
     assert result.exit_code == 0
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        ({"fetch": lambda: "0.9.0", "runner": "ok", "yes": True}, (0, True)),
+        ({"fetch": lambda: "0.9.0", "runner": "fail", "yes": True}, (1, False)),
+        ({"fetch": lambda: "0.7.0", "runner": "ok", "yes": True}, (0, False)),
+        ({"fetch": lambda: "0.9.0", "runner": "ok", "check": True}, (0, False)),
+        ({"fetch": lambda: "0.9.0", "runner": "ok", "answer": "n"}, (0, False)),
+    ],
+    ids=["installed", "command-failed", "up-to-date", "check-only", "declined"],
+)
+def test_run_update_says_whether_it_installed(kwargs, expected):
+    runner = kwargs.pop("runner")
+    answer = kwargs.pop("answer", "y")
+
+    result = ui.run_update(
+        installed="0.8.0",
+        plan=su.UpdatePlan(su.PIP, argv=["py"], display=["py"]),
+        runner=lambda *a, **k: subprocess.CompletedProcess(
+            a, 0 if runner == "ok" else 3
+        ),
+        input_fn=lambda prompt: answer,
+        is_tty=True,
+        **kwargs,
+    )
+
+    assert result == expected

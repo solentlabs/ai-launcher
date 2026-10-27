@@ -25,9 +25,11 @@ from ai_launcher.core.models import ConfigData, UIConfig
 from ai_launcher.ui.selector import select_project, show_project_list
 from ai_launcher.ui.startup_report import display_launch_info
 from ai_launcher.utils.logging import setup_logging
+from ai_launcher.utils.paths import listed_path
 from ai_launcher.utils.terminal import format_terminal_title, set_terminal_title
 
 if TYPE_CHECKING:
+    from ai_launcher.core.update_check import UpdateNotice
     from ai_launcher.providers.base import AIProvider
 
 app = typer.Typer(
@@ -59,6 +61,7 @@ def main(
 
 def _run_launcher(
     provider_name: str,
+    *,
     path: Optional[Path] = None,
     verbose: bool = False,
     debug: bool = False,
@@ -74,6 +77,10 @@ def _run_launcher(
     allow_writes: Optional[str] = None,
 ) -> None:
     """Internal function to run the launcher with specified provider."""
+    from ai_launcher.utils.terminal import ensure_utf8_output
+
+    # The launch box prints emoji; on Windows a piped stdout is cp1252
+    ensure_utf8_output()
 
     # Setup logging
     logger = setup_logging(verbose=verbose or debug)
@@ -125,7 +132,7 @@ def _run_launcher(
 
     # Determine scan paths: CLI argument takes precedence
     if path:
-        scan_paths = [path.resolve()]
+        scan_paths = [listed_path(path)]  # symlinks are preserved
     else:
         # Only error if we need scan paths for the operation
         if not (discover or context):
@@ -215,6 +222,7 @@ def _run_launcher(
     # Refresh stale cache sizes while the picker is open, so the launch notice
     # has numbers without ever walking a tree itself
     start_size_refresh()
+    start_update_check()
 
     # Interactive selection
     selection = select_project(
@@ -329,6 +337,27 @@ def start_size_refresh() -> None:
         logging.getLogger("ai_launcher").debug(f"Size refresh not started: {error}")
 
 
+def start_update_check() -> None:
+    """Start the opt-in background update check. Never raises: a launch comes first."""
+    try:
+        from ai_launcher.core.update_check import load_setting, start_check
+
+        start_check(load_setting().enabled)
+    except Exception as error:
+        logging.getLogger("ai_launcher").debug(f"Update check not started: {error}")
+
+
+def current_update_notice() -> Optional["UpdateNotice"]:
+    """The saved update notice for this launch, or None. Never raises."""
+    try:
+        from ai_launcher.core.update_check import load_setting, update_notice
+
+        return update_notice(load_setting().enabled, __version__)
+    except Exception as error:
+        logging.getLogger("ai_launcher").debug(f"Update notice failed: {error}")
+        return None
+
+
 def prepare_scratch(project_path: Path) -> Optional[Path]:
     """Make this session's scratch folder and name it in AI_SCRATCH_DIR.
 
@@ -340,6 +369,8 @@ def prepare_scratch(project_path: Path) -> Optional[Path]:
     try:
         path = create_session_dir(project_path.name)
     except OSError:
+        # An inherited value would name another session's folder: remove it
+        os.environ.pop(ENV_VAR, None)
         return None
     os.environ[ENV_VAR] = str(path)
     return path
@@ -402,28 +433,35 @@ def launch_ai(
     # Clean environment before launching (if configured)
     print()
     provider.cleanup_environment(verbose=True, cleanup_config=config.cleanup)
+    if config.cleanup.enabled and config.cleanup.clean_npm_cache:
+        from ai_launcher.utils import cleanup
+
+        cleanup.clean_npm_cache(verbose=True)
 
     # The launch notice reads the size cache only; it never walks a tree
     from ai_launcher.core.cache_notice import launch_notice
 
     notice = launch_notice()
+    update_notice = current_update_notice()
 
     # A scratch folder for the session. The scope guard must not ask about it.
     scratch_dir = prepare_scratch(project_path)
     if scratch_dir is not None:
         scope_exempt = [*scope_exempt, scratch_dir]
 
-    # Display launch information and launch provider
-    display_launch_info(
-        project_path,
-        provider,
-        verbose=True,
-        scope_roots=scope_roots,
-        scope_exempt=scope_exempt,
-        notice=notice,
-        scratch_dir=scratch_dir,
-    )
+    # The folder is finished however the launch ends, the launch box included
     try:
+        # Display launch information and launch provider
+        display_launch_info(
+            project_path,
+            provider,
+            verbose=True,
+            scope_roots=scope_roots,
+            scope_exempt=scope_exempt,
+            notice=notice,
+            scratch_dir=scratch_dir,
+            update_notice=update_notice,
+        )
         provider.launch_with_title(
             project_path,
             set_title=config.ui.set_terminal_title,
@@ -459,12 +497,14 @@ def claude(
     ),
     # Configuration options
     cleanup: bool = typer.Option(
-        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+        False,
+        "--cleanup/--no-cleanup",
+        help="Clean the tool's own old files before launch",
     ),
     clean_provider: bool = typer.Option(
         False,
         "--clean-provider/--no-clean-provider",
-        help="Clean AI assistant cache/logs",
+        help="Clean provider-specific files only",
     ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
@@ -496,18 +536,18 @@ def claude(
     # Just call main() with provider forced to claude-code
     _run_launcher(
         "claude-code",
-        path,
-        verbose,
-        debug,
-        list_projects,
-        discover,
-        context,
-        cleanup,
-        clean_provider,
-        clean_npm,
-        global_files,
-        manual_paths,
-        check_permissions,
+        path=path,
+        verbose=verbose,
+        debug=debug,
+        list_projects=list_projects,
+        discover=discover,
+        context=context,
+        cleanup=cleanup,
+        clean_provider=clean_provider,
+        clean_npm=clean_npm,
+        global_files=global_files,
+        manual_paths=manual_paths,
+        check_permissions=check_permissions,
         allow_writes=allow_writes,
     )
 
@@ -528,12 +568,14 @@ def gemini(
     context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
     # Configuration options
     cleanup: bool = typer.Option(
-        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+        False,
+        "--cleanup/--no-cleanup",
+        help="Clean the tool's own old files before launch",
     ),
     clean_provider: bool = typer.Option(
         False,
         "--clean-provider/--no-clean-provider",
-        help="Clean AI assistant cache/logs",
+        help="Clean provider-specific files only",
     ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
@@ -564,17 +606,17 @@ def gemini(
     # Just call main() with provider forced to gemini
     _run_launcher(
         "gemini",
-        path,
-        verbose,
-        debug,
-        list_projects,
-        discover,
-        context,
-        cleanup,
-        clean_provider,
-        clean_npm,
-        global_files,
-        manual_paths,
+        path=path,
+        verbose=verbose,
+        debug=debug,
+        list_projects=list_projects,
+        discover=discover,
+        context=context,
+        cleanup=cleanup,
+        clean_provider=clean_provider,
+        clean_npm=clean_npm,
+        global_files=global_files,
+        manual_paths=manual_paths,
         allow_writes=allow_writes,
     )
 
@@ -595,12 +637,14 @@ def cursor(
     context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
     # Configuration options
     cleanup: bool = typer.Option(
-        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+        False,
+        "--cleanup/--no-cleanup",
+        help="Clean the tool's own old files before launch",
     ),
     clean_provider: bool = typer.Option(
         False,
         "--clean-provider/--no-clean-provider",
-        help="Clean AI assistant cache/logs",
+        help="Clean provider-specific files only",
     ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
@@ -622,17 +666,17 @@ def cursor(
     """
     _run_launcher(
         "cursor",
-        path,
-        verbose,
-        debug,
-        list_projects,
-        discover,
-        context,
-        cleanup,
-        clean_provider,
-        clean_npm,
-        global_files,
-        manual_paths,
+        path=path,
+        verbose=verbose,
+        debug=debug,
+        list_projects=list_projects,
+        discover=discover,
+        context=context,
+        cleanup=cleanup,
+        clean_provider=clean_provider,
+        clean_npm=clean_npm,
+        global_files=global_files,
+        manual_paths=manual_paths,
     )
 
 
@@ -652,12 +696,14 @@ def aider(
     context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
     # Configuration options
     cleanup: bool = typer.Option(
-        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+        False,
+        "--cleanup/--no-cleanup",
+        help="Clean the tool's own old files before launch",
     ),
     clean_provider: bool = typer.Option(
         False,
         "--clean-provider/--no-clean-provider",
-        help="Clean AI assistant cache/logs",
+        help="Clean provider-specific files only",
     ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
@@ -679,17 +725,17 @@ def aider(
     """
     _run_launcher(
         "aider",
-        path,
-        verbose,
-        debug,
-        list_projects,
-        discover,
-        context,
-        cleanup,
-        clean_provider,
-        clean_npm,
-        global_files,
-        manual_paths,
+        path=path,
+        verbose=verbose,
+        debug=debug,
+        list_projects=list_projects,
+        discover=discover,
+        context=context,
+        cleanup=cleanup,
+        clean_provider=clean_provider,
+        clean_npm=clean_npm,
+        global_files=global_files,
+        manual_paths=manual_paths,
     )
 
 
@@ -709,12 +755,14 @@ def copilot(
     context: bool = typer.Option(False, "--context", "-c", help="Show context viewer"),
     # Configuration options
     cleanup: bool = typer.Option(
-        False, "--cleanup/--no-cleanup", help="Clean AI assistant cache/logs"
+        False,
+        "--cleanup/--no-cleanup",
+        help="Clean the tool's own old files before launch",
     ),
     clean_provider: bool = typer.Option(
         False,
         "--clean-provider/--no-clean-provider",
-        help="Clean AI assistant cache/logs",
+        help="Clean provider-specific files only",
     ),
     clean_npm: bool = typer.Option(
         False, "--clean-npm/--no-clean-npm", help="Clean npm cache"
@@ -736,17 +784,17 @@ def copilot(
     """
     _run_launcher(
         "copilot",
-        path,
-        verbose,
-        debug,
-        list_projects,
-        discover,
-        context,
-        cleanup,
-        clean_provider,
-        clean_npm,
-        global_files,
-        manual_paths,
+        path=path,
+        verbose=verbose,
+        debug=debug,
+        list_projects=list_projects,
+        discover=discover,
+        context=context,
+        cleanup=cleanup,
+        clean_provider=clean_provider,
+        clean_npm=clean_npm,
+        global_files=global_files,
+        manual_paths=manual_paths,
     )
 
 
@@ -761,7 +809,7 @@ def _project_paths(
         mp_path = Path(mp.strip()).expanduser()
         if mp.strip() and mp_path.exists():
             manual.append(Project.from_path(mp_path, is_manual=True))
-    scan = [p.resolve() for p in (paths or [])]
+    scan = [listed_path(p) for p in (paths or [])]
     projects = get_all_projects(
         scan, 5, ["node_modules", ".cache", "venv", ".git"], manual
     )

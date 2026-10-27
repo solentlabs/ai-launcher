@@ -150,3 +150,84 @@ def test_scan_detects_git_file(tmp_path):
 
     assert len(projects) == 1
     assert projects[0].name == "my-submodule"
+
+
+class TestSymlinksArePreserved:
+    """Invariant: projects keep the path as listed; duplicates go by real path."""
+
+    def test_a_symlinked_scan_folder_lists_projects_under_the_link(
+        self, tmp_path, make_symlink
+    ):
+        (tmp_path / "real_projects" / "repo" / ".git").mkdir(parents=True)
+        link = tmp_path / "projects"
+        make_symlink(link, tmp_path / "real_projects", target_is_directory=True)
+
+        (project,) = scan_for_git_repos([link], max_depth=5, prune_dirs=[])
+
+        assert project.path == link / "repo"
+        assert "real_projects" not in str(project.path)
+
+    def test_the_real_folder_wins_over_a_link_to_it_whatever_the_names(
+        self, tmp_path, make_symlink
+    ):
+        root = tmp_path / "projects"
+        (root / "zzz-repo" / ".git").mkdir(parents=True)
+        make_symlink(root / "aaa-alias", root / "zzz-repo", target_is_directory=True)
+
+        (project,) = scan_for_git_repos([root], max_depth=5, prune_dirs=[])
+
+        assert project.path == root / "zzz-repo"
+
+    def test_the_result_does_not_depend_on_directory_order(self, tmp_path):
+        root = tmp_path / "projects"
+        for name in ("c", "a", "b"):
+            (root / name / ".git").mkdir(parents=True)
+
+        names = [p.name for p in scan_for_git_repos([root], max_depth=5, prune_dirs=[])]
+
+        assert names == ["a", "b", "c"]
+
+    def test_from_path_keeps_a_symlinked_project_as_listed(
+        self, tmp_path, make_symlink
+    ):
+        from ai_launcher.core.models import Project
+
+        (tmp_path / "real" / ".git").mkdir(parents=True)
+        link = tmp_path / "link"
+        make_symlink(link, tmp_path / "real", target_is_directory=True)
+
+        project = Project.from_path(link, is_manual=False)
+
+        assert project.path == link
+        assert project.name == "link"
+        assert project.is_git_repo is True
+
+    def test_a_manual_symlink_and_the_scanned_real_folder_are_one_project(
+        self, tmp_path, make_symlink
+    ):
+        from ai_launcher.core.models import Project
+
+        root = tmp_path / "projects"
+        (root / "repo" / ".git").mkdir(parents=True)
+        alias = tmp_path / "shortcut"
+        make_symlink(alias, root / "repo", target_is_directory=True)
+
+        projects = get_all_projects(
+            [root], 5, [], [Project.from_path(alias, is_manual=True)]
+        )
+
+        assert [p.path for p in projects] == [alias]  # the manual one wins
+
+
+def test_two_manual_projects_that_are_the_same_folder_are_one(tmp_path, make_symlink):
+    from ai_launcher.core.models import Project
+
+    real = tmp_path / "repo"
+    (real / ".git").mkdir(parents=True)
+    alias = tmp_path / "alias"
+    make_symlink(alias, real, target_is_directory=True)
+    manual = [Project.from_path(alias, True), Project.from_path(real, True)]
+
+    projects = get_all_projects([], 5, [], manual)
+
+    assert len(projects) == 1

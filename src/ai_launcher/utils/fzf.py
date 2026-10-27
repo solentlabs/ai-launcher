@@ -6,15 +6,15 @@ from GitHub releases automatically.
 Author: Solent Labs™
 """
 
+import io
 import os
 import platform
 import shutil
 import stat
 import tarfile
-import tempfile
 import zipfile
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import IO, Optional, Tuple, cast
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -134,36 +134,30 @@ def download_fzf(install_dir: Optional[Path] = None) -> Path:
     except (URLError, OSError) as e:
         raise RuntimeError(f"Failed to download fzf: {e}") from e
 
-    # Extract the fzf binary
+    # Pull the fzf binary out of the archive. An archive names its own members, so
+    # nothing it says picks where a file lands: the member's bytes are read and
+    # written to the one fixed destination, and only a regular file counts (a
+    # symlink or device named "fzf" is not the binary).
     binary_name = "fzf.exe" if platform.system().lower() == "windows" else "fzf"
     target_path = install_dir / binary_name
+    payload: Optional[bytes] = None
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmppath = Path(tmpdir)
-        archive_path = tmppath / ("fzf.zip" if is_zip else "fzf.tar.gz")
-        archive_path.write_bytes(archive_data)
-
-        if is_zip:
-            with zipfile.ZipFile(archive_path) as zf:
-                # Find the fzf binary in the archive
-                for name in zf.namelist():
-                    if Path(name).name == binary_name:
-                        zf.extract(name, tmpdir)
-                        extracted = tmppath / name
-                        shutil.move(str(extracted), str(target_path))
-                        break
-                else:
-                    raise RuntimeError(f"'{binary_name}' not found in archive")
-        else:
-            with tarfile.open(archive_path, "r:gz") as tf:
-                for member in tf.getmembers():
-                    if Path(member.name).name == binary_name:
-                        tf.extract(member, tmpdir)
-                        extracted = tmppath / member.name
-                        shutil.move(str(extracted), str(target_path))
-                        break
-                else:
-                    raise RuntimeError(f"'{binary_name}' not found in archive")
+    if is_zip:
+        with zipfile.ZipFile(io.BytesIO(archive_data)) as zf:
+            for info in zf.infolist():
+                if not info.is_dir() and Path(info.filename).name == binary_name:
+                    payload = zf.read(info)
+                    break
+    else:
+        with tarfile.open(fileobj=io.BytesIO(archive_data), mode="r:gz") as tf:
+            for member in tf.getmembers():
+                if member.isfile() and Path(member.name).name == binary_name:
+                    # isfile() means extractfile() returns a file object
+                    payload = cast(IO[bytes], tf.extractfile(member)).read()
+                    break
+    if payload is None:
+        raise RuntimeError(f"'{binary_name}' not found in archive")
+    target_path.write_bytes(payload)
 
     # Set executable permissions on Unix
     if platform.system().lower() != "windows":
@@ -240,7 +234,9 @@ def ensure_fzf() -> bool:
                 return True
             print("  Error: fzf was downloaded but could not be found on PATH.")
             return False
-        except RuntimeError as e:
+        except Exception as e:  # a download convenience: never a traceback
+            # RuntimeError is ours; the rest are a damaged archive (tarfile,
+            # zipfile), bad JSON from the API, a full disk or a failed move
             print(f"  Error: {e}")
             _print_manual_instructions()
             return False

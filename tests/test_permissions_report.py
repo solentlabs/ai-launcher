@@ -238,3 +238,64 @@ class TestSummary:
         check_project_permissions(projects, "claude-code")
         captured = capsys.readouterr()
         assert expected_text in captured.out
+
+
+class TestOddGlobalSettings:
+    """--check-permissions reads two global files; neither may crash it."""
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            b'{"permissions": {"allow": null}}',
+            b'{"permissions": {"allow": "Bash(*)", "ask": 3}}',
+            b'{"permissions": []}',
+            b"[]",
+            b"\xff\xfe\x00",
+            b"{nope",
+        ],
+        ids=[
+            "allow-null",
+            "wrong-types",
+            "permissions-list",
+            "top-level-list",
+            "not-utf8",
+            "not-json",
+        ],
+    )
+    @pytest.mark.parametrize("name", ["settings.json", "settings.local.json"])
+    def test_never_raises(self, mock_home, capsys, content, name):
+        (mock_home / ".claude").mkdir()
+        (mock_home / ".claude" / name).write_bytes(content)
+        project = mock_home / "p"
+        project.mkdir()
+
+        check_project_permissions([_make_project(project)], "claude-code")
+
+        assert "Global Settings" in capsys.readouterr().out
+
+    def test_invalid_files_are_named(self, mock_home, capsys):
+        (mock_home / ".claude").mkdir()
+        (mock_home / ".claude" / "settings.json").write_bytes(b"[]")
+        project = mock_home / "p"
+        project.mkdir()
+
+        check_project_permissions([_make_project(project)], "claude-code")
+
+        assert "has invalid JSON" in capsys.readouterr().out
+
+
+def test_the_report_box_is_square(mock_home, capsys):
+    from ai_launcher.ui.startup_report import _visual_length
+
+    project = mock_home / "p"
+    project.mkdir()
+
+    check_project_permissions([_make_project(project)], "claude-code")
+
+    box = [
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line and line[0] in "┌│└"
+    ]
+    assert len(box) == 4
+    assert {_visual_length(line) for line in box} == {_visual_length(box[0])}

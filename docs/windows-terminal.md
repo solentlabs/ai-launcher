@@ -10,7 +10,22 @@ The install script can configure this automatically:
 curl -sSL https://raw.githubusercontent.com/solentlabs/ai-launcher/master/install.sh | bash
 ```
 
-When prompted, choose "Yes" to configure Windows Terminal and specify your projects folder.
+When prompted, choose "Yes" to configure Windows Terminal and specify your projects folder. The
+questions are read from the keyboard (`/dev/tty`), so they work even though the script arrives on a
+pipe; with no keyboard (a CI job, say) they are skipped and nothing is configured.
+
+What the script does to your Windows Terminal settings:
+
+- **Adds one profile**, `AI Launcher`, that runs `ai-launcher claude <your projects folder>` in WSL.
+  An existing profile named `AI Launcher` or `Claude Code` is left alone.
+- **Backs the file up first**, as `settings.json.ai-launcher.bak` beside it, and writes the new
+  version through a temporary file, so a failure cannot leave half a file.
+- **Asks before making it the default profile**; the answer is no unless you say yes.
+- **Skips a settings file it cannot read as JSON.** Windows Terminal allows comments in that file,
+  which plain JSON does not. The script says so, changes nothing, and finishes the install; add the
+  profile by hand ([below](#manual-setup)).
+- **Treats what you type as data.** A path with quotes or `$(...)` in it is quoted into the profile,
+  never run.
 
 ## Manual Setup
 

@@ -23,7 +23,6 @@ def scan_for_git_repos(
         List of discovered Project instances
     """
     projects = []
-    seen_paths: set = set()
     # Track visited real directories to prevent cycles when following symlinks
     seen_real_dirs: set = set()
 
@@ -56,17 +55,20 @@ def scan_for_git_repos(
             # .git can be a directory (normal repos) or a file (submodules).
             has_git = ".git" in dirs or ".git" in files
 
-            # Remove pruned directories from traversal
-            dirs[:] = [d for d in dirs if d not in prune_dirs]
+            # Remove pruned directories from traversal. Name order, real folders
+            # before symlinks: the result must not depend on the order the
+            # filesystem lists names, and a real folder should win over a link
+            # to it in the same parent (the cycle check keeps the first route).
+            dirs[:] = sorted(
+                (d for d in dirs if d not in prune_dirs),
+                key=lambda d: ((Path(root) / d).is_symlink(), d),
+            )
 
             if has_git:
-                project_path = Path(root).resolve()
-                path_str = str(project_path)
-
-                # Avoid duplicates
-                if path_str not in seen_paths:
-                    seen_paths.add(path_str)
-                    projects.append(Project.from_path(project_path, is_manual=False))
+                # The path as listed (symlinks are preserved). A project reachable
+                # twice appears once: the cycle check above keeps the first route to
+                # each real directory.
+                projects.append(Project.from_path(Path(root), is_manual=False))
 
     return projects
 
@@ -91,22 +93,23 @@ def get_all_projects(
     # Scan for git repositories
     discovered = scan_for_git_repos(scan_paths, max_depth, prune_dirs)
 
-    # Remove duplicates (prefer manual over discovered)
+    # Remove duplicates by real path (prefer manual over discovered). The path
+    # each project keeps is the one as listed: symlinks are preserved.
     seen_paths = set()
     unique_projects = []
 
     # Process manual first (they take precedence)
     for project in sorted(manual_projects, key=lambda p: str(p.path)):
-        path_str = str(project.path)
-        if path_str not in seen_paths:
-            seen_paths.add(path_str)
+        real = os.path.realpath(project.path)
+        if real not in seen_paths:
+            seen_paths.add(real)
             unique_projects.append(project)
 
     # Then add discovered projects
     for project in discovered:
-        path_str = str(project.path)
-        if path_str not in seen_paths:
-            seen_paths.add(path_str)
+        real = os.path.realpath(project.path)
+        if real not in seen_paths:
+            seen_paths.add(real)
             unique_projects.append(project)
 
     # Sort alphabetically by path

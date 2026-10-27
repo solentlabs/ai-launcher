@@ -601,3 +601,141 @@ class TestEnsureFzf:
             assert str(install_dir) in os.environ["PATH"]
         finally:
             os.environ["PATH"] = original_path
+
+
+class TestEnsureFzfFailures:
+    """A bad download must end in the manual instructions, not a traceback."""
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RuntimeError("no release"),
+            OSError("disk full"),
+            ValueError("bad json"),
+            KeyError("assets"),
+            tarfile.TarError("damaged"),
+            zipfile.BadZipFile("damaged"),
+        ],
+        ids=["runtime", "os", "value", "key", "tar", "zip"],
+    )
+    def test_returns_false_and_prints_instructions(self, error, tmp_path, capsys):
+        with patch("ai_launcher.utils.fzf.is_fzf_installed", return_value=False), patch(
+            "ai_launcher.utils.fzf.get_fzf_install_dir", return_value=tmp_path
+        ), patch("builtins.input", return_value="y"), patch(
+            "ai_launcher.utils.fzf.download_fzf", side_effect=error
+        ):
+            assert ensure_fzf() is False
+
+        out = capsys.readouterr().out
+        assert "Error" in out and "fzf" in out
+
+
+class TestDownloadNeverTrustsAnArchivesPaths:
+    """An archive names its own members: nothing it says may pick where a file lands."""
+
+    @staticmethod
+    def _download(tmp_path, data, url="https://example.com/fzf-linux_amd64.tar.gz"):
+        resp = MagicMock()
+        resp.read.return_value = data
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        install_dir = tmp_path / "bin"
+        with patch(
+            "ai_launcher.utils.fzf.get_fzf_download_url", return_value=url
+        ), patch("ai_launcher.utils.fzf.urlopen", return_value=resp), patch(
+            "ai_launcher.utils.fzf.platform.system", return_value="Linux"
+        ):
+            return download_fzf(install_dir), install_dir
+
+    def test_a_tar_member_with_a_traversing_name_lands_only_in_the_install_dir(
+        self, tmp_path
+    ):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+            body = b"#!/bin/sh\necho fzf\n"
+            member = tarfile.TarInfo("../../outside/fzf")
+            member.size = len(body)
+            member.mode = 0o755
+            tf.addfile(member, io.BytesIO(body))
+
+        result, install_dir = self._download(tmp_path, buf.getvalue())
+
+        assert result == install_dir / "fzf"
+        assert result.read_bytes() == body
+        assert not (tmp_path / "outside").exists()
+        assert not (tmp_path.parent / "outside").exists()
+        assert sorted(p.name for p in install_dir.iterdir()) == ["fzf"]
+
+    def test_a_tar_symlink_named_fzf_is_not_a_binary(self, tmp_path):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+            link = tarfile.TarInfo("fzf")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "/etc/passwd"
+            tf.addfile(link)
+
+        with pytest.raises(RuntimeError, match="not found"):
+            self._download(tmp_path, buf.getvalue())
+
+    def test_a_zip_member_with_a_traversing_name_lands_only_in_the_install_dir(
+        self, tmp_path
+    ):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("../../outside/fzf", "binary")
+
+        with patch("ai_launcher.utils.fzf.platform.system", return_value="Linux"):
+            result, install_dir = self._download(
+                tmp_path, buf.getvalue(), "https://example.com/fzf.zip"
+            )
+
+        assert result.read_bytes() == b"binary"
+        assert not (tmp_path / "outside").exists()
+
+
+class TestDownloadFindsTheBinaryAmongOtherMembers:
+    @staticmethod
+    def _download(tmp_path, data, url):
+        resp = MagicMock()
+        resp.read.return_value = data
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        with patch(
+            "ai_launcher.utils.fzf.get_fzf_download_url", return_value=url
+        ), patch("ai_launcher.utils.fzf.urlopen", return_value=resp), patch(
+            "ai_launcher.utils.fzf.platform.system", return_value="Linux"
+        ):
+            return download_fzf(tmp_path / "bin")
+
+    def test_a_zip_with_other_members_before_the_binary(self, tmp_path):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("docs/", "")
+            zf.writestr("README.md", "read me")
+            zf.writestr("fzf", "the binary")
+
+        result = self._download(tmp_path, buf.getvalue(), "https://example.com/fzf.zip")
+
+        assert result.read_bytes() == b"the binary"
+
+    def test_a_zip_without_the_binary_is_an_error(self, tmp_path):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("README.md", "read me")
+
+        with pytest.raises(RuntimeError, match="not found"):
+            self._download(tmp_path, buf.getvalue(), "https://example.com/fzf.zip")
+
+    def test_a_tar_with_other_members_before_the_binary(self, tmp_path):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+            for name, body in (("README.md", b"read me"), ("fzf", b"the binary")):
+                member = tarfile.TarInfo(name)
+                member.size = len(body)
+                tf.addfile(member, io.BytesIO(body))
+
+        result = self._download(
+            tmp_path, buf.getvalue(), "https://example.com/fzf-linux_amd64.tar.gz"
+        )
+
+        assert result.read_bytes() == b"the binary"
