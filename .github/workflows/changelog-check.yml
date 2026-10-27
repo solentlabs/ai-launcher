@@ -9,6 +9,9 @@ on:
       - ".github/**"
       - "tests/**"
 
+permissions:
+  contents: read
+
 jobs:
   check-changelog:
     name: Verify CHANGELOG.md Updated
@@ -19,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -27,15 +30,20 @@ jobs:
       # tests/test_gate_checks.py exercise the same code this gate runs. It used
       # to be inline bash, which nothing could test -- and it deadlocked the
       # v0.4.2 release by failing the release PR's version bump.
+      # Branch names are attacker-chosen: they reach the shell through env, never
+      # by interpolation into the script (docs/releasing.md, "Workflow Safety").
       - name: Verify changelog update
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          git fetch origin ${{ github.base_ref }}
-          git diff --name-only origin/${{ github.base_ref }}...HEAD \
-            | python3 scripts/gate_checks.py changelog --head-ref "${{ github.head_ref }}"
+          git fetch origin "$BASE_REF"
+          git diff --name-only "origin/$BASE_REF...HEAD" \
+            | python3 scripts/gate_checks.py changelog --head-ref "$HEAD_REF"
 
       - name: Comment on PR if changelog missing
         if: failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             github.rest.issues.createComment({
@@ -64,9 +72,4 @@ jobs:
 
       - name: Success
         if: success()
-        run: |
-          if [ "${{ steps.code_check.outputs.code_changed }}" == "true" ]; then
-            echo "✅ CHANGELOG.md updated alongside code changes"
-          else
-            echo "✅ No code changes — changelog update not required"
-          fi
+        run: echo "✅ Changelog check passed"

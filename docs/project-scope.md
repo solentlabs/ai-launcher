@@ -69,11 +69,42 @@ File edits name their target, so those are exact. Shell commands are judged from
 | git changing it: `cd ../angel-captain && git commit`, `git -C … add`      | `git status`, `log`, `diff`, `show`, `blame`         |
 | running any other command inside it: `cd ../angel-captain && make`        |                                                      |
 
+### Commands that carry a path or a command inside them
+
+The text of these is read more closely, because the path is not an ordinary argument:
+
+- **Wrapped commands.** `bash -c '…'`, `sh -c`, `zsh -c`, `eval '…'` (and `-lc`, `-ec` and the like)
+  are read as if the inner command had been typed: `bash -c 'touch ../angel-captain/x'` asks.
+- **Inline code.** `python -c`, `node -e`, `perl -e`, `ruby -e` and `php -r` cannot be read as
+  shell. If the code names a path inside another project, the call asks, even when the code would
+  only read it, since the text cannot say.
+- **Paths attached to an option.** `dd of=…`, `curl -o/path`, `tar --file=…`, `--output=…`.
+- **Flags joined together.** `sed -Ei`, `sed -ni` and `sed -i.bak` all edit in place. `fd -x` and
+  `fd -X` run a command per match. `find -fprint0` writes a file.
+- **Git pointed elsewhere.** `git --git-dir=…`, `git --work-tree …` (with `=` or a space).
+- **`cd -`** goes back to the folder you were in, not to `~`.
+
 Disk use is a separate matter: [Cache and Scratch](cache-and-scratch.md) reports what sessions leave
 behind, which this guard does not look at.
 
-This is a check for accidents, not a sandbox. A script, a variable the session sets, or a program
-that writes on its own can change another project without the command text saying so.
+This is a check for accidents, not a sandbox. A script, a variable the session sets, a program that
+writes on its own, or a command whose paths arrive on a pipe (`find … | xargs rm`) can change
+another project without the command text saying so. `xargs` is not read, for that reason.
+
+### When the guard itself fails
+
+- **A bug while judging a call asks.** The prompt says the guard could not check the call and names
+  the error, so a failure never lets a write through silently.
+- **Unreadable hook input** (not JSON) is a hook error that Claude Code shows and then carries on.
+  It is not a real tool call, so there is nothing to judge.
+- **The hook runs by file path**, not as `python -m ai_launcher…`, so a project that contains its
+  own `ai_launcher` folder cannot take the guard's place. Claude Code runs hooks from the project
+  folder, and `-m` makes Python look there first. (`python -I` would also close that, but it drops
+  the user site-packages, which breaks `pip install --user`.) The guard imports only the standard
+  library.
+- **If the program is gone** (a virtual environment that was moved or deleted, or a package upgrade
+  under a running session), the hook cannot start, Claude Code shows a hook error and carries on,
+  and nothing asks. Start AI Launcher again.
 
 ## Other Tools
 

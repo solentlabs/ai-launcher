@@ -5,7 +5,9 @@ registry, so a wrong registry entry cannot weaken them:
 
 - report-only locations, ``~/.claude`` and every project are never deleted;
 - a path must sit under the home folder (or the temp folder), never be the
-  home folder or one of its user-data folders, and never be a symlink;
+  home folder, a direct child of the home folder, or inside a credentials or documents
+  folder, never be or sit under a symlink, and never be (or be inside) a git
+  repository;
 - the protected set and the in-use check are rerun at delete time;
 - commands run as an argv list with no shell, under a timeout.
 
@@ -17,6 +19,7 @@ import os
 import shutil
 import stat as stat_module
 import subprocess  # nosec B404
+import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -39,14 +42,11 @@ logger = get_logger(__name__)
 
 COMMAND_TIMEOUT_SECONDS = 300
 
-# Folders directly under the home folder that are never deletable, even if a
-# registry entry names them: they hold user data, credentials or the cache
-# folder itself.
-NEVER_DELETE_TOP = frozenset(
+# Folders under the home folder that are never deletable at any depth, even if
+# a registry entry names something inside them: credentials and user documents.
+# (A direct child of the home folder is refused for any name.)
+NEVER_DELETE_UNDER = frozenset(
     {
-        ".cache",
-        ".config",
-        ".local",
         ".ssh",
         ".gnupg",
         ".aws",
@@ -55,8 +55,6 @@ NEVER_DELETE_TOP = frozenset(
         "Desktop",
         "Downloads",
         "Pictures",
-        "Library",
-        "AppData",
     }
 )
 
@@ -122,24 +120,47 @@ def protection_reason(path: Path, ctx: CleanContext) -> Optional[str]:
     return None
 
 
+def _git_reason(path: Path, base: Path) -> Optional[str]:
+    """A repository root, or anything inside one below `base`, is never deleted.
+
+    The search stops at `base` (the home or temp folder): a dotfiles repository
+    in the home folder must not make every cache under it undeletable.
+    """
+    current = path
+    while current != base and current != current.parent:
+        if (current / ".git").exists():
+            return "a git repository"
+        current = current.parent
+    return None
+
+
 def guard_reason(path: Path, ctx: CleanContext) -> Optional[str]:
     """Why a path fails the deletion guards, or None if it passes."""
-    if path.is_symlink():
-        return "a symlink"
     here = _norm(path)
     home = _norm(ctx.home)
     temp = _norm(ctx.temp_dir)
     if here in (home, temp) or Path(here).parent == Path(here):
         return "the home or temp folder itself"
     if _inside(here, home):
-        parts = Path(here[len(home) :].lstrip("\\/")).parts
-        names = {n.lower() for n in NEVER_DELETE_TOP}
-        if len(parts) == 1 and parts[0].lower() in names:
-            return "a folder that holds user data"
-        return None
-    if _inside(here, temp):
-        return None
-    return "outside the home folder"
+        base, is_home = Path(home), True
+    elif _inside(here, temp):
+        base, is_home = Path(temp), False
+    else:
+        return "outside the home folder"
+
+    parts = Path(here[len(str(base)) :].lstrip("\\/")).parts
+    # Every folder from the base down to the path, the path itself included:
+    # a link anywhere in between would send the delete somewhere else.
+    current = base
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            return "a symlink" if current == Path(here) else "under a symlink"
+    if is_home and len(parts) == 1:
+        return "a folder directly in the home folder"
+    if is_home and parts[0].lower() in {n.lower() for n in NEVER_DELETE_UNDER}:
+        return "a folder that holds credentials or documents"
+    return _git_reason(Path(here), base)
 
 
 def action_for(entry: CacheEntry) -> Optional[PlanItem]:
@@ -221,8 +242,18 @@ def make_plan(
 def _make_writable_and_retry(
     func: Callable[[str], object], target: str, _exc: object
 ) -> None:
-    """rmtree error hook: clear a read-only bit (Windows) and try once more."""
-    Path(target).chmod(stat_module.S_IWRITE | stat_module.S_IREAD)
+    """rmtree error hook: clear a read-only bit (Windows) and try once more.
+
+    Changes the entry itself, never a link's target, and keeps a directory
+    enterable: a bare 0600 would leave it unusable.
+    """
+    entry = Path(target)
+    if not entry.is_symlink():
+        mode = entry.lstat().st_mode
+        extra = stat_module.S_IWRITE | stat_module.S_IREAD
+        if stat_module.S_ISDIR(mode):
+            extra |= stat_module.S_IEXEC
+        entry.chmod(stat_module.S_IMODE(mode) | extra)
     func(target)
 
 
@@ -231,7 +262,10 @@ def remove_path(path: Path) -> None:
     if path.is_symlink() or path.is_file():
         path.unlink()
         return
-    shutil.rmtree(path, onerror=_make_writable_and_retry)
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_make_writable_and_retry)
+    else:
+        shutil.rmtree(path, onerror=_make_writable_and_retry)
 
 
 def _run(

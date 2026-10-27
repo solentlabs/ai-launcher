@@ -96,6 +96,102 @@ def test_hostile_entries_never_reach_a_plan(cache_home, ctx, where):
     assert len(plan.skipped) == 1
 
 
+@pytest.mark.parametrize(
+    "where",
+    [
+        ".password-store",  # a direct child of home that no blocklist names
+        ".mozilla",
+        "scratch-stuff",
+        ".ssh/keys",  # under a credentials folder, at any depth
+        ".aws/cli/cache",
+        ".gnupg/private-keys-v1.d",
+        "Documents/notes/2026",
+        "Downloads/a/b/c",
+    ],
+)
+def test_direct_children_of_home_and_credential_trees_are_refused(
+    cache_home, ctx, where
+):
+    target = make_dir(cache_home / where)
+
+    plan = clean.make_plan([entry(target)], ctx)
+
+    assert plan.items == []
+    assert plan.skipped[0][1].startswith("refused")
+    assert target.exists()
+
+
+def test_a_path_under_a_symlinked_folder_is_refused(cache_home, ctx, make_symlink):
+    real = make_dir(cache_home / "real-data" / "x")
+    (cache_home / ".cache").mkdir(exist_ok=True)
+    make_symlink(cache_home / ".cache" / "data", real.parent, target_is_directory=True)
+
+    plan = clean.make_plan([entry(cache_home / ".cache" / "data" / "x")], ctx)
+
+    assert plan.items == []
+    assert "symlink" in plan.skipped[0][1]
+    assert (real / "f0.bak").exists()
+
+
+def test_a_git_repository_is_never_deleted_even_with_no_known_projects(cache_home):
+    nothing_known = clean.build_context([])
+    repo = make_dir(cache_home / "work" / "repo")
+    (repo / ".git").mkdir()
+    inside = make_dir(repo / "build" / "out")
+
+    plan = clean.make_plan([entry(repo), entry(inside)], nothing_known)
+
+    assert plan.items == []
+    assert [reason for _, reason in plan.skipped] == ["refused (a git repository)"] * 2
+    assert (repo / ".git").exists()
+
+
+def test_a_cache_that_merely_contains_repositories_can_still_be_cleaned(
+    cache_home, ctx
+):
+    """pre-commit keeps clones under its cache folder: the folder is not a repo."""
+    cache = make_dir(cache_home / ".cache" / "pre-commit")
+    (make_dir(cache / "repo1") / ".git").mkdir()
+
+    plan = clean.make_plan([entry(cache, cls=CLASS_CLEAN)], ctx)
+
+    assert [i.entry.path for i in plan.items] == [cache]
+
+
+def test_making_writable_never_follows_a_link_and_keeps_directories_usable(
+    cache_home, make_symlink
+):
+    outside = make_dir(cache_home / "important")
+    outside.chmod(0o755)
+    link = cache_home / "link"
+    make_symlink(link, outside, target_is_directory=True)
+    seen = []
+
+    clean._make_writable_and_retry(lambda target: seen.append(target), str(link), None)
+
+    assert seen == [str(link)]
+    assert (outside.stat().st_mode & 0o777) == 0o755  # the target was not touched
+
+    locked = make_dir(cache_home / "locked")
+    locked.chmod(0o500)
+    clean._make_writable_and_retry(lambda target: None, str(locked), None)
+
+    assert (locked.stat().st_mode & 0o700) == 0o700  # still enterable and writable
+
+
+def test_removing_a_readonly_tree_raises_no_deprecation_warning(cache_home):
+    import warnings
+
+    tree = make_dir(cache_home / "tree")
+    (tree / "f0.bak").chmod(0o400)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        clean.remove_path(tree)
+
+    assert not tree.exists()
+
+
 def test_root_is_refused(ctx):
     root = Path(Path.cwd().anchor)
 

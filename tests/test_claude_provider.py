@@ -10,7 +10,7 @@ import os
 import subprocess
 import sys
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -70,7 +70,7 @@ class TestClaudeCleanup:
         assert backup.exists()
 
     def test_cleanup_backup_files(self, provider, mock_home, cleanup_config):
-        """Test cleanup removes .claude.json.backup.* files."""
+        """Cleanup removes old .claude.json.backup.* files but keeps the newest."""
         # Create backup files
         backup1 = mock_home / ".claude.json.backup.123"
         backup2 = mock_home / ".claude.json.backup.456"
@@ -79,12 +79,14 @@ class TestClaudeCleanup:
         backup1.write_text("backup1")
         backup2.write_text("backup2")
         other_file.write_text("other")
+        os.utime(backup1, (100, 100))
+        os.utime(backup2, (200, 200))
 
         provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
-        # Backup files should be removed
+        # The older backup is removed, the newest is kept as a recovery copy
         assert not backup1.exists()
-        assert not backup2.exists()
+        assert backup2.exists()
         # Other files should remain
         assert other_file.exists()
 
@@ -112,39 +114,46 @@ class TestClaudeCleanup:
         # Recent log should remain
         assert recent_log.exists()
 
-    def test_cleanup_old_versions(self, provider, mock_home, cleanup_config):
-        """Test cleanup removes old CLI versions."""
+    def test_cleanup_old_versions(
+        self, provider, mock_home, cleanup_config, make_symlink
+    ):
+        """Old native versions go; the one `claude` resolves to stays."""
         versions_dir = mock_home / ".local" / "share" / "claude" / "versions"
         versions_dir.mkdir(parents=True)
-
-        # Create version files
         current = versions_dir / "2.1.37"
         old1 = versions_dir / "2.1.36"
         old2 = versions_dir / "2.1.35"
         other = versions_dir / "other.txt"
+        for f in (current, old1, old2, other):
+            f.write_text(f.name)
+        link = mock_home / ".local" / "bin" / "claude"
+        link.parent.mkdir(parents=True)
+        make_symlink(link, current)
 
-        current.write_text("current")
-        old1.write_text("old1")
-        old2.write_text("old2")
-        other.write_text("other")
+        with patch("shutil.which", return_value=str(link)):
+            provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
 
-        # Mock claude --version to return current version
-        with patch("shutil.which", return_value="/usr/bin/claude"):
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = MagicMock(
-                    returncode=0, stdout="2.1.37 (Claude Code)"
-                )
-
-                provider.cleanup_environment(
-                    verbose=False, cleanup_config=cleanup_config
-                )
-
-        # Old versions should be removed
         assert not old1.exists()
         assert not old2.exists()
-        # Current version and non-version files should remain
         assert current.exists()
         assert other.exists()
+
+    def test_cleanup_leaves_native_versions_alone_when_claude_is_elsewhere(
+        self, provider, mock_home, cleanup_config
+    ):
+        """An npm `claude` first on PATH must not cost the user the native binary."""
+        versions_dir = mock_home / ".local" / "share" / "claude" / "versions"
+        versions_dir.mkdir(parents=True)
+        native = versions_dir / "2.1.37"
+        native.write_text("native")
+        npm = mock_home / "npm" / "bin" / "claude"
+        npm.parent.mkdir(parents=True)
+        npm.write_text("#!/bin/sh")
+
+        with patch("shutil.which", return_value=str(npm)):
+            provider.cleanup_environment(verbose=False, cleanup_config=cleanup_config)
+
+        assert native.exists()
 
     def test_cleanup_verbose_output(self, provider, mock_home, cleanup_config, capsys):
         """Test cleanup prints messages when verbose=True."""
@@ -232,7 +241,8 @@ class TestClaudeLaunchScope:
         }
         (hook,) = entry["hooks"]
         assert hook["type"] == "command"
-        assert "ai_launcher.core.scope_guard" in hook["command"]
+        assert "scope_guard.py" in hook["command"]
+        assert "-m ai_launcher" not in hook["command"]
 
     @pytest.mark.parametrize(
         ("os_name", "expected"),

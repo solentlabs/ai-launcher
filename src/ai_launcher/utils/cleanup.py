@@ -68,10 +68,11 @@ Created: 2026-02-09
 Last Modified: 2026-02-10 (Added cleanup config support)
 """
 
+import re
 import shutil
 import subprocess  # nosec B404
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from ai_launcher.utils.logging import get_logger
 
@@ -79,6 +80,69 @@ if TYPE_CHECKING:
     from ai_launcher.core.models import CleanupConfig
 
 logger = get_logger(__name__)
+
+_VERSION_FILE = re.compile(r"^\d+\.\d+\.\d+$")
+
+
+def prune_claude_backups(home: Path) -> int:
+    """Remove old ``~/.claude.json.backup.*`` files, keeping the newest.
+
+    Claude Code writes one at every start and never removes them. The newest can
+    be the only recovery copy of a damaged ``~/.claude.json``, so it stays. A
+    file that cannot be removed is skipped. Returns how many were removed.
+    """
+    try:
+        backups = [f for f in home.glob(".claude.json.backup.*") if f.is_file()]
+        backups.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+    except OSError as error:
+        logger.debug(f"Could not list backup files: {error}")
+        return 0
+    removed = 0
+    for backup in backups[1:]:
+        try:
+            backup.unlink(missing_ok=True)
+            removed += 1
+        except OSError as error:
+            logger.debug(f"Could not remove {backup}: {error}")
+    return removed
+
+
+def prune_claude_versions(
+    home: Path, which: Optional[Callable[[str], Optional[str]]] = None
+) -> int:
+    """Remove native Claude Code versions other than the one `claude` runs.
+
+    Only when the ``claude`` on PATH resolves into the native versions folder:
+    the file it resolves to is the version in use, and is kept. If ``claude``
+    comes from elsewhere (an npm install, say) nothing is removed, because the
+    native version in use cannot be told. Reading ``claude --version`` for it
+    once deleted the binary that ``~/.local/bin/claude`` points to. A file that
+    cannot be removed is skipped. Returns how many were removed.
+    """
+    versions = home / ".local" / "share" / "claude" / "versions"
+    try:
+        found = (which or shutil.which)("claude")
+        if not found or not versions.is_dir():
+            return 0
+        in_use = Path(found).resolve()
+        if in_use.parent != versions.resolve():
+            return 0
+        candidates = [
+            f
+            for f in versions.iterdir()
+            if f.is_file() and f.name != in_use.name and _VERSION_FILE.match(f.name)
+        ]
+    except OSError as error:
+        logger.debug(f"Could not look at Claude versions: {error}")
+        return 0
+    removed = 0
+    for version in candidates:
+        try:
+            version.unlink(missing_ok=True)
+            removed += 1
+        except OSError as error:
+            logger.debug(f"Could not remove {version}: {error}")
+    return removed
 
 
 def cleanup_environment(
@@ -144,14 +208,8 @@ def cleanup_environment(
         # Files are created in ~/ instead of ~/.claude/ directory.
         # TODO: Remove this cleanup when GitHub issue #21429 is resolved.
         if verbose:
-            print("  → Removing old .claude.json.backup.* files")
-        try:
-            for backup_file in home.glob(".claude.json.backup.*"):
-                if backup_file.is_file():
-                    backup_file.unlink(missing_ok=True)
-            logger.debug("Removed old .claude.json.backup.* files")
-        except (OSError, PermissionError) as e:
-            logger.debug(f"Could not remove backup files: {e}")
+            print("  → Removing old .claude.json.backup.* files (keeping the newest)")
+        prune_claude_backups(home)
 
         # Remove old Claude debug logs (provider-specific maintenance)
         # Debug logs in ~/.claude/debug/ accumulate indefinitely and can reach 500MB+.
@@ -188,46 +246,9 @@ def cleanup_environment(
         # Best practice: Regular cleanup of accumulated files
         # References: https://ctok.ai/en/claude-code-cleanup
         #            https://claudelog.com/faqs/revert-claude-code-version/
-        if shutil.which("claude"):
-            if verbose:
-                print("  → Removing old Claude CLI versions (keeping current only)")
-            versions_dir = home / ".local" / "share" / "claude" / "versions"
-            if versions_dir.exists() and versions_dir.is_dir():
-                try:
-                    # Get current version
-                    result = subprocess.run(
-                        ["claude", "--version"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                        timeout=5,
-                    )  # nosec B603, B607
-
-                    if result.returncode == 0:
-                        # Extract version number (e.g., "2.1.37" from "2.1.37 (Claude Code)")
-                        import re
-
-                        match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
-                        if match:
-                            current_version = match.group(1)
-
-                            # Remove all version files except current
-                            removed_versions = []
-                            for version_file in versions_dir.iterdir():
-                                if (
-                                    version_file.is_file()
-                                    and version_file.name != current_version
-                                    and re.match(r"^\d+\.\d+\.\d+$", version_file.name)
-                                ):
-                                    version_file.unlink(missing_ok=True)
-                                    removed_versions.append(version_file.name)
-
-                            if removed_versions:
-                                logger.debug(
-                                    f"Removed old Claude version(s): {', '.join(removed_versions)}"
-                                )
-                except (subprocess.SubprocessError, OSError) as e:
-                    logger.debug(f"Could not clean old Claude versions: {e}")
+        if verbose:
+            print("  → Removing old Claude CLI versions (keeping the one in use)")
+        prune_claude_versions(home)
 
     if verbose:
         print("  ✓ Cleanup complete")

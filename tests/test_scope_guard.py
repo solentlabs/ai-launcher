@@ -282,6 +282,109 @@ class TestBashCommands:
         assert targets
 
 
+class TestWrappedAndAttachedPaths:
+    """Commands that carry a command, code or a path inside an option."""
+
+    @pytest.mark.parametrize(
+        ("command", "asks"),
+        [
+            # sed: flags joined together still edit in place
+            ("sed -Ei s/a/b/ {other}/setup.cfg", True),
+            ("sed -ni s/a/b/ {other}/setup.cfg", True),
+            ("sed -i.bak s/a/b/ {other}/setup.cfg", True),
+            ("sed --in-place=.bak s/a/b/ {other}/setup.cfg", True),
+            ("sed -n 1,5p {other}/setup.cfg", False),
+            ("sed -e s/i/x/ {other}/setup.cfg", False),
+            # a command inside a shell
+            ("bash -c 'touch {other}/x'", True),
+            ('sh -c "echo hi > {other}/x"', True),
+            ("bash -lc 'touch {other}/x'", True),
+            ("sudo bash -c 'touch {other}/x'", True),
+            ("eval 'touch {other}/x'", True),
+            ("bash -c 'cat {other}/x'", False),
+            ("bash -c 'touch local.txt'", False),
+            ("bash script.sh", False),
+            # inline code in an interpreter
+            ('python3 -c \'open("{other}/x", "w")\'', True),
+            ('node -e \'fs.writeFileSync("{other}/x", "")\'', True),
+            ("perl -e 'open F, \">{other}/x\"'", True),
+            ("python3 -c 'print(1)'", False),
+            ('python3 -c \'open("{outside}/x", "w")\'', False),
+            # fd runs a command per match
+            ("fd -X rm . {other}", True),
+            ("fd --exec rm . {other}", True),
+            ("fd -e py . {other}", False),
+            # a path attached to an option
+            ("dd if=/dev/zero of={other}/x count=1", True),
+            ("dd if={other}/x of={outside}/y", False),
+            ("curl -o{other}/x http://example.invalid", True),
+            ("curl -o {other}/x http://example.invalid", True),
+            ("curl http://example.invalid", False),
+            ("tar --file={other}/a.tar -c .", True),
+            ("tar --create --file {other}/a.tar .", True),
+            ("tar -cf local.tar .", False),
+            # git pointed at another repository
+            ("git --git-dir={other}/.git commit -m wip", True),
+            ("git --git-dir {other}/.git commit -m wip", True),
+            ("git --work-tree {other} add .", True),
+            ("git --git-dir={other}/.git log", False),
+            # find writes a file with -fprint0 too
+            ("find . -fprint0 {other}/x", True),
+            ("find . -print0", False),
+            # cd - goes back to where we were
+            ("cd {other} && cd {project} && cd - && touch x.txt", True),
+            ("cd {other} && cd - && touch x.txt", False),
+            # known limit, documented: the paths arrive on a pipe
+            ("find {other} -name '*.pyc' | xargs rm", False),
+        ],
+        ids=[
+            "sed-Ei",
+            "sed-ni",
+            "sed-i-bak",
+            "sed-in-place-long",
+            "sed-print",
+            "sed-script-with-an-i",
+            "bash-c",
+            "sh-c-redirect",
+            "bash-lc",
+            "sudo-bash-c",
+            "eval",
+            "bash-c-read",
+            "bash-c-local",
+            "bash-script",
+            "python-c-write",
+            "node-e-write",
+            "perl-e-write",
+            "python-c-no-path",
+            "python-c-outside-root",
+            "fd-X",
+            "fd-exec-long",
+            "fd-search",
+            "dd-of",
+            "dd-if-only",
+            "curl-attached",
+            "curl-separate",
+            "curl-plain",
+            "tar-file-equals",
+            "tar-file-space",
+            "tar-local",
+            "git-dir-equals",
+            "git-dir-space",
+            "git-work-tree-space",
+            "git-dir-read",
+            "find-fprint0",
+            "find-print0",
+            "cd-dash-returns",
+            "cd-dash-from-sibling",
+            "xargs-is-not-read",
+        ],
+    )
+    def test_bash(self, scope, layout, command, asks):
+        tool_input = {"command": _fill(command, layout)}
+        targets = scope.write_targets("Bash", tool_input, layout["project"])
+        assert bool(targets) is asks
+
+
 class TestDecide:
     """decide() turns a PreToolUse event into Claude Code's hook output."""
 
@@ -431,3 +534,62 @@ class TestHookEntryPoint:
         assert result.returncode == 0, result.stderr
         output = json.loads(result.stdout)
         assert output["hookSpecificOutput"]["permissionDecision"] == "ask"
+
+    @pytest.mark.parametrize(
+        "broken",
+        ["decide", "scope"],
+        ids=["bug-while-judging", "bug-building-the-scope"],
+    )
+    def test_a_bug_while_judging_asks_instead_of_letting_the_call_through(
+        self, layout, argv, monkeypatch, capsys, broken
+    ):
+        from ai_launcher.core import scope_guard
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("symlink loop")
+
+        monkeypatch.setattr(
+            scope_guard, "decide" if broken == "decide" else "ProjectScope", boom
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO(self._event(layout, "project")))
+
+        assert main(argv) == 0
+
+        output = json.loads(capsys.readouterr().out)["hookSpecificOutput"]
+        assert output["permissionDecision"] == "ask"
+        assert "could not check" in output["permissionDecisionReason"]
+        assert "symlink loop" in output["permissionDecisionReason"]
+
+    def test_the_hook_runs_isolated_so_a_project_cannot_replace_it(
+        self, layout, tmp_path
+    ):
+        """Claude Code runs hooks from the project folder, and `python -m` looks there first."""
+        import shlex
+
+        from ai_launcher.providers.claude import scope_guard_settings
+
+        settings = scope_guard_settings(layout["project"], [layout["root"]])
+        hook = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        words = shlex.split(hook, posix=(sys.platform != "win32"))
+        assert words[1].endswith("scope_guard.py")  # by path, not -m
+
+        shadow = tmp_path / "hostile" / "ai_launcher" / "core"
+        shadow.mkdir(parents=True)
+        (shadow.parent / "__init__.py").write_text("")
+        (shadow / "__init__.py").write_text("")
+        (shadow / "scope_guard.py").write_text("print('SHADOWED')\n")
+
+        result = subprocess.run(
+            words,
+            cwd=tmp_path / "hostile",
+            input=self._event(layout, "other"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert "SHADOWED" not in result.stdout
+        assert (
+            json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
+            == "ask"
+        )

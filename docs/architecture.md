@@ -666,7 +666,7 @@ provider.launch(project_path, scope_roots, scope_exempt)
 claude --append-system-prompt "<launched in PROJECT; flag other-project requests>"
        --settings '{"hooks": {"PreToolUse": [scope_guard]}}'
    ↓ (on every Write / Edit / MultiEdit / NotebookEdit / Bash)
-python -m ai_launcher.core.scope_guard --project P --root R... [--exempt E...]
+python <path>/core/scope_guard.py --project P --root R... [--exempt E...]
    → nothing, or {"permissionDecision": "ask", "systemMessage": reason}
 ```
 
@@ -693,9 +693,13 @@ python -m ai_launcher.core.scope_guard --project P --root R... [--exempt E...]
 - **Not Claude Code's sandbox.** It confines shell writes at the OS level, but it also restricts
   network access (breaking `gh`, `pip`, `git push` until configured) and needs bubblewrap on Linux.
   That is too much for a launcher to impose.
-- **Fails open, visibly.** A guard error exits 1, which Claude Code shows as a non-blocking hook
-  error. A bug in the guard must not stop work. The module is stdlib-only and takes about 0.1s per
-  call.
+- **A bug in the guard asks.** An error while judging a call becomes an `ask` that names the error,
+  so a bug never lets a write through unasked and never blocks work either. Unreadable hook input
+  (not a tool call) is the one case that exits 1, a non-blocking hook error Claude Code shows. The
+  module is stdlib-only and takes about 0.1s per call.
+- **Run by path, not `-m`.** Claude Code runs hooks from the project folder, and `python -m` puts
+  that folder first on `sys.path`, so a project with its own `ai_launcher` folder would replace the
+  guard. `-I` would close that but drops the user site-packages, which breaks `pip install --user`.
 - **Other providers get nothing extra.** Copilot already asks for paths outside its folder, Gemini's
   file tools refuse them, and Aider asks before editing any file not in the chat. Cursor's CLI
   behaviour is undocumented. Their `launch()` accepts `scope_roots` and ignores it; the table in

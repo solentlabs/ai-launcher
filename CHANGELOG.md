@@ -17,6 +17,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   keypress away even without the automatic check. A 🆕 on the row marks a newer release. After an
   update the picker exits, so it never runs half old and half new code.
 
+### Fixed
+
+- **Scope guard hook could be replaced by a project** — it ran as `python -m ai_launcher…` from the
+  project folder, so a repository with its own `ai_launcher` folder took its place. It now runs by
+  file path.
+- **Scope guard missed common writers** — `sed -Ei`/`-ni`, `bash -c`, `sh -c`, `eval`, inline
+  `python -c`/`node -e`, `fd -x`, `dd of=`, `curl -o`, `tar --file=`, `git --git-dir`/`--work-tree`
+  with a space, `find -fprint0`. `cd -` now returns to the previous folder.
+- **Scope guard failed open on its own bug** — an error while judging a call now asks instead of
+  letting the call through.
+- **Cache deletion guards had gaps** — a path under a symlinked folder was not refused, a user entry
+  such as `~/*` or `~/.*` could delete any direct child of home outside a short blocklist, and a
+  bare `ai-launcher cache` knew of no projects. Now a symlink anywhere in the path refuses it, no
+  direct child of home and nothing under `.ssh`, `.gnupg`, `.aws`, `.kube`, `Documents`, `Desktop`,
+  `Downloads` or `Pictures` is deletable, and a git repository never is. The confirm step says when
+  no scan folder was given. Making a read-only entry writable no longer follows a link's target.
+- **`--cleanup` could delete the native Claude Code binary** — it kept the version printed by
+  whichever `claude` came first on `PATH`, so with an npm install there it removed every native
+  binary. It now prunes only when `claude` resolves into the native versions folder, keeps that
+  file, and skips a file it cannot remove. It also keeps the newest `~/.claude.json.backup.*`. The
+  two copies of this code (`utils/cleanup.py` and the Claude provider) now share one.
+
+- **Release workflows hardened** — PyPI publishing by hand is limited to `v*` tags (Test PyPI can
+  still start anywhere), the changelog check no longer interpolates branch names into a shell
+  script, the tag gate no longer reads an all-skipped test matrix as a pass and requires `Lint`, the
+  tag-on-main check is an ancestor test, actions are pinned to commit SHAs with Dependabot to update
+  them, and every workflow declares `permissions:`.
+
 ### Notes
 
 - **Bash prototype diverges** — `bin/ai-launcher` has no update command, so it has no check or About

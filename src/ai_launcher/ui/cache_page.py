@@ -333,9 +333,18 @@ def confirm_plan(
     input_fn: Callable[[str], str] = input,
     is_tty: Optional[bool] = None,
     out: Callable[[str], None] = print,
+    no_projects: bool = False,
 ) -> bool:
     """Show the plan and ask. The default is no; with nobody there, it is no."""
     out(render_plan(plan))
+    if no_projects and plan.items:
+        out(
+            fmt.paint(
+                "\nNo project folder was given, so only git repositories are protected. "
+                "Pass your projects folder: ai-launcher cache ~/projects",
+                fmt.YELLOW,
+            )
+        )
     if not plan.items:
         out("\nNothing to remove.")
         return False
@@ -536,7 +545,7 @@ def run_cache_page(
             continue
 
         plan = make_plan(chosen, ctx, now)
-        if confirm_plan(plan, input_fn, is_tty):
+        if confirm_plan(plan, input_fn, is_tty, no_projects=not ctx.project_paths):
             print()
             results = execute_plan(
                 plan, ctx, progress=lambda item: print(f"Cleaning {item.entry.name}…")

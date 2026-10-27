@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
+from ai_launcher.core import scope_guard
 from ai_launcher.core.provider_data import (
     ContextFile,
     GlobalContextSummary,
@@ -35,6 +36,7 @@ from ai_launcher.core.scope_guard import GUARDED_TOOLS
 from ai_launcher.core.scratch import ENV_VAR as SCRATCH_ENV_VAR
 from ai_launcher.core.scratch import SCRATCH_STATEMENT
 from ai_launcher.providers.base import AIProvider, ProviderMetadata
+from ai_launcher.utils.cleanup import prune_claude_backups, prune_claude_versions
 from ai_launcher.utils.session import encode_project_path
 
 if TYPE_CHECKING:
@@ -68,7 +70,10 @@ def scope_guard_settings(
     replacing them, and its "ask" overrides allow rules such as Bash(*).
     Writes under scope_exempt never ask.
     """
-    words = [sys.executable, "-m", "ai_launcher.core.scope_guard"]
+    # By file path, not `-m`: Claude Code runs hooks from the project folder, and
+    # `-m` would import a project's own ai_launcher folder in place of the guard.
+    # The guard imports only the standard library, so it needs nothing else.
+    words = [sys.executable, str(Path(scope_guard.__file__).resolve())]
     words += ["--project", str(project_path)]
     for root in scope_roots:
         words += ["--root", str(root)]
@@ -91,12 +96,12 @@ class ClaudeProvider(AIProvider):
     """Claude Code provider implementation.
 
     Provides integration with Anthropic's Claude Code CLI tool.
-    Delegates cleanup to the existing utils/cleanup.py module which handles:
-    - Clearing ~/.cache directory
+    Shares its Claude file pruning with utils/cleanup.py (one copy, so the two
+    cannot drift). The cleanup:
     - Cleaning npm cache
-    - Removing .claude.json.backup.* files
+    - Removing old .claude.json.backup.* files, keeping the newest
     - Cleaning old debug logs
-    - Removing old CLI versions
+    - Removing old CLI versions, only when the native one is in use
     """
 
     @property
@@ -206,13 +211,8 @@ class ClaudeProvider(AIProvider):
         # Files are created in ~/ instead of ~/.claude/ directory.
         # TODO: Remove this cleanup when GitHub issue #21429 is resolved.
         if verbose:
-            print("    → Removing old .claude.json.backup.* files")
-        try:
-            for backup_file in home.glob(".claude.json.backup.*"):
-                if backup_file.is_file():
-                    backup_file.unlink(missing_ok=True)
-        except (OSError, PermissionError):
-            pass  # Non-fatal, continue with other cleanup
+            print("    → Removing old .claude.json.backup.* files (keeping the newest)")
+        prune_claude_backups(home)
 
         # 2. Remove old Claude debug logs
         # Debug logs in ~/.claude/debug/ accumulate indefinitely and can reach 500MB+.
@@ -246,45 +246,11 @@ class ClaudeProvider(AIProvider):
         # 3. Remove old Claude CLI versions
         # Claude auto-updates leave old versions in ~/.local/share/claude/versions/
         # Each version is ~212MB. Keep only the currently running version.
-        if shutil.which("claude"):
-            if verbose:
-                print("    → Removing old CLI versions (keeping current)")
-
-            versions_dir = home / ".local" / "share" / "claude" / "versions"
-            if versions_dir.exists() and versions_dir.is_dir():
-                try:
-                    import re
-
-                    # Get current version
-                    result = subprocess.run(
-                        ["claude", "--version"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                        timeout=5,
-                    )  # nosec B603, B607
-
-                    if result.returncode == 0:
-                        # Extract version number (e.g., "2.1.37" from output)
-                        match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
-                        if match:
-                            current_version = match.group(1)
-
-                            # Remove all version files except current
-                            removed_count = 0
-                            for version_file in versions_dir.iterdir():
-                                if (
-                                    version_file.is_file()
-                                    and version_file.name != current_version
-                                    and re.match(r"^\d+\.\d+\.\d+$", version_file.name)
-                                ):
-                                    version_file.unlink(missing_ok=True)
-                                    removed_count += 1
-
-                            if removed_count > 0 and verbose:
-                                print(f"    → Removed {removed_count} old version(s)")
-                except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-                    pass  # Non-fatal, continue
+        if verbose:
+            print("    → Removing old CLI versions (keeping the one in use)")
+        removed_versions = prune_claude_versions(home)
+        if removed_versions and verbose:
+            print(f"    → Removed {removed_versions} old version(s)")
 
         if verbose:
             print("    ✓ Claude cleanup complete")
